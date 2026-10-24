@@ -610,7 +610,12 @@ func _physics_process(delta: float) -> void:
 
 	velocity.x = want.x
 	velocity.z = want.z
-	velocity.y = -1.0 if is_on_floor() else velocity.y - 22.0 * delta
+	# Grounded stick only when not moving up — a fresh jump()
+	# sets velocity.y > 0 between frames and must survive this.
+	if is_on_floor() and velocity.y <= 0.0:
+		velocity.y = -1.0
+	else:
+		velocity.y -= 22.0 * delta
 	move_and_slide()
 	if is_on_floor():
 		_pounced = false

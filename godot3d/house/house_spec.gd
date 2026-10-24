@@ -204,3 +204,98 @@ static func shell_cfg(id: String) -> Dictionary:
 				"roof": true,
 			}
 	return {}
+
+
+# ============================================================================
+# THE MODULE FRAME — 255 Massey as a drop-in module (Daniel, 2026-10-24:
+# "develop this as a separate, drop in module for GTA Fredericton").
+#
+# The CANONICAL frame is GTA's real house (scripts/world/god_mode.gd +
+# landmark_interiors.gd FITTED + interior_cells.gd SPECS, via the
+# mergeability eval of 2026-10-24): OSM footprint 11.79 m (x) by
+# 15.64 m (z) centred (-99.75, 2307.51), Massey St along the NORTH
+# face, door on the WEST wall under the carport, fitted interior
+# cell 10.8 x 14.6 m with wall_h 3.1, cells instanced at CELL_Y 300
+# with LINKED floors at +40 per storey (MacTavish precedent; a
+# below-grade LINKED cell is expressible but UNVERIFIED in GTA).
+#
+# PvK's local shell (17.0 x 9.6, door on the yard/south face) is the
+# module's FIRST HOST realization, not the canon. Layout therefore
+# travels as ANCHORS: (u, v) fractions of footprint — u west->east,
+# v north->south — plus a floor id. Anchor fractions are identical
+# in every host; each host realizes walls/doors in its own frame
+# (GTA: entry function on the west/carport face; PvK: south/yard).
+# ============================================================================
+
+const GTA_FOOTPRINT := Vector2(11.79, 15.64) # (x, z) metres, OSM
+const GTA_CENTER := Vector2(-99.75, 2307.51) # world (x, z)
+const GTA_INTERIOR := Vector2(10.8, 14.6) # fitted cell (x, z)
+const GTA_WALL_H := 3.1
+const GTA_CELL_Y := 300.0
+const GTA_LINKED_DY := 40.0
+const GTA_DOOR_WALL := "west" # under the carport
+const GTA_STREET_SIDE := "north" # Massey St itself
+
+## Where each PvK floor lands in GTA's cell stack. Attic rides the
+## proven above-cell LINKED pattern; basement is the same pattern
+## below grade — data-expressible, not yet verified in GTA.
+const GTA_FLOOR_Y := {BASEMENT: 260.0, GROUND_FLOOR: 300.0, ATTIC: 340.0}
+
+## Canonical anchors: name -> {u, v, floor}. Derived from the PvK
+## local constants above via anchor_uv() (the tests round-trip
+## them); a host rendering the module reads THESE, never PvK metres.
+const ANCHORS := {
+	"front_door": {"u": 0.647, "v": 1.0, "floor": GROUND_FLOOR}, # on the entry wall
+	"stairwell": {"u": 0.118, "v": 0.188, "floor": GROUND_FLOOR}, # centre
+	"hatch": {"u": 0.882, "v": 0.188, "floor": GROUND_FLOOR}, # centre
+	"kitchen": {"u": 0.197, "v": 0.5, "floor": GROUND_FLOOR}, # room centre
+	"living": {"u": 0.697, "v": 0.5, "floor": GROUND_FLOOR}, # room centre
+	"drawer": {"u": 0.194, "v": 0.068, "floor": GROUND_FLOOR}, # Aggie's drawer
+	"water_bowl": {"u": 0.362, "v": 0.781, "floor": GROUND_FLOOR},
+	"sofa": {"u": 0.782, "v": 0.099, "floor": GROUND_FLOOR}, # the lap seat
+	"scratch_post": {"u": 0.965, "v": 0.594, "floor": GROUND_FLOOR},
+	"basement_entry": {"u": 0.118, "v": 0.188, "floor": BASEMENT},
+	"attic_entry": {"u": 0.882, "v": 0.188, "floor": ATTIC},
+	"attic_perch": {"u": 0.929, "v": 0.438, "floor": ATTIC},
+}
+
+
+## PvK-local (x, z) -> canonical anchor fractions.
+static func anchor_uv(local_xz: Vector2) -> Vector2:
+	return Vector2(
+		(local_xz.x + FOOTPRINT_W / 2.0) / FOOTPRINT_W,
+		(local_xz.y + FOOTPRINT_D / 2.0) / FOOTPRINT_D)
+
+
+## Canonical fractions -> PvK-local (x, z) on the given floor.
+static func uv_to_pvk(uv: Vector2) -> Vector2:
+	return Vector2(
+		uv.x * FOOTPRINT_W - FOOTPRINT_W / 2.0,
+		uv.y * FOOTPRINT_D - FOOTPRINT_D / 2.0)
+
+
+## Canonical fractions -> GTA fitted-cell local (x, z). The plan is
+## TRANSPOSED between hosts (PvK's long axis is x, GTA's is z), but
+## u always runs west->east and v north->south, so the mapping is
+## axis-aligned in (u, v) space: GTA x takes u across its short
+## span, GTA z takes v along its long span.
+static func uv_to_gta(uv: Vector2) -> Vector2:
+	return Vector2(
+		uv.x * GTA_INTERIOR.x - GTA_INTERIOR.x / 2.0,
+		uv.y * GTA_INTERIOR.y - GTA_INTERIOR.y / 2.0)
+
+
+## A named anchor in whichever host frame a builder needs:
+## "pvk" -> Vector3 local on its floor; "gta" -> Vector3 cell-local
+## at the GTA_FLOOR_Y for its floor.
+static func anchor(name_: String, host: String) -> Vector3:
+	var a: Dictionary = ANCHORS.get(name_, {})
+	if a.is_empty():
+		return Vector3.ZERO
+	var uv := Vector2(float(a["u"]), float(a["v"]))
+	var floor_id := String(a["floor"])
+	if host == "gta":
+		var p := uv_to_gta(uv)
+		return Vector3(p.x, float(GTA_FLOOR_Y[floor_id]), p.y)
+	var p2 := uv_to_pvk(uv)
+	return Vector3(p2.x, floor_y(floor_id), p2.y)

@@ -271,3 +271,137 @@ The cats are **Willie** and **Aggie**; the game is **"Willie and
 Aggie"**. New text, data and UI use those names. (Pre-existing files
 keep their current names until the coordinator's single rename pass
 at integration — do not do piecemeal renames in a zone branch.)
+
+
+---
+
+## 9. THE MODULE CONTRACT — 255 Massey as a drop-in module
+
+Daniel's direction (2026-10-24): *"I want to be able to develop
+this as a separate, drop in module for GTA Fredericton — keep the
+framework and we'll iterate here on the fine inner and outer
+details of 255 Massey St."*
+
+So this game is the module's **first host and test bed**. The
+module is the Massey detail itself — floors, rooms, props,
+occupants, cats, encounters — authored ONCE as data + builders
+against a host interface, renderable in PvK today and in GTA
+Fredericton's interiors system when the re-fit happens at
+integration. This section is the contract that makes that true;
+§1–§8 above remain the PvK-host realization rules.
+
+### 9.1 The canonical frame is GTA's real house
+
+The canon is not PvK's stage set. From GTA's `god_mode.gd`,
+`landmark_interiors.gd` (FITTED) and `interior_cells.gd` (SPECS),
+via the 2026-10-24 mergeability eval:
+
+| Fact | Canonical (GTA) | PvK host realization |
+|---|---|---|
+| Footprint | **11.79 m (x) × 15.64 m (z)**, OSM, centre (−99.75, 2307.51) | 17.0 × 9.6 m, house-local |
+| Long axis | **z** | x (transposed) |
+| Street face | **north** (Massey St) | — (yard diorama) |
+| Entry door | **west** wall, under the carport | south (yard) face, x 2.5 |
+| Fitted interior | 10.8 × 14.6 m cell, wall_h 3.1 | three honest floor shells |
+| Instancing | cells at **CELL_Y 300**, LINKED floors **+40/storey** | stack at world z −200, real floor heights |
+| Ground rooms | living north, kitchen/dining, bedroom SE | kitchen west ‖ living east |
+| Basement/attic | **do not exist in GTA yet** | stub shells (§2) → zone lanes |
+
+Layout therefore travels as **anchors**, never as host metres:
+`(u, v)` fractions of footprint — u west→east, v north→south —
+plus a floor id. `HouseSpec.ANCHORS` holds them;
+`HouseSpec.anchor(name, "pvk" | "gta")` resolves a named anchor to
+a host-local Vector3. Anchor fractions are the SAME in every host;
+walls and doors are host realizations (the entry function lives on
+GTA's west/carport face and on PvK's south/yard face — same anchor,
+different wall). New layout data from any lane should be recorded
+as anchors (or as fractions of a room rect) wherever practical —
+absolute PvK metres are the one avoidable re-fit cost.
+
+### 9.2 The mapping table (foundation anchors)
+
+PvK local (x, z) ↔ (u, v) ↔ GTA cell-local (x, z), computed by
+`HouseSpec.anchor_uv / uv_to_pvk / uv_to_gta`. GTA cell-local is
+centred on the fitted 10.8 × 14.6 cell; floors map to
+`HouseSpec.GTA_FLOOR_Y` (ground 300, attic 340 = the proven
+above-cell LINKED pattern, basement 260 = below-grade LINKED,
+**expressible but unverified in GTA**).
+
+| Anchor | PvK local | (u, v) | GTA cell-local |
+|---|---|---|---|
+| front door | (2.5, +4.8 wall) | (0.647, 1.000) | (1.59, 7.30) — realized on the west wall |
+| stairwell | (−6.5, −3.0) | (0.118, 0.188) | (−4.13, −4.56) |
+| hatch | (6.5, −3.0) | (0.882, 0.188) | (4.13, −4.56) |
+| kitchen centre | (−5.15, 0) | (0.197, 0.500) | (−3.27, 0.00) |
+| living centre | (3.35, 0) | (0.697, 0.500) | (2.13, 0.00) |
+| the drawer | (−5.2, −4.15) | (0.194, 0.068) | (−3.30, −6.31) |
+| water bowl | (−2.35, 2.7) | (0.362, 0.781) | (−1.49, 4.10) |
+| sofa / lap seat | (4.8, −3.85) | (0.782, 0.099) | (3.05, −5.85) |
+| scratch post | (7.9, 0.9) | (0.965, 0.594) | (5.02, 1.37) |
+| attic perch | (7.3, −0.6) | (0.929, 0.438) | (4.63, −0.91) |
+
+Vertical mapping: PvK floor heights are honest (−2.6 / 0 / +2.9)
+because PvK stacks real storeys; in GTA each floor is its own
+cell at its `GTA_FLOOR_Y` with the cell's own wall_h — the module
+carries floor *content* and relative heights of furniture, the
+host carries the storey placement.
+
+### 9.3 Host interface — what a host provides, what the module provides
+
+A host game that wants 255 Massey must provide:
+
+1. **A cell/shell registration** — a way to instance a floor's
+   content at a host transform (GTA: FITTED/SPECS registration +
+   LINKED cells; PvK: a ZoneRoot scene at `HouseSpec.zone_origin`).
+2. **Builder primitives in the host idiom** — `_box/_mat`-style
+   helpers (GTA's interior kit; PvK: `HouseBuilder.Kit`). Module
+   builders are written against the *pattern* (flat-colour boxes,
+   cached materials, one static body per room/floor), and are
+   re-implemented per host — builders are cheap, layout is canon.
+3. **Actor spawn + the cat API** — a player-cat actor exposing the
+   §4 surface (`take_damage`, `heal`, `hiss`, `strike/pounce`,
+   HP) or an adapter for it (GTA: MasseyCat/cat mode; PvK: PvKCat).
+4. **Sinks** — damage numbers read `CombatData` profiles; kills,
+   objectives and score events land in a registry with the §5
+   names (GTA: its own objective/balance systems read the same
+   tables as data).
+5. **Scale discipline** — real-world metres; Willie 0.35, Aggie
+   0.25; humans on the 1.70 m body-proportions table. Identical
+   on both sides already — do not fork these numbers.
+
+The module provides, as data first and code second:
+
+- The floor/room/prop **spec tables** (HouseSpec + ANCHORS) and
+  the per-floor builders against (2).
+- The **encounter designs + numbers**: CombatData profiles,
+  enemy configs per species, boss patterns (attic), the ghost
+  block/hiss rule (basement), the road/vehicle tuning (outside).
+- The **cat + occupant rule data**: species JSON (coats, scales,
+  provocation numbers), ankle/underfoot/lap tuning + score table.
+- **Objectives text + ids** in the §5 shape.
+
+### 9.4 Module contents inventory (as of this PR)
+
+| Contents | State | Where |
+|---|---|---|
+| Ground floor (kitchen/living, drawer, bowl, sofa) | built (PvK host) | house_builder.gd |
+| Basement shell + entry room | stub; lane content in flight | zones/basement |
+| Attic shell + perch block | stub; lane content in flight | zones/attic |
+| Outside yard + street frontage | existing yard; lane in flight | main.tscn, zones/outside (lane) |
+| Cats (Willie/Aggie: data, controller, health, hiss) | built (PvK host) | cat_kit/, duo/ |
+| Occupants (Daniel + Folasade NPCs + interactions) | lane in flight, contract §4/§5 | occupants lane |
+| Encounters (rats/spiders/ghosts; raccoon family; squirrels/birds/cars) | enemy base built; species are lane content | combat/, zone lanes |
+| Damage/score/objective tables | built, host-agnostic data | combat_data.gd, objectives.gd |
+
+### 9.5 What is NOT module-shaped yet (the honest re-fit list)
+
+- PvK's zone travel (ZoneManager/ZoneConnector) is a PvK host
+  mechanism — GTA uses its door/cell streaming instead. The
+  *pairing data* (which entry leads where) is module content;
+  the mechanism is not.
+- PvKCat as a controller (touch, duo sibling, nine lives) is
+  PvK's game machinery. The module surface is the §4 API + the
+  species data; GTA's MasseyCat already proves the data ports.
+- The PvK ground floor's exact furniture placement is in PvK
+  metres inside house_builder.gd; anchors (§9.2) are the
+  portable form, and new placement work should go anchor-first.
