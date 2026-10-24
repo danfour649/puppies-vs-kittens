@@ -6,9 +6,9 @@ extends CharacterBody3D
 ## "quad" animals in _build_mesh(): flat-colour BoxMesh parts on a unit
 ## (~1 m) frame, forward = -Z, a Body group as child 0 that carries the
 ## gait bob, legs parented to the model root, and the whole model scaled
-## by the species scale (stray_cat s = 0.32). Willow herself is a
-## stray_cat: orange coat Color(0.85, 0.55, 0.25), and her lounge pose is
-## wildlife.gd's own trick — body.scale = (1.05, 0.7, 1.0), "low and
+## by the species scale (stray_cat s = 0.32). This cat is Willy,
+## Daniel's boy. His build is GTA's stray_cat: orange coat
+## Color(0.85, 0.55, 0.25), and his lounge pose is wildlife.gd's own trick — body.scale = (1.05, 0.7, 1.0), "low and
 ## long, tail wrapped" (_spawn_river_cat).
 ##
 ## Kit refinements over the GTA original (geometry unchanged, only pivot
@@ -26,7 +26,7 @@ signal paw_swiped
 const DATA_PATH := "res://cat_kit/cat_species.json"
 const LEG_H := 0.35 ## wildlife.gd quad leg height (unit space)
 
-var species_name := "Wolastoq Willow"
+var species_name := "Willy"
 var coat := Color(0.85, 0.55, 0.25)
 var model_scale := 0.32
 var walk_speed := 2.4
@@ -53,7 +53,7 @@ var _cooldown := 0.0
 var _phase := 0.0
 var _time := 0.0
 var _exhausted := false
-var _lounge_k := 0.0 ## 0 = normal pose, 1 = full Willow lounge, eased
+var _lounge_k := 0.0 ## 0 = normal pose, 1 = full Willy lounge, eased
 
 var _model: Node3D
 var _body: Node3D
@@ -144,7 +144,7 @@ func _build_model() -> void:
 	_model.add_child(_body)
 	# Torso (wildlife.gd: box (bw, 0.35, 0.9) at leg_h + 0.18; quad bw = 0.35).
 	_box(_body, Vector3(0.35, 0.35, 0.9), Vector3(0, LEG_H + 0.18, 0), coat)
-	# Tabby stripes (kit refinement; Willow is a ginger tabby).
+	# Tabby stripes (kit refinement; the GTA stray_cat is a ginger tabby).
 	for sz: float in [-0.22, 0.02, 0.26]:
 		_box(_body, Vector3(0.36, 0.03, 0.07), Vector3(0, LEG_H + 0.36, sz), dark)
 	# Pale chest patch (kit refinement).
@@ -325,7 +325,7 @@ func _process(delta: float) -> void:
 			pass # posed by the strike timeline below
 	if _lounge_k > 0.0:
 		var k := _lounge_k
-		body_scale = body_scale.lerp(Vector3(1.05, 0.7, 1.0), k) # Willow's numbers
+		body_scale = body_scale.lerp(Vector3(1.05, 0.7, 1.0), k) # GTA's numbers (the river cat's lounge scale)
 		body_pos.y = lerpf(body_pos.y, -0.02, k)
 		head_rot.x = lerpf(head_rot.x, 0.3, k)
 		head_rot.z = lerpf(head_rot.z, 0.12, k)

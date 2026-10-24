@@ -1,5 +1,6 @@
 {
-  "name": "Wolastoq Willow",
+  "name": "Willy",
+  "sex": "male",
   "species": "stray_cat",
   "source": "GTA Fredericton scripts/world/wildlife.gd: SPECIES[stray_cat] (line 33), HOSTILE[stray_cat] (line 79), _spawn_river_cat() (line 217), _build_mesh() quad branch (line 776).",
   "color": [0.85, 0.55, 0.25],
@@ -11,7 +12,7 @@
     "flee": 3.5,
     "shape": "quad",
     "hostile": { "chance": 0.04, "notice": 8.0, "dmg": 4.0, "cd": 1.0, "hp": 18.0, "chase": 2.4, "reach": 0.9 },
-    "willow": { "persistent": true, "chill": true, "leash": 3.0, "idle_bias": 4.0, "lounge_body_scale": [1.05, 0.7, 1.0] }
+    "willow_reference": { "persistent": true, "chill": true, "leash": 3.0, "idle_bias": 4.0, "lounge_body_scale": [1.05, 0.7, 1.0] }
   },
   "game": {
     "walk_speed": 2.4,

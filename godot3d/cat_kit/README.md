@@ -1,4 +1,4 @@
-# cat_kit — the portable Willow
+# cat_kit — the portable Willy
 
 A self-contained procedural 3D cat for Godot 4.7, built to be lifted
 into other projects. No scene files, no external assets: `cat.gd`
@@ -6,8 +6,10 @@ builds the whole animal in code.
 
 ## What it is
 
-`PvKCat` (a `CharacterBody3D`) is GTA Fredericton's river cat,
-**Wolastoq Willow**, defined in `scripts/world/wildlife.gd`:
+`PvKCat` (a `CharacterBody3D`) is **Willy**, Daniel's boy cat,
+built to GTA Fredericton's stray_cat construction — the construction
+GTA's river cat **Wolastoq Willow** is defined with, in
+`scripts/world/wildlife.gd`:
 
 - `SPECIES["stray_cat"]` (line 33): `hab URBAN, w 4.0, spd 1.2,
   flee 3.5, s 0.32, c Color(0.85, 0.55, 0.25), shape "quad"`
@@ -47,7 +49,7 @@ this hero cat leaves shadow casting on.
 - `sprint` — bigger swings/bob, tail streamed, stamina-gated
 - `strike` — 0.34 s windup -> lunge -> slash; `paw_swiped` signal fires
   at the landing moment (t = 0.10 s); 0.38 s cooldown
-- `lounge` — Willow's flop: body scale eases to (1.05, 0.7, 1.0),
+- `lounge` — Willy's flop: body scale eases to (1.05, 0.7, 1.0),
   tail wraps (yaw 0.85), head rests, legs tuck
 
 ## Controller contract

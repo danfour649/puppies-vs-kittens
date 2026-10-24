@@ -1,6 +1,6 @@
 extends Node3D
 ## Puppies vs Kittens 3D — cat-first edition (v0.4).
-## You are the cat: Wolastoq Willow, built by cat_kit from GTA
+## You are the cat: Willy, built by cat_kit from GTA's
 ## Fredericton's stray_cat. Catch every mouse in the backyard.
 ## No birds. Puppies are Phase 2 (see README.md).
 
@@ -43,7 +43,7 @@ func _ready() -> void:
 	_build_environment()
 	_build_lights()
 	cat = CatScene.new()
-	cat.name = "Willow"
+	cat.name = "Willy"
 	add_child(cat)
 	cat.global_position = Vector3(2.5, 0.1, -6.2)
 	cat.rotation.y = PI # face into the yard (+Z); model forward is -Z
@@ -291,9 +291,9 @@ func _on_mouse_caught(_m: PvKMouse) -> void:
 	caught_count += 1
 	if caught_count >= MOUSE_COUNT and not won:
 		won = true
-		_banner.text = "All mice caught in %.1f s!\nWillow approves. Press R to play again." % elapsed
+		_banner.text = "All mice caught in %.1f s!\nWilly approves. Press R to play again." % elapsed
 		_banner.visible = true
-		cat.set_lounge(true) # victory flop, Willow style
+		cat.set_lounge(true) # victory flop, Willy style
 
 
 func restart_game() -> void:

@@ -42,7 +42,7 @@ func _run() -> void:
 	_game.input_override = {"active": false, "move": Vector2.ZERO, "sprint": false, "stalk": false}
 	await _wait(0.4)
 	await _shot("gameplay_wide")
-	# (c) The lounge: cat teleported onto the garden chair, Willow flop.
+	# (c) The lounge: cat teleported onto the garden chair, Willy flop.
 	_game.cat.velocity = Vector3.ZERO
 	_game.cat.global_position = Vector3(4.5, 0.55, 4.5)
 	_game.cat.rotation.y = 0.8

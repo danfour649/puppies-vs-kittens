@@ -38,7 +38,7 @@ func _run() -> void:
 	check(cat.anim_state == "idle", "cat starts idle (got %s)" % cat.anim_state)
 	check(cat.is_on_floor(), "cat stands on the ground")
 	check(cat.global_position.y > -0.1 and cat.global_position.y < 0.2, "cat at ground height (y=%.2f)" % cat.global_position.y)
-	check(cat.species_name == "Wolastoq Willow", "cat is Willow (got %s)" % cat.species_name)
+	check(cat.species_name == "Willy", "cat is Willy (got %s)" % cat.species_name)
 	# Scripted walk.
 	var start_pos: Vector3 = cat.global_position
 	_game.input_override = {"active": true, "move": Vector2(0, 1), "sprint": false, "stalk": false}

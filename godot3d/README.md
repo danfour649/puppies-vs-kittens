@@ -8,10 +8,11 @@ original and the 2D Godot port (branch `godot-revamp`) are untouched.
 **Scope of this edition: play as the cat.** No bird mode, no birds of
 any kind. Puppies are Phase 2.
 
-You are **Wolastoq Willow** — GTA Fredericton's river cat, rebuilt by
-`cat_kit/` straight from her definition in `scripts/world/wildlife.gd`
-(the `stray_cat`: orange coat, 0.32 scale, quad frame). Catch all 7 mice
-in the backyard. Win, and she does Willow's lounge flop.
+You are **Willy** — a boy cat, built by `cat_kit/` to GTA Fredericton's
+`stray_cat` construction from `scripts/world/wildlife.gd` (orange coat,
+0.32 scale, quad frame) — the same construction GTA's river cat Willow
+uses, but Willy is his own cat. Catch all 7 mice in the backyard. Win,
+and he does his lounge flop.
 
 The cat is the real deliverable: `cat_kit/` is a self-contained package
 designed to be lifted back into GTA Fredericton (for example for TODO
@@ -23,7 +24,7 @@ designed to be lifted back into GTA Fredericton (for example for TODO
 - **Shift** — sprint (stamina drains; it refills when you ease off)
 - **Ctrl or C held** — stalk: slow, low crouch at GTA cat speed (1.2 m/s)
 - **Space** — paw strike (catches a mouse in the front-paw arc)
-- **L** — lounge / get up (Willow's signature flop)
+- **L** — lounge / get up (Willy's signature flop)
 - **R** — restart
 - **Mouse drag** — orbit camera, **wheel** — zoom
 - **Touch** — virtual joystick (bottom-left) + PAW button (bottom-right)
