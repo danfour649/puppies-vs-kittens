@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<StackPane xmlns="http://javafx.com/javafx"
+           xmlns:fx="http://javafx.com/fxml"
+           prefHeight="500.0" prefWidth="500.0"
+           style="-fx-background-color: firebrick;">
+    <children>
+        <ImageView fx:id="splashImageView" layoutX="250.0" layoutY="250.0" preserveRatio="true">
+            <image>
+                <Image url="@KvPlogo.png" backgroundLoading="false"/>
+            </image>
+        </ImageView>
+    </children>
+</StackPane>
