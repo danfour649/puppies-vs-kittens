@@ -1,21 +1,29 @@
 class_name PvKCat
 extends CharacterBody3D
-## PvKCat — a procedural 3D cat in the GTA Fredericton wildlife idiom.
+## PvKCat — a procedural 3D cat: Willy, Daniel's boy.
 ##
-## The model is built exactly the way scripts/world/wildlife.gd builds its
-## "quad" animals in _build_mesh(): flat-colour BoxMesh parts on a unit
-## (~1 m) frame, forward = -Z, a Body group as child 0 that carries the
-## gait bob, legs parented to the model root, and the whole model scaled
-## by the species scale (stray_cat s = 0.32). This cat is Willy,
-## Daniel's boy. His build is GTA's stray_cat: orange coat
-## Color(0.85, 0.55, 0.25), and his lounge pose is wildlife.gd's own trick — body.scale = (1.05, 0.7, 1.0), "low and
+## Construction keeps the GTA Fredericton wildlife idiom's architecture —
+## a unit (~1 m) frame, forward = -Z, a Body group as child 0 that
+## carries the gait bob, legs parented to the model root under hip
+## pivots, the head under a neck pivot, the tail under a base pivot, and
+## the whole model scaled by the species scale (stray_cat s = 0.32) —
+## so the port path back into GTA (see README.md) is unchanged. But the
+## parts are SMOOTH primitives (ellipsoids, tapered cylinders, capsule
+## paws, a segmented-sphere tail), not GTA's flat boxes: Willy is a
+## modelled cat, not a voxel toy.
+##
+## Colouring is Willy's own, sampled from the original v0.1 hand-drawn
+## kitten art (cat_kit/reference-willy-v01.png — the same sprite ships
+## in every version): a WHITE coat with GINGER patches (#E8AF54) — a
+## saddle along the spine sweeping into the tail, a cap on top of the
+## head, a small chest bib — dark eyes and a small pink nose. It is
+## deliberately NOT GTA stray_cat's solid orange (0.85, 0.55, 0.25);
+## that palette belongs to a different cat. The lounge pose is still
+## wildlife.gd's own trick — body.scale = (1.05, 0.7, 1.0), "low and
 ## long, tail wrapped" (_spawn_river_cat).
 ##
-## Kit refinements over the GTA original (geometry unchanged, only pivot
-## wrappers added so parts can move): each leg sits under a hip pivot, the
-## head under a neck pivot, the tail under a base pivot. Animation is all
-## in code: idle breathing, diagonal-pair walk cycle, stalk crouch,
-## paw-strike lunge, sprint, and the LOUNGE flop.
+## Animation is all in code: idle breathing, diagonal-pair walk cycle,
+## stalk crouch, paw-strike lunge, sprint, and the LOUNGE flop.
 ##
 ## Controller contract: call set_move_input() every physics frame, then
 ## strike() / set_lounge() on events. paw_swiped fires at the moment the
@@ -27,7 +35,10 @@ const DATA_PATH := "res://cat_kit/cat_species.json"
 const LEG_H := 0.35 ## wildlife.gd quad leg height (unit space)
 
 var species_name := "Willy"
-var coat := Color(0.85, 0.55, 0.25)
+var coat := Color(1.0, 1.0, 1.0) ## Willy's white, from the v0.1 art
+var ginger := Color(0.9098, 0.6863, 0.3294) ## sampled ginger #E8AF54
+var nose_color := Color(0.851, 0.549, 0.478) ## pink #D98C7A
+var eye_color := Color(0.10, 0.08, 0.07) ## near-black brown
 var model_scale := 0.32
 var walk_speed := 2.4
 var stalk_speed := 1.2 ## = GTA stray_cat spd: a hunting cat is a slow cat
@@ -59,13 +70,23 @@ var _model: Node3D
 var _body: Node3D
 var _head: Node3D
 var _tail: Node3D
+var _torso: MeshInstance3D
+var _saddle_patch: MeshInstance3D
 var _legs := {}
 var _mats := {}
-var _meshes := {}
+var _sphere_mesh: SphereMesh
+var _cyl_meshes := {}
 
 
 func _init() -> void:
 	_load_data()
+
+
+func _json_color(a: Variant, fallback: Color) -> Color:
+	if typeof(a) == TYPE_ARRAY and (a as Array).size() >= 3:
+		var arr: Array = a
+		return Color(float(arr[0]), float(arr[1]), float(arr[2]))
+	return fallback
 
 
 func _load_data() -> void:
@@ -79,8 +100,13 @@ func _load_data() -> void:
 		return
 	var d: Dictionary = parsed
 	species_name = String(d.get("name", species_name))
-	var col: Array = d.get("color", [0.85, 0.55, 0.25])
-	coat = Color(float(col[0]), float(col[1]), float(col[2]))
+	coat = _json_color(d.get("color", []), coat)
+	var pal: Dictionary = d.get("palette", {})
+	if not pal.is_empty():
+		coat = _json_color(pal.get("coat", []), coat)
+		ginger = _json_color(pal.get("ginger", []), ginger)
+		nose_color = _json_color(pal.get("nose", []), nose_color)
+		eye_color = _json_color(pal.get("eye", []), eye_color)
 	model_scale = float(d.get("scale", model_scale))
 	var g: Dictionary = d.get("game", {})
 	walk_speed = float(g.get("walk_speed", walk_speed))
@@ -107,25 +133,48 @@ func _ready() -> void:
 	safe_margin = 0.04
 
 
-# --- construction (mirrors wildlife.gd _mat/_box/_build_mesh) ---------------
+# --- construction (smooth primitives on the GTA anchor layout) -------------
 
-func _mat(c: Color) -> StandardMaterial3D:
-	var key := c.to_html()
+func _mat(c: Color, rough := 0.9) -> StandardMaterial3D:
+	var key := c.to_html() + "|" + str(rough)
 	if not _mats.has(key):
 		var m := StandardMaterial3D.new()
 		m.albedo_color = c
-		m.roughness = 0.95
+		m.roughness = rough
 		_mats[key] = m
 	return _mats[key]
 
 
-func _box(parent: Node3D, size: Vector3, pos: Vector3, c: Color) -> MeshInstance3D:
-	if not _meshes.has(size):
-		var bm := BoxMesh.new()
-		bm.size = size
-		_meshes[size] = bm
+## One shared unit sphere (diameter 1); ellipsoids are instances scaled
+## to their diameters, so parts blend instead of butting like boxes.
+func _ell(parent: Node3D, pos: Vector3, dia: Vector3, c: Color, rot := Vector3.ZERO, rough := 0.9) -> MeshInstance3D:
+	if _sphere_mesh == null:
+		_sphere_mesh = SphereMesh.new()
+		_sphere_mesh.radius = 0.5
+		_sphere_mesh.height = 1.0
+		_sphere_mesh.radial_segments = 32
+		_sphere_mesh.rings = 16
 	var mi := MeshInstance3D.new()
-	mi.mesh = _meshes[size]
+	mi.mesh = _sphere_mesh
+	mi.material_override = _mat(c, rough)
+	mi.position = pos
+	mi.scale = dia
+	mi.rotation = rot
+	parent.add_child(mi)
+	return mi
+
+
+func _taper(parent: Node3D, pos: Vector3, top_r: float, bot_r: float, h: float, c: Color) -> MeshInstance3D:
+	var key := "%f|%f|%f" % [top_r, bot_r, h]
+	if not _cyl_meshes.has(key):
+		var cm := CylinderMesh.new()
+		cm.top_radius = top_r
+		cm.bottom_radius = bot_r
+		cm.height = h
+		cm.radial_segments = 16
+		_cyl_meshes[key] = cm
+	var mi := MeshInstance3D.new()
+	mi.mesh = _cyl_meshes[key]
 	mi.material_override = _mat(c)
 	mi.position = pos
 	parent.add_child(mi)
@@ -133,8 +182,6 @@ func _box(parent: Node3D, size: Vector3, pos: Vector3, c: Color) -> MeshInstance
 
 
 func _build_model() -> void:
-	var dark := coat.darkened(0.35)
-	var light := coat.lightened(0.45)
 	_model = Node3D.new()
 	_model.name = "Model"
 	_model.scale = Vector3.ONE * model_scale
@@ -142,40 +189,66 @@ func _build_model() -> void:
 	_body = Node3D.new()
 	_body.name = "Body"
 	_model.add_child(_body)
-	# Torso (wildlife.gd: box (bw, 0.35, 0.9) at leg_h + 0.18; quad bw = 0.35).
-	_box(_body, Vector3(0.35, 0.35, 0.9), Vector3(0, LEG_H + 0.18, 0), coat)
-	# Tabby stripes (kit refinement; the GTA stray_cat is a ginger tabby).
-	for sz: float in [-0.22, 0.02, 0.26]:
-		_box(_body, Vector3(0.36, 0.03, 0.07), Vector3(0, LEG_H + 0.36, sz), dark)
-	# Pale chest patch (kit refinement).
-	_box(_body, Vector3(0.3, 0.28, 0.1), Vector3(0, LEG_H + 0.12, -0.42), light)
-	# Head group: same boxes as wildlife.gd, wrapped in a neck pivot.
+	# Torso: a long ellipsoid with a chest sphere at the front and two
+	# haunch spheres at the rear, all blended into one body mass.
+	_torso = _ell(_body, Vector3(0, 0.55, 0.02), Vector3(0.38, 0.37, 0.92), coat)
+	_ell(_body, Vector3(0, 0.545, -0.30), Vector3(0.365, 0.355, 0.36), coat) # chest
+	for hx: float in [-0.088, 0.088]:
+		_ell(_body, Vector3(hx, 0.565, 0.29), Vector3(0.20, 0.30, 0.34), coat) # haunches
+	# Willy's ginger saddle: flattened ellipsoid shells hugging the back,
+	# sweeping from mid-back to the tail base (v0.1 art layout).
+	_saddle_patch = _ell(_body, Vector3(0, 0.615, 0.06), Vector3(0.395, 0.27, 0.68), ginger)
+	_ell(_body, Vector3(0, 0.60, 0.33), Vector3(0.37, 0.24, 0.30), ginger) # rear saddle
+	# Small ginger chest bib at the throat (v0.1 art).
+	_ell(_body, Vector3(0, 0.60, -0.435), Vector3(0.15, 0.19, 0.10), ginger, Vector3(-0.35, 0, 0))
+	# Head group under a neck pivot (same anchor as the GTA build).
 	_head = Node3D.new()
 	_head.name = "Head"
 	_head.position = Vector3(0, LEG_H + 0.38, -0.5)
 	_body.add_child(_head)
-	_box(_head, Vector3(0.26, 0.26, 0.3), Vector3(0, 0, -0.05), coat)
-	_box(_head, Vector3(0.12, 0.1, 0.14), Vector3(0, -0.06, -0.24), dark) # snout
-	_box(_head, Vector3(0.05, 0.03, 0.03), Vector3(0, -0.03, -0.315), Color(0.85, 0.45, 0.45)) # nose
-	for ex: float in [-0.08, 0.08]:
-		_box(_head, Vector3(0.06, 0.1, 0.04), Vector3(ex, 0.17, 0.0), coat) # ears
-	for ex: float in [-0.065, 0.065]:
-		_box(_head, Vector3(0.035, 0.05, 0.02), Vector3(ex, 0.03, -0.205), Color(0.15, 0.35, 0.15)) # eyes
-	# Legs on the model root (as in GTA), each under a hip pivot for gait.
+	_ell(_head, Vector3(0, 0.03, -0.05), Vector3(0.30, 0.28, 0.29), coat) # skull
+	_ell(_head, Vector3(0, -0.035, -0.155), Vector3(0.185, 0.135, 0.155), coat) # muzzle
+	# Ginger cap on top of the head, between the ears (v0.1 art).
+	_ell(_head, Vector3(0, 0.095, -0.045), Vector3(0.295, 0.175, 0.285), ginger)
+	# Ears: pinched spheres tilted out, pale inner ear on the front face.
+	for ex: float in [-0.088, 0.088]:
+		var tilt := Vector3(0.06, 0, -signf(ex) * 0.14)
+		_ell(_head, Vector3(ex, 0.165, -0.01), Vector3(0.085, 0.15, 0.05), coat, tilt)
+		_ell(_head, Vector3(ex, 0.16, -0.038), Vector3(0.05, 0.09, 0.02), Color(0.89, 0.65, 0.56), tilt)
+	# Dark eyes, slightly proud; tiny pink nose.
+	for ex: float in [-0.067, 0.067]:
+		_ell(_head, Vector3(ex, 0.045, -0.178), Vector3(0.034, 0.034, 0.034), eye_color, Vector3.ZERO, 0.25)
+	_ell(_head, Vector3(0, -0.018, -0.222), Vector3(0.042, 0.028, 0.026), nose_color, Vector3.ZERO, 0.5)
+	# Legs on the model root (as in GTA), each under a hip pivot for
+	# gait: hip blend sphere, tapered leg, capsule paw. All white.
 	for lx: float in [-0.12, 0.12]:
 		for lz: float in [-0.32, 0.32]:
 			var pivot := Node3D.new()
 			pivot.position = Vector3(lx, LEG_H, lz)
 			_model.add_child(pivot)
-			_box(pivot, Vector3(0.09, LEG_H, 0.09), Vector3(0, -LEG_H * 0.5, 0), dark)
+			_ell(pivot, Vector3(0, -0.02, 0), Vector3(0.145, 0.13, 0.145), coat)
+			_taper(pivot, Vector3(0, -0.175, 0), 0.060, 0.044, 0.34, coat)
+			_ell(pivot, Vector3(0, -0.332, -0.016), Vector3(0.10, 0.06, 0.13), coat)
 			_legs[_leg_key(lx, lz)] = pivot
-	# Tail under a base pivot; GTA: box (0.08, 0.08, 0.5) centred z +0.65.
+	# Tail under a base pivot: a curved chain of shrinking spheres.
+	# White at the base and tip, ginger along the rear (v0.1 art).
 	_tail = Node3D.new()
 	_tail.name = "Tail"
 	_tail.position = Vector3(0, LEG_H + 0.3, 0.42)
 	_body.add_child(_tail)
-	_box(_tail, Vector3(0.08, 0.08, 0.46), Vector3(0, 0, 0.21), coat)
-	_box(_tail, Vector3(0.085, 0.085, 0.1), Vector3(0, 0, 0.4), light) # pale tip
+	var tail_segs := [
+		[0.02, 0.000, 0.112, coat],
+		[0.068, 0.005, 0.108, coat],
+		[0.116, 0.013, 0.103, ginger],
+		[0.164, 0.024, 0.097, ginger],
+		[0.212, 0.038, 0.090, ginger],
+		[0.260, 0.055, 0.083, ginger],
+		[0.308, 0.074, 0.075, ginger],
+		[0.356, 0.094, 0.067, ginger],
+		[0.400, 0.114, 0.058, coat],
+	]
+	for seg: Array in tail_segs:
+		_ell(_tail, Vector3(0, float(seg[1]), float(seg[0])), Vector3.ONE * float(seg[2]), seg[3] as Color)
 
 
 func _leg_key(lx: float, lz: float) -> String:

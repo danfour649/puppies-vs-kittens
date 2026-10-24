@@ -1,17 +1,21 @@
 # Puppies vs Kittens 3D — cat-first edition (v0.4)
 
 The 3D revamp of Puppies vs Kittens, rebuilt in Godot 4.7 in the visual
-language of GTA Fredericton: procedural flat-colour box meshes, real
-metre scale, directional sun + sky ambience, light fog. The Java v0.2
+language of GTA Fredericton: procedural flat-colour meshes, real
+metre scale, directional sun + sky ambience, light fog — the yard in
+GTA's box idiom, the cat modelled smooth from ellipsoids and tapered
+cylinders (see `cat_kit/`). The Java v0.2
 original and the 2D Godot port (branch `godot-revamp`) are untouched.
 
 **Scope of this edition: play as the cat.** No bird mode, no birds of
 any kind. Puppies are Phase 2.
 
 You are **Willy** — a boy cat, built by `cat_kit/` to GTA Fredericton's
-`stray_cat` construction from `scripts/world/wildlife.gd` (orange coat,
-0.32 scale, quad frame) — the same construction GTA's river cat Willow
-uses, but Willy is his own cat. Catch all 7 mice in the backyard. Win,
+`stray_cat` construction from `scripts/world/wildlife.gd` (0.32 scale,
+quad-frame anchors) — the same construction GTA's river cat Willow
+uses, but Willy is his own cat, and he wears his own colouring from
+the original v0.1 hand-drawn art: a white coat with ginger patches,
+not GTA's orange. Catch all 7 mice in the backyard. Win,
 and he does his lounge flop.
 
 The cat is the real deliverable: `cat_kit/` is a self-contained package

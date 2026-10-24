@@ -30,16 +30,31 @@ GTA's river cat **Wolastoq Willow** is defined with, in
   meshes are cached `BoxMesh`es keyed by size (`_mat` / `_box`,
   lines 739-763).
 
-`cat.gd` reproduces that construction part for part (same sizes,
-positions, colours, forward axis, scale), so a side-by-side render
-against GTA's stray_cat matches. `cat_species.json` carries the
+`cat.gd` keeps that construction's architecture — same unit frame,
+forward axis, anchor positions (head, hips, tail base), species scale,
+Body-group-as-child-0 and legs-on-the-root structure — so the port
+path below is unchanged. What changed in the v0.1-colouring remodel:
+the parts are **smooth primitives**, not boxes — ellipsoid torso with
+blended chest and haunch spheres, a sphere skull with muzzle, pinched-
+sphere ears, tapered-cylinder legs with capsule paws, and a tail made
+of a curved chain of shrinking spheres. `cat_species.json` carries the
 identity, palette, scale, GTA stat block and game tuning.
 
-Kit refinements (geometry identical; wrappers and small additions):
-each leg sits under a hip pivot, the head under a neck pivot, and the
-tail under a base pivot, so parts can swing; plus tabby stripes, a pale
-chest patch, nose and eyes. GTA cats cast no shadows (city perf);
-this hero cat leaves shadow casting on.
+Colouring is Willy's own, sampled from the original v0.1 hand-drawn
+kitten art (`reference-willy-v01.png`, kept beside this README; the
+identical sprite ships in every version of the game): a **white coat**
+with **ginger patches (#E8AF54)** — a saddle along the spine sweeping
+into the tail, a cap on top of the head between the ears, a small
+chest bib, and ginger along the tail's rear — plus dark eyes and a
+small pink nose. It is deliberately **not** GTA stray_cat's solid
+orange (0.85, 0.55, 0.25): that is a different cat, and it is recorded
+in the JSON (`gta.coat_in_gta`) as provenance only. There are no tabby
+stripes — an earlier build invented them; the v0.1 art has none.
+
+Kit refinements over the GTA original: each leg sits under a hip
+pivot, the head under a neck pivot, and the tail under a base pivot,
+so parts can swing. GTA cats cast no shadows (city perf); this hero
+cat leaves shadow casting on.
 
 ## Animation states (all in code, poses are functions of state+time)
 
@@ -70,11 +85,13 @@ damage)` forwards to `Wildlife.hurt_animal(animal, dir, damage)`.
 Three ways in, in increasing order of ambition:
 
 1. **Model swap (mechanical, an afternoon):** replace the stray_cat
-   branch of `_build_mesh()` with `PvKCat.build_standalone()` — i.e.
-   call the kit's builder to produce the same root Node3D GTA
-   expects (child 0 = Body group, legs on the root, root scaled
-   0.32, forward -Z). GTA's dictionary brain, habitats, hostility
-   and hitbox attach unchanged. Willow gets leg swings and a real
+   branch of `_build_mesh()` with the kit's builder to produce the
+   same root Node3D GTA expects (child 0 = Body group, legs on the
+   root, root scaled 0.32, forward -Z). GTA's dictionary brain, habitats, hostility
+   and hitbox attach unchanged. The palette travels as data
+   (`cat_species.json`), so the port is unaffected by colouring: a
+   swapped-in cat can wear Willy's white-and-ginger or be restyled
+   per species without touching the builder. Willow gets leg swings and a real
    lounge for free, because the kit's pivots accept the same
    body-bob writes `_step()` already makes.
 2. **Brain transplant:** keep GTA's Dictionary entry but drive the

@@ -27,12 +27,22 @@ func _run() -> void:
 	_game = load("res://main.tscn").instantiate()
 	add_child(_game)
 	await _wait(1.0)
-	# (a) Cat close-up: 3/4 front view, cat idle (breathing).
-	_game.cam_dist = 1.6
-	_game.cam_pitch = -0.2
+	# (a) Cat close-up: 3/4 front view, cat idle (breathing). Genuinely
+	# close, and the sun eased for this shot only so Willy's white coat
+	# and ginger don't blow out under the game's midday lighting.
+	var suns: Array = _game.find_children("*", "DirectionalLight3D")
+	var sun: DirectionalLight3D = null
+	if suns.size() > 0:
+		sun = suns[0] as DirectionalLight3D
+	if sun != null:
+		sun.light_energy = 0.85
+	_game.cam_dist = 0.8
+	_game.cam_pitch = -0.18
 	_game.cam_yaw = -0.6
 	await _wait(0.7)
 	await _shot("cat_closeup")
+	if sun != null:
+		sun.light_energy = 1.05
 	# (b) Wide gameplay: cat walks into the yard among the mice.
 	_game.cam_dist = 8.5
 	_game.cam_pitch = -0.72
@@ -49,7 +59,7 @@ func _run() -> void:
 	await _wait(0.5)
 	_game.cat.set_lounge(true)
 	_game.cam_yaw = -2.36
-	_game.cam_dist = 2.0
+	_game.cam_dist = 1.5
 	_game.cam_pitch = -0.35
 	await _wait(1.0)
 	await _shot("lounge")

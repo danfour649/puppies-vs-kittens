@@ -39,6 +39,19 @@ func _run() -> void:
 	check(cat.is_on_floor(), "cat stands on the ground")
 	check(cat.global_position.y > -0.1 and cat.global_position.y < 0.2, "cat at ground height (y=%.2f)" % cat.global_position.y)
 	check(cat.species_name == "Willy", "cat is Willy (got %s)" % cat.species_name)
+	# Willy's v0.1 colouring, asserted on the values fed into the
+	# materials (data level only — rendered readbacks lie headless).
+	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://cat_kit/cat_species.json"))
+	var pal: Dictionary = data.get("palette", {})
+	var j_coat: Array = pal.get("coat", [])
+	var j_ginger: Array = pal.get("ginger", [])
+	var want_coat := Color(float(j_coat[0]), float(j_coat[1]), float(j_coat[2]))
+	var want_ginger := Color(float(j_ginger[0]), float(j_ginger[1]), float(j_ginger[2]))
+	check(cat.coat.is_equal_approx(want_coat), "coat colour comes from the v0.1 palette (got %s)" % cat.coat)
+	var torso_mat := (cat._torso.material_override as StandardMaterial3D).albedo_color
+	check(torso_mat.is_equal_approx(want_coat), "torso material albedo is the palette white (got %s)" % torso_mat)
+	var saddle_mat := (cat._saddle_patch.material_override as StandardMaterial3D).albedo_color
+	check(saddle_mat.is_equal_approx(want_ginger), "saddle patch albedo is the v0.1 ginger (got %s)" % saddle_mat)
 	# Scripted walk.
 	var start_pos: Vector3 = cat.global_position
 	_game.input_override = {"active": true, "move": Vector2(0, 1), "sprint": false, "stalk": false}
