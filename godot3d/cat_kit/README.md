@@ -1,4 +1,4 @@
-# cat_kit — the portable Willy
+# cat_kit — the portable cats
 
 A self-contained procedural 3D cat for Godot 4.7, built to be lifted
 into other projects. No scene files, no external assets: `cat.gd`
@@ -6,7 +6,8 @@ builds the whole animal in code.
 
 ## What it is
 
-`PvKCat` (a `CharacterBody3D`) is **Willy**, Daniel's boy cat,
+`PvKCat` (a `CharacterBody3D`) is the kit actor for Daniel's two
+cats — **Willie**, his boy cat, and Willie's sister **Aggie** —
 built to GTA Fredericton's stray_cat construction — the construction
 GTA's river cat **Wolastoq Willow** is defined with, in
 `scripts/world/wildlife.gd`:
@@ -31,30 +32,108 @@ GTA's river cat **Wolastoq Willow** is defined with, in
   lines 739-763).
 
 `cat.gd` keeps that construction's architecture — same unit frame,
-forward axis, anchor positions (head, hips, tail base), species scale,
-Body-group-as-child-0 and legs-on-the-root structure — so the port
-path below is unchanged. What changed in the v0.1-colouring remodel:
-the parts are **smooth primitives**, not boxes — ellipsoid torso with
-blended chest and haunch spheres, a sphere skull with muzzle, pinched-
-sphere ears, tapered-cylinder legs with capsule paws, and a tail made
-of a curved chain of shrinking spheres. `cat_species.json` carries the
-identity, palette, scale, GTA stat block and game tuning.
+forward axis, anchor positions (head, hips, tail base), per-character
+scale, Body-group-as-child-0 and legs-on-the-root structure — so the
+port path below is unchanged. The parts are **smooth primitives**,
+not boxes — ellipsoid torso with blended chest and haunch spheres, a
+sphere skull with muzzle, pinched-sphere ears, tapered-cylinder legs
+with capsule paws, and a tail made of a curved chain of shrinking
+spheres. `cat_species.json` carries the shared GTA stat block plus a
+`characters` map with each cat's identity, palette, build profile,
+temperament and game tuning (see Characters).
 
-Colouring is Willy's own, sampled from the original v0.1 hand-drawn
-kitten art (`reference-willy-v01.png`, kept beside this README; the
-identical sprite ships in every version of the game): a **white coat**
-with **ginger patches (#E8AF54)** — a saddle along the spine sweeping
-into the tail, a cap on top of the head between the ears, a small
-chest bib, and ginger along the tail's rear — plus dark eyes and a
-small pink nose. It is deliberately **not** GTA stray_cat's solid
-orange (0.85, 0.55, 0.25): that is a different cat, and it is recorded
-in the JSON (`gta.coat_in_gta`) as provenance only. There are no tabby
-stripes — an earlier build invented them; the v0.1 art has none.
+Colouring is each cat's own, taken from Daniel's photos of the
+real cats (the `reference/` folder beside this README, which also
+keeps the v0.1 hand-drawn sprite, `reference-willy-v01.png`) — see
+the Characters section below for palettes and provenance. It is
+deliberately **not** GTA stray_cat's solid orange (0.85, 0.55,
+0.25): that is a different cat, recorded in the JSON
+(`gta.coat_in_gta`) as provenance only.
 
 Kit refinements over the GTA original: each leg sits under a hip
 pivot, the head under a neck pivot, and the tail under a base pivot,
 so parts can swing. GTA cats cast no shadows (city perf); this hero
 cat leaves shadow casting on.
+
+## Characters
+
+`cat_species.json` was restructured in the appearance-refinement
+pass: the shared species data (GTA stat block, construction source)
+stays top-level, and everything per-cat — name, sex, scale, palette,
+build profile, temperament, game tuning — now lives under
+`characters.<id>`. `PvKCat` defaults to `willie`; call
+`set_character("aggie")` before `add_child()` for the sister. The
+schema change is data-only: Willie's entries carry the same meaning
+as the old single-cat file, with the appearance values refined as
+below.
+
+### Willie — the big plush boy (player cat, scale 0.35)
+
+Daniel's boy, and the game's player character. Photo truth (from
+`reference/reference-willie-basket.jpg` and
+`reference/reference-willie-table.jpg`; these override the v0.1
+hand-drawn sprite where they differ): pure white face blaze,
+muzzle, chest, belly, legs and paws; **rich orange tabby** — a cap
+wrapping the top of the head around the ears and down the sides of
+the cheeks, a **large saddle** over the whole back and upper sides,
+and a substantially ginger, ringed tail; green-gold eyes; pink
+nose.
+
+- Palette: coat `#FFFFFF`; ginger `#C97020` (inside the
+  #C26D1E–#CD7A2A band Daniel specified — "definitely darker
+  orange" than the v0.1 art's #E8AF54); tabby striping
+  `ginger_dark #975417` — a faint, darker banding laid as thin
+  flattened shells across the saddle, two on the cap, and
+  alternating into the tail rings; eyes `#8A9A3B`; nose `#D98C7A`.
+- Tonemapping compensation: raw photo medians sample muted
+  (#A68041-ish) under indoor light and shadow, and the game's ACES
+  tonemapper + midday sun desaturate further (the old #E8AF54 build
+  rendered pale gold). The albedo is therefore set rich and tuned
+  by eye against the photos in the standing `willie_closeup` shot.
+- Build: **plush** — thick torso (0.44 unit wide), full chest and
+  haunches, legs a touch shorter relative to the body, tail 1.3×
+  thick. Scale **0.35**, up from the GTA stray's 0.32: he is a big
+  boy.
+- Character: a total asshole (owner's field report): knocks drinks
+  and his own water bowl over, scratches the furniture, shits right
+  beside the litter box in the basement, and **meows constantly** —
+  `meowing: "constant"` in his record, which matters because it is
+  Aggie's attack trigger (below). Behaviour lands in the later GTA
+  slices; this kit carries the definition.
+
+### Aggie — the wiry tortie (NPC, scale 0.25)
+
+Willie's much smaller sister — "chill but vicious". Daniel calls
+her a calico; the photos (`reference/reference-aggie-drawer.jpg`,
+`reference/reference-aggie-plant.jpg`) show a **dark
+tortoiseshell**: warm black-brown base with irregular orange and
+cream mottling everywhere, a mostly dark face with orange mottling
+and a cream/orange throat and chest, a dark tail with orange
+running through it, green-gold eyes like his.
+
+- Palette: base `#241C17` (photo median); mottle orange `#B06E2C`;
+  mottle cream `#BFA87A`; eyes `#8A9A3B`; nose near-black brown.
+- Tortie technique: a **seeded scatter** of small flattened
+  ellipsoid shells in the two tones, hugging the torso (denser),
+  head, legs and tail over the dark base — irregular sizes,
+  rotations and placement driven by `palette.mottle.seed`
+  (20261024), so she builds identically every run; the smoke test
+  asserts patch count and scatter signature across two builds.
+  Primitives have no fur texture, so the mottle reads as patchy
+  colour rather than individual hairs — the honest limit of the
+  technique.
+- Build: **wiry** — a lean, slim torso (0.30 unit wide vs Willie's
+  0.44), narrow chest and haunches, slim legs, thin tail. Not a
+  scaled-down Willie: the silhouette differs in the data
+  (`build.profile: "wiry"`), and at scale **0.25** she stands
+  visibly smaller than him.
+- Character (definition only — no fight AI in this kit): she
+  weighs **half** what Willie does (`weight_vs_willie: 0.5`) but
+  **always wins their fights** (`wins_vs_willie: true`); her style
+  is `fight_style: "burst_and_flee"` — dart in, brief flurry, run
+  away; she is chill until provoked, and the provocation trigger
+  is `provocation_trigger: "willie_meowing"` — his constant
+  meowing is literally what sets her off.
 
 ## Animation states (all in code, poses are functions of state+time)
 
@@ -64,7 +143,7 @@ cat leaves shadow casting on.
 - `sprint` — bigger swings/bob, tail streamed, stamina-gated
 - `strike` — 0.34 s windup -> lunge -> slash; `paw_swiped` signal fires
   at the landing moment (t = 0.10 s); 0.38 s cooldown
-- `lounge` — Willy's flop: body scale eases to (1.05, 0.7, 1.0),
+- `lounge` — the flop: body scale eases to (1.05, 0.7, 1.0),
   tail wraps (yaw 0.85), head rests, legs tuck
 
 ## Controller contract
@@ -87,7 +166,8 @@ Three ways in, in increasing order of ambition:
 1. **Model swap (mechanical, an afternoon):** replace the stray_cat
    branch of `_build_mesh()` with the kit's builder to produce the
    same root Node3D GTA expects (child 0 = Body group, legs on the
-   root, root scaled 0.32, forward -Z). GTA's dictionary brain, habitats, hostility
+   root, root scaled by the character's scale — Willie 0.35 / Aggie
+   0.25 here; GTA's own strays use 0.32 — forward -Z). GTA's dictionary brain, habitats, hostility
    and hitbox attach unchanged. The palette travels as data
    (`cat_species.json`), so the port is unaffected by colouring: a
    swapped-in cat can wear Willy's white-and-ginger or be restyled
@@ -107,7 +187,9 @@ Three ways in, in increasing order of ambition:
    for named animals (Willow, the #97 pair), which matches how GTA
    already special-cases her (`persistent`, `chill`, name tag).
 
-Scale/units: everything is metres, Y-up, forward -Z, species scale
-applied on the model root exactly as GTA does (`root.scale = s`).
-Heights: cat stands leg_h * s = 0.11 m to the belly, back at
-~0.24 m — a real cat against GTA's 1 m-unit doors and furniture.
+Scale/units: everything is metres, Y-up, forward -Z, character
+scale applied on the model root exactly as GTA does
+(`root.scale = s`). Heights: a cat stands leg_h * s to the belly —
+0.12 m for Willie at 0.35, 0.09 m for Aggie at 0.25 — backs at
+~0.27 m / ~0.19 m: real cats against GTA's 1 m-unit doors and
+furniture.
