@@ -3,3 +3,5 @@ out/
 .DS_Store
 .idea/
 *.iml
+godot3d/.godot/
+godot3d/build/
