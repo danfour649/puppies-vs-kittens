@@ -138,6 +138,10 @@ func choose(id: String) -> void:
 	var old := player_cat
 	player_cat = want
 	game.set("cat", player_cat)
+	# MASSEY: enemies hunt the "player_cat" group — keep it current.
+	for c: PvKCat in [willie_cat, aggie_cat]:
+		c.remove_from_group("player_cat")
+	player_cat.add_to_group("player_cat")
 	# main's catch handler listens to one cat's paw: move the wire.
 	var handler := Callable(game, "_on_paw_swiped")
 	for c: PvKCat in [willie_cat, aggie_cat]:
@@ -389,3 +393,16 @@ func _update_meter_label() -> void:
 
 func _flat(a: Vector3, b: Vector3) -> float:
 	return Vector2(a.x - b.x, a.z - b.z).length()
+
+
+## MASSEY: after a zone travel, the sibling rebinds to the new
+## zone's lounge spots and wander rect, then settles.
+func relocate_sibling(zone_root: Node) -> void:
+	if sibling == null or sibling.cat == null or zone_root == null:
+		return
+	if zone_root.has_method("get_lounge_spots"):
+		sibling.lounge_spots = zone_root.call("get_lounge_spots")
+	if zone_root.has_method("get_wander_rect"):
+		sibling.wander_rect = zone_root.call("get_wander_rect")
+	sibling.cat.set_lounge(false)
+	sibling.go_lounge_nearest()
