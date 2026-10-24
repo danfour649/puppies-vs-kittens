@@ -98,8 +98,8 @@ func _build_environment() -> void:
 	env.name = "Yard"
 	add_child(env)
 	var grass := Color(0.32, 0.5, 0.22)
-	var grass2 := Color(0.28, 0.45, 0.19)
-	var grass3 := Color(0.37, 0.55, 0.25)
+	var grass2 := Color(0.29, 0.46, 0.20)
+	var grass3 := Color(0.335, 0.515, 0.23)
 	var wood := Color(0.55, 0.42, 0.3)
 	var wood_dark := Color(0.42, 0.31, 0.21)
 	_box(env, Vector3(26.4, 0.2, 20.4), Vector3(0, -0.1, 0), grass)
@@ -138,15 +138,20 @@ func _build_environment() -> void:
 	_box(env, Vector3(0.72, 0.72, 0.72), Vector3(10.3, 0.36, -6.1), Color(0.57, 0.45, 0.3))
 	_box(env, Vector3(0.72, 0.72, 0.72), Vector3(9.9, 1.08, -6.05), Color(0.63, 0.5, 0.34))
 	var chair := Color(0.7, 0.68, 0.62)
-	_box(env, Vector3(0.66, 0.06, 0.58), CHAIR_SEAT + Vector3(0, -0.03, 0), chair, Vector3(-0.08, 0.5, 0))
-	_box(env, Vector3(0.66, 0.8, 0.06), CHAIR_SEAT + Vector3(-0.19, 0.36, -0.24), chair, Vector3(-0.3, 0.5, 0))
+	var chair_g := Node3D.new()
+	chair_g.position = CHAIR_SEAT # group origin at seat-top height
+	chair_g.rotation.y = 0.8 # back (+Z local) away from the lounging cat
+	env.add_child(chair_g)
+	_box(chair_g, Vector3(0.66, 0.06, 0.58), Vector3(0, -0.03, 0), chair)
+	_box(chair_g, Vector3(0.66, 0.62, 0.06), Vector3(0, 0.28, 0.28), chair, Vector3(0.28, 0, 0))
 	for sx: float in [-0.26, 0.26]:
 		for sz: float in [-0.22, 0.22]:
-			_box(env, Vector3(0.07, 0.46, 0.07), CHAIR_SEAT + Vector3(sx * 0.9, -0.26, sz), chair, Vector3(0, 0.5, 0))
+			_box(chair_g, Vector3(0.07, 0.46, 0.07), Vector3(sx, -0.26, sz), chair)
 	# Collision: perimeter, house, porch, tree, crates, chair.
 	var statics := StaticBody3D.new()
 	statics.name = "Statics"
 	add_child(statics)
+	_static_box(statics, Vector3(26.4, 0.2, 20.4), Vector3(0, -0.1, 0)) # the lawn itself
 	_static_box(statics, Vector3(17.0, 3.4, 1.0), Vector3(0, 1.7, -10.2))
 	_static_box(statics, Vector3(26.4, 1.3, 0.6), Vector3(0, 0.65, 10.2))
 	_static_box(statics, Vector3(0.6, 1.3, 20.4), Vector3(13.2, 0.65, 0))
@@ -161,7 +166,7 @@ func _build_lights() -> void:
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-52, -32, 0)
 	sun.light_color = Color(1.0, 0.95, 0.85)
-	sun.light_energy = 1.15
+	sun.light_energy = 1.05
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 60.0
 	add_child(sun)
@@ -177,7 +182,7 @@ func _build_lights() -> void:
 	e.background_mode = Environment.BG_SKY
 	e.sky = sky
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	e.ambient_light_energy = 0.55
+	e.ambient_light_energy = 0.4
 	e.tonemap_mode = Environment.TONE_MAPPER_ACES
 	e.fog_enabled = true
 	e.fog_light_color = Color(0.78, 0.84, 0.9)
@@ -272,6 +277,8 @@ func attempt_strike() -> void:
 func _on_paw_swiped() -> void:
 	var pp := cat.paw_point()
 	for m: Variant in mice:
+		if not is_instance_valid(m):
+			continue
 		var mouse := m as PvKMouse
 		if mouse.state == "caught":
 			continue
