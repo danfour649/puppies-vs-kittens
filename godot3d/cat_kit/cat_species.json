@@ -32,6 +32,8 @@
         "wins_vs_willie": true
       },
       "game": {
+        "hp": 80.0,
+        "jump_velocity": 6.8,
         "sprint_speed": 6.0,
         "stalk_speed": 1.6,
         "stamina_drain": 26.0,
@@ -122,6 +124,8 @@
         "temperament": "A total asshole (the owner's words, affectionate): knocks drinks and his own water bowl everywhere, scratches the fuck out of the furniture, shits right beside the litter box in the basement, and meows constantly, like a shithead."
       },
       "game": {
+        "hp": 120.0,
+        "jump_velocity": 6.0,
         "sprint_speed": 5.0,
         "stalk_speed": 1.2,
         "stamina_drain": 22.0,

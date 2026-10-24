@@ -20,9 +20,14 @@ extends CharacterBody3D
 ## _step()-driven actor transforms.
 
 signal paw_swiped
+signal health_changed(hp: float, max_hp: float)
+signal fainted(cat: PvKCat)
+signal hissed(cat: PvKCat)
 
 const DATA_PATH := "res://cat_kit/cat_species.json"
 const LEG_H := 0.35 # unit-space leg anchor height (GTA stray_cat leg_h)
+const HISS_TIME := 1.5 # the startle lock (basement ghosts force this)
+const INVULN_TIME := 0.8 # brief mercy window after any landed hit
 
 # --- character identity / palette (from cat_species.json) -------------------
 var character_id := "willie"
@@ -57,11 +62,15 @@ var strike_cooldown := 0.38
 var stamina_max := 100.0
 var stamina_drain := 22.0
 var stamina_regen := 14.0
+var max_hp := 120.0
+var jump_velocity := 6.0
 
 # --- read-only state (the controller contract) -------------------------------
 var anim_state := "idle"
 var stamina := 100.0
 var is_lounging := false
+var hp := 120.0
+var is_fainted := false
 
 # --- structure verification handles (smoke test) ------------------------------
 var mottle_count := 0
@@ -92,6 +101,12 @@ var _strike_t := -1.0
 var _strike_cd := 0.0
 var _swipe_fired := false
 var _lounge_k := 0.0
+var _invuln_t := 0.0
+var _pounced := false
+var _hiss_t := -1.0
+var _hiss_k := 0.0
+var _faint_k := 0.0
+var _tail_segs: Array = [] # [MeshInstance3D, base diameter] — the hiss puff
 
 static var _doc: Dictionary = {}
 static var _doc_loaded := false
@@ -152,6 +167,9 @@ func _apply_character() -> void:
 	stamina_max = float(g.get("stamina_max", stamina_max))
 	stamina_drain = float(g.get("stamina_drain", stamina_drain))
 	stamina_regen = float(g.get("stamina_regen", stamina_regen))
+	max_hp = float(g.get("hp", max_hp))
+	hp = max_hp
+	jump_velocity = float(g.get("jump_velocity", jump_velocity))
 	stamina = stamina_max
 
 
@@ -394,7 +412,8 @@ func _build_tail() -> void:
 		var s: Array = segs[i]
 		var pos := Vector3(0, float(s[1]), float(s[0]))
 		seg_pos.append([pos, float(s[2]) * tail_k])
-		_ell(_tail, pos, Vector3.ONE * float(s[2]) * tail_k, tail_cols[i])
+		var seg_mi := _ell(_tail, pos, Vector3.ONE * float(s[2]) * tail_k, tail_cols[i])
+		_tail_segs.append([seg_mi, float(s[2]) * tail_k])
 	if pattern == "tortoiseshell":
 		# Orange running through the dark tail (photo truth).
 		var rng := _mottle_rng()
@@ -422,7 +441,7 @@ func set_move_input(dir: Vector3, sprint: bool, stalk: bool) -> void:
 
 
 func strike() -> bool:
-	if _strike_t >= 0.0 or _strike_cd > 0.0 or is_lounging:
+	if _strike_t >= 0.0 or _strike_cd > 0.0 or is_lounging or is_fainted or _hiss_t >= 0.0:
 		return false
 	_strike_t = 0.0
 	_swipe_fired = false
@@ -445,14 +464,126 @@ func forward_dir() -> Vector3:
 
 
 ## Where the striking paw lands: front-right paw, half a strike ahead.
+## Mid-pounce the paw reaches ~1.6x as far (see combat_director.gd).
 func paw_point() -> Vector3:
-	return global_position + forward_dir() * strike_range * model_scale / 0.32
+	var r := strike_range * model_scale / 0.32
+	if is_pouncing():
+		r *= 1.6
+	return global_position + forward_dir() * r
+
+
+# --- combat / health / startle (the zone-facing cat API) ----------------------
+
+## A real jump, for shelves and platforms. Standard platforming
+## ledge in the Massey house is 0.5 m; this apex clears ~0.8 m.
+func jump() -> bool:
+	if not is_on_floor() or is_lounging or is_fainted or _hiss_t >= 0.0:
+		return false
+	velocity.y = jump_velocity
+	return true
+
+
+## Mid-jump only: the paw strike becomes a pounce — a forward lunge
+## with the longer paw reach above. Returns true if it fired.
+func pounce() -> bool:
+	if is_on_floor() or _pounced or is_fainted:
+		return false
+	if not strike():
+		return false
+	_pounced = true
+	velocity += forward_dir() * 4.2 + Vector3(0, 0.8, 0)
+	return true
+
+
+func is_pouncing() -> bool:
+	return _pounced and not is_on_floor()
+
+
+## Damage in, from enemies / cars / the world. `profile` is a
+## CombatData profile: it may carry damage_frac (fraction of max HP
+## — vehicle_hit) and launch (pop the cat up hard). Returns true if
+## the hit landed (brief invulnerability swallows the rest).
+func take_damage(amount: float, from_position: Vector3, profile: Dictionary = {}) -> bool:
+	if is_fainted:
+		return false
+	if _invuln_t > 0.0 and not bool(profile.get("ignore_invuln", false)):
+		return false
+	var dmg := amount
+	if profile.has("damage_frac"):
+		dmg = max_hp * float(profile["damage_frac"])
+	if dmg <= 0.0:
+		return false
+	hp = maxf(0.0, hp - dmg)
+	_invuln_t = INVULN_TIME
+	var away := global_position - from_position
+	away.y = 0.0
+	var kb := float(profile.get("knockback", 2.5))
+	if away.length() > 0.01:
+		velocity.x += away.normalized().x * kb
+		velocity.z += away.normalized().z * kb
+	if bool(profile.get("launch", false)):
+		velocity.y = 7.5
+	elif is_on_floor():
+		velocity.y = maxf(velocity.y, 1.2)
+	health_changed.emit(hp, max_hp)
+	if hp <= 0.0:
+		_faint()
+	return true
+
+
+## Partial heal — the lap-petting / fish-treat seam. The house
+## occupants' lap state and the outside lane's treats call this;
+## it only ever tops the cat up (and never un-faints him — a faint
+## is the game's respawn flow, §4 of the zones doc).
+func heal(amount: float) -> float:
+	if is_fainted or amount <= 0.0:
+		return 0.0
+	var before := hp
+	hp = minf(max_hp, hp + amount)
+	health_changed.emit(hp, max_hp)
+	return hp - before
+
+
+func heal_full() -> void:
+	hp = max_hp
+	is_fainted = false
+	_invuln_t = 0.0
+	set_lounge(false)
+	health_changed.emit(hp, max_hp)
+
+
+func _faint() -> void:
+	is_fainted = true
+	set_lounge(true) # the dramatic flop; the game handles the respawn
+	fainted.emit(self)
+
+
+## The startle state — basement ghosts force it, anything may call
+## it. Full arched-back Halloween pose (spine up, tail puffed, head
+## low), HISS_TIME of control lock, NO damage. Emits hissed (the
+## audio hook). Returns false if it couldn't start.
+func hiss() -> bool:
+	if _hiss_t >= 0.0 or is_lounging or is_fainted:
+		return false
+	_hiss_t = 0.0
+	hissed.emit(self)
+	return true
+
+
+func is_hissing() -> bool:
+	return _hiss_t >= 0.0
 
 
 # --- physics --------------------------------------------------------------------
 
 func _physics_process(delta: float) -> void:
 	_time += delta
+	if _invuln_t > 0.0:
+		_invuln_t -= delta
+	if _hiss_t >= 0.0:
+		_hiss_t += delta
+		if _hiss_t >= HISS_TIME:
+			_hiss_t = -1.0
 	if _strike_cd > 0.0:
 		_strike_cd -= delta
 	if _strike_t >= 0.0:
@@ -467,7 +598,7 @@ func _physics_process(delta: float) -> void:
 	var want := Vector3.ZERO
 	var speed := 0.0
 	var moving := false
-	if _input_dir.length() > 0.05 and not is_lounging and _strike_t < 0.0:
+	if _input_dir.length() > 0.05 and not is_lounging and not is_fainted and _hiss_t < 0.0 and _strike_t < 0.0:
 		moving = true
 		var sprinting := _input_sprint and stamina > 1.0
 		speed = stalk_speed if _input_stalk else (sprint_speed if sprinting else walk_speed)
@@ -481,11 +612,20 @@ func _physics_process(delta: float) -> void:
 
 	velocity.x = want.x
 	velocity.z = want.z
-	velocity.y = -1.0 if is_on_floor() else velocity.y - 22.0 * delta
+	# Grounded stick only when not moving up — a fresh jump()
+	# sets velocity.y > 0 between frames and must survive this.
+	if is_on_floor() and velocity.y <= 0.0:
+		velocity.y = -1.0
+	else:
+		velocity.y -= 22.0 * delta
 	move_and_slide()
+	if is_on_floor():
+		_pounced = false
 
 	if _strike_t >= 0.0:
 		anim_state = "strike"
+	elif _hiss_t >= 0.0:
+		anim_state = "hiss"
 	elif is_lounging:
 		anim_state = "lounge"
 	elif moving:
@@ -497,6 +637,8 @@ func _physics_process(delta: float) -> void:
 # --- animation (poses are pure functions of state + time) ------------------------
 
 func _process(delta: float) -> void:
+	_hiss_k = move_toward(_hiss_k, 1.0 if _hiss_t >= 0.0 else 0.0, delta * (5.0 if _hiss_t >= 0.0 else 2.5))
+	_faint_k = move_toward(_faint_k, 1.0 if is_fainted else 0.0, delta * 3.0)
 	var spd := Vector2(velocity.x, velocity.z).length()
 	if anim_state in ["walk", "stalk", "sprint"]:
 		_phase += delta * (4.2 + spd * 1.9)
@@ -540,10 +682,23 @@ func _process(delta: float) -> void:
 		body_scale = body_scale.lerp(Vector3(1.05, 0.7, 1.0), _lounge_k)
 		tail_rot.y = lerpf(tail_rot.y, 0.85, _lounge_k)
 		head_rot.x = lerpf(head_rot.x, 0.22, _lounge_k)
+	if _hiss_k > 0.0:
+		# The Halloween arch: spine arched up, head low, tail high.
+		body_scale = body_scale * Vector3(1.0 + 0.03 * _hiss_k, 1.0 + 0.30 * _hiss_k, 1.0 - 0.04 * _hiss_k)
+		body_y += 0.05 * _hiss_k
+		head_rot.x = lerpf(head_rot.x, 0.34, _hiss_k)
+		tail_rot.x = lerpf(tail_rot.x, -0.85, _hiss_k)
 	_body.scale = body_scale
 	_body.position.y = body_y * (1.0 - _lounge_k)
+	_body.rotation.z = 0.85 * _faint_k # the faint flop rolls him over
 	_head.rotation = head_rot
 	_tail.rotation = tail_rot
+	# Tail puff for the hiss (segments recorded at build time).
+	for seg: Array in _tail_segs:
+		(seg[0] as MeshInstance3D).scale = Vector3.ONE * float(seg[1]) * (1.0 + 0.75 * _hiss_k)
+	# Invulnerability blink — never while fainted (he's a drama cat).
+	if _model != null:
+		_model.visible = (int(_time * 18.0) % 2 == 0) if (_invuln_t > 0.0 and not is_fainted) else true
 
 	# Legs: diagonal pairs; tucked away in the lounge.
 	var amp := 0.0

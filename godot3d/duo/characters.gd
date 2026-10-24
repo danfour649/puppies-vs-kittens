@@ -77,7 +77,7 @@ static func _willie_from_flat(d: Dictionary) -> Dictionary:
 	var g: Dictionary = d.get("game", {}) if typeof(d.get("game")) == TYPE_DICTIONARY else {}
 	return {
 		"id": "willie",
-		"name": String(d.get("name", "Willy")),
+		"name": String(d.get("name", "Willie")),
 		"scale": float(d.get("scale", 0.35)),
 		"coat": _col(pal.get("coat", d.get("color", [])), Color(1, 1, 1)),
 		"patch": _col(pal.get("ginger", []), Color(0.9098, 0.6863, 0.3294)),

@@ -1,5 +1,5 @@
 extends Node
-## Standing-shot pass for Puppies vs Kittens 3D. Run under Xvfb (real
+## Standing-shot pass for Willie and Aggie. Run under Xvfb (real
 ## rendering, unlike the headless smoke test):
 ##   xvfb-run godot --path godot3d res://tools/shots.tscn
 ## Saves four PNGs into res://screenshots/: willie_closeup,

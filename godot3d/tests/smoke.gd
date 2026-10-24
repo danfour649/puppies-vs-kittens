@@ -1,5 +1,5 @@
 extends Node
-## Headless smoke test for Puppies vs Kittens 3D.
+## Headless smoke test for Willie and Aggie.
 ## Run: godot --headless --path godot3d res://tests/smoke.tscn
 ## Drives the real game through its input_override seam and asserts on
 ## STATE only — never on rendered pixels (headless readbacks lie).

@@ -13,6 +13,8 @@ extends Node
 ## back into chilling on its own.
 
 const YARD := Rect2(-11.6, -8.6, 23.2, 17.2)
+## MASSEY: the wander bounds follow the zone (set on travel).
+var wander_rect := Rect2(-11.6, -8.6, 23.2, 17.2)
 
 var cat: PvKCat = null
 var player_cat: PvKCat = null
@@ -164,9 +166,9 @@ func _start_wander() -> void:
 	var p := cat.global_position
 	for tries in 4:
 		p = Vector3(
-			_rng.randf_range(YARD.position.x, YARD.position.x + YARD.size.x),
+			_rng.randf_range(wander_rect.position.x, wander_rect.position.x + wander_rect.size.x),
 			0.0,
-			_rng.randf_range(YARD.position.y, YARD.position.y + YARD.size.y))
+			_rng.randf_range(wander_rect.position.y, wander_rect.position.y + wander_rect.size.y))
 		if player_cat == null or not is_instance_valid(player_cat):
 			break
 		if _flat(p, player_cat.global_position) > 2.2:

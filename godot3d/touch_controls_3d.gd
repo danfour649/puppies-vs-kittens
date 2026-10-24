@@ -5,6 +5,7 @@ extends CanvasLayer
 ## TouchControls, minus the bird button (there are no birds here).
 
 signal strike_pressed
+signal pounce_pressed
 
 var joystick: PvKJoystick3D
 
@@ -27,6 +28,16 @@ func _ready() -> void:
 	paw.offset_bottom = -50
 	paw.pressed.connect(func() -> void: strike_pressed.emit())
 	add_child(paw)
+	var pounce := Button.new()
+	pounce.text = "POUNCE"
+	pounce.add_theme_font_size_override("font_size", 22)
+	pounce.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	pounce.offset_left = -330
+	pounce.offset_right = -175
+	pounce.offset_top = -300
+	pounce.offset_bottom = -190
+	pounce.pressed.connect(func() -> void: pounce_pressed.emit())
+	add_child(pounce)
 
 
 func move_vector() -> Vector2:
