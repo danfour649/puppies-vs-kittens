@@ -64,7 +64,7 @@ func _run() -> void:
 	daniel.dwell_scale = 0.02 # routines effectively hold their stations
 	folasade.dwell_scale = 0.02
 	daniel.go_station(2)
-	folasade.go_station(4)
+	folasade.go_station(1) # her rotated routine: counter is station 1
 	var sib = _game.duo.sibling_cat()
 	if sib != null:
 		sib.global_position = Vector3(5.55, 0.05, -201.15)
