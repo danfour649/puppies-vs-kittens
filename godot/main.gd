@@ -125,11 +125,11 @@ func _mk_label(text: String, size: int, color: Color = Color(0.08, 0.08, 0.08)) 
     return l
 
 
-func _mk_button(text: String, min_h: float = 52.0) -> Button:
+func _mk_button(text: String, min_h: float = 52.0, font_size: int = 22) -> Button:
     var b := Button.new()
     b.text = text
     b.custom_minimum_size = Vector2(0, min_h)
-    b.add_theme_font_size_override("font_size", 22)
+    b.add_theme_font_size_override("font_size", font_size)
     b.focus_mode = Control.FOCUS_NONE
     return b
 
@@ -150,13 +150,13 @@ func _build_hud() -> void:
     panel.add_theme_stylebox_override("panel", sb)
     _hud.add_child(panel)
     var row := HBoxContainer.new()
-    row.add_theme_constant_override("separation", 14)
+    row.add_theme_constant_override("separation", 8)
     panel.add_child(row)
-    _lbl_mice = _mk_label("Mice Left: 0", 24)
-    _lbl_kills = _mk_label("Kills: 0", 24)
-    _lbl_time = _mk_label("Time: 0", 24, Color(0, 0.45, 0.45))
-    _lbl_hp = _mk_label("HP: 100", 24, Color(0.5, 0.05, 0.05))
-    _lbl_mode = _mk_label("", 20, Color(0.3, 0.3, 0.3))
+    _lbl_mice = _mk_label("Mice Left: 0", 20)
+    _lbl_kills = _mk_label("Kills: 0", 20)
+    _lbl_time = _mk_label("Time: 0", 20, Color(0, 0.45, 0.45))
+    _lbl_hp = _mk_label("HP: 100", 20, Color(0.5, 0.05, 0.05))
+    _lbl_mode = _mk_label("", 16, Color(0.3, 0.3, 0.3))
     row.add_child(_lbl_mice)
     row.add_child(_lbl_kills)
     row.add_child(_lbl_time)
@@ -165,22 +165,22 @@ func _build_hud() -> void:
     var spacer := Control.new()
     spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     row.add_child(spacer)
-    var b_easy := _mk_button("EASY", 46)
+    var b_easy := _mk_button("EASY", 46, 18)
     b_easy.pressed.connect(func() -> void: start_round("easy"))
     row.add_child(b_easy)
-    var b_med := _mk_button("MED", 46)
+    var b_med := _mk_button("MED", 46, 18)
     b_med.pressed.connect(func() -> void: start_round("medium"))
     row.add_child(b_med)
-    var b_hard := _mk_button("HARD", 46)
+    var b_hard := _mk_button("HARD", 46, 18)
     b_hard.pressed.connect(func() -> void: start_round("hard"))
     row.add_child(b_hard)
-    var b_bird := _mk_button("BIRD", 46)
+    var b_bird := _mk_button("BIRD", 46, 18)
     b_bird.pressed.connect(toggle_bird_mode)
     row.add_child(b_bird)
-    var b_restart := _mk_button("RESTART", 46)
+    var b_restart := _mk_button("RESTART", 46, 18)
     b_restart.pressed.connect(func() -> void: start_round(difficulty))
     row.add_child(b_restart)
-    var b_quit := _mk_button("QUIT", 46)
+    var b_quit := _mk_button("QUIT", 46, 18)
     b_quit.pressed.connect(quit_round)
     row.add_child(b_quit)
     _hud.visible = false
@@ -326,7 +326,11 @@ func start_round(diff_id: String) -> void:
     _splash.visible = false
     _credits.visible = false
     _hud.visible = true
-    _touch.visible = DisplayServer.is_touchscreen_available()
+    # Touch UI only where it belongs: phones/tablets and mobile web.
+    # (Xvfb and some desktop setups report a phantom touchscreen.)
+    _touch.visible = DisplayServer.is_touchscreen_available() and (
+        OS.has_feature("android") or OS.has_feature("ios")
+        or OS.has_feature("web_android") or OS.has_feature("web_ios"))
     _update_hud()
 
 
@@ -413,12 +417,12 @@ func toggle_bird_mode() -> void:
 func _on_animal_died(a: Animal) -> void:
     if a.species_id == "mouse":
         _corpses.append({"node": a, "t": 0.9})
+        mice.erase(a) # always: flock arrays reference this list, a freed corpse must not linger in them
         if state == "playing":
             kills += 1
             round_kills += 1
             kills_by_mode[difficulty] = int(kills_by_mode[difficulty]) + 1
             mice_remaining -= 1
-            mice.erase(a)
             _update_hud()
             if mice_remaining <= 0:
                 total_play_time += clock_time

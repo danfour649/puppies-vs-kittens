@@ -56,6 +56,9 @@ func _initialize() -> void:
         "kitten moves under input (%.0f -> %.0f)" % [start_x, _game.kitten.position.x])
 
     # --- strike wounds a mouse at the paw; wound kills after 3 s (Java TTL) ---
+    # Shield the kitten: on hard the (now correctly dangerous) puppies can
+    # legitimately kill it during this 3.4 s window and end the round early.
+    _game.kitten.hp = 100000.0
     var mouse: Animal = _game.mice[0]
     _game.kitten.facing = Vector2.RIGHT
     mouse.position = _game.kitten.paw_point()
@@ -82,22 +85,27 @@ func _initialize() -> void:
     _check(_game.player == _game.player_bird, "bird mode: player possesses the bird")
     _check(_game.kitten.brain == "wanderer", "bird mode: kitten stays in the world as an NPC")
     var frames := 0
-    while _game.player_bird.flight_phase != "cruise" and frames < 300:
+    while is_instance_valid(_game.player_bird) and _game.player_bird.flight_phase != "cruise" and frames < 300:
         await physics_frame
         frames += 1
     _check(_game.player_bird.flight_phase == "cruise", "bird climbs to cruise (altitude %.2f)" % _game.player_bird.altitude)
-    _game.player_bird.try_strike() # SPACE = dive
-    var saw_dive := false
-    frames = 0
-    while frames < 300:
-        await physics_frame
-        frames += 1
-        if _game.player_bird.flight_phase == "dive":
-            saw_dive = true
-        if saw_dive and _game.player_bird.altitude > 0.8:
-            break
-    _check(saw_dive, "bird dived on strike input")
-    _check(_game.player_bird.altitude > 0.8, "bird climbed back out of the dive")
+    if is_instance_valid(_game.player_bird):
+        _game.player_bird.try_strike() # SPACE = dive
+        var saw_dive := false
+        frames = 0
+        while frames < 300 and is_instance_valid(_game.player_bird):
+            await physics_frame
+            frames += 1
+            if _game.player_bird.flight_phase == "dive":
+                saw_dive = true
+            if saw_dive and _game.player_bird.altitude > 0.8:
+                break
+        _check(saw_dive, "bird dived on strike input")
+        _check(is_instance_valid(_game.player_bird) and _game.player_bird.altitude > 0.8,
+            "bird climbed back out of the dive")
+    else:
+        _check(false, "bird dived on strike input (no player bird)")
+        _check(false, "bird climbed back out of the dive (no player bird)")
 
     # --- quit with mice left is a loss (Java rule) ---
     _game.quit_round()

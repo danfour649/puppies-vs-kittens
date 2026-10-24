@@ -25,6 +25,7 @@ func _initialize() -> void:
     _save("splash")
 
     _game.start_round("medium")
+    _game._touch.visible = true # show the touch UI in the shots (it is platform-gated in real play)
     await create_timer(2.2).timeout
     # Stage a strike so the shot shows the fight stars and the wounded mouse.
     var mouse: Animal = _game.mice[0]

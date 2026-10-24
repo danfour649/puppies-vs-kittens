@@ -375,7 +375,7 @@ func _brain_prey(delta: float) -> void:
     var sep := Vector2.ZERO
     var sep_r := float(species_def["separation_radius"])
     for other in flock:
-        if other == self or other.is_dead or not is_instance_valid(other):
+        if other == self or not is_instance_valid(other) or other.is_dead:
             continue
         var dd := global_position.distance_to(other.global_position)
         if dd > 0.01 and dd < sep_r:
