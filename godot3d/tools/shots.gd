@@ -2,7 +2,8 @@ extends Node
 ## Standing-shot pass for Puppies vs Kittens 3D. Run under Xvfb (real
 ## rendering, unlike the headless smoke test):
 ##   xvfb-run godot --path godot3d res://tools/shots.tscn
-## Saves three PNGs into res://screenshots/.
+## Saves four PNGs into res://screenshots/: willie_closeup,
+## aggie_closeup, both_cats, lounge.
 
 var _game = null
 
@@ -23,42 +24,60 @@ func _shot(name: String) -> void:
 	print("SHOT saved ", name, " ", img.get_size())
 
 
+func _anchor_at(pos: Vector3) -> void:
+	var n := Node3D.new()
+	n.position = pos
+	_game.add_child(n)
+	_game.cam_anchor = n
+
+
 func _run() -> void:
 	_game = load("res://main.tscn").instantiate()
 	add_child(_game)
 	await _wait(1.0)
-	# (a) Cat close-up: 3/4 front view, cat idle (breathing). Genuinely
-	# close, and the sun eased for this shot only so Willy's white coat
-	# and ginger don't blow out under the game's midday lighting.
 	var suns: Array = _game.find_children("*", "DirectionalLight3D")
 	var sun: DirectionalLight3D = null
 	if suns.size() > 0:
 		sun = suns[0] as DirectionalLight3D
+	# (a) Willie close-up: 3/4 front view, cat idle (breathing).
+	# Genuinely close, and the sun eased for this shot only so the
+	# white coat and rich ginger don't blow out under midday light.
 	if sun != null:
 		sun.light_energy = 0.85
 	_game.cam_dist = 0.8
 	_game.cam_pitch = -0.18
 	_game.cam_yaw = -0.6
 	await _wait(0.7)
-	await _shot("cat_closeup")
+	await _shot("willie_closeup")
 	if sun != null:
 		sun.light_energy = 1.05
-	# (b) Wide gameplay: cat walks into the yard among the mice.
-	_game.cam_dist = 8.5
-	_game.cam_pitch = -0.72
-	_game.cam_yaw = PI
-	_game.input_override = {"active": true, "move": Vector2(0.3, 1), "sprint": false, "stalk": false}
-	await _wait(1.5)
-	_game.input_override = {"active": false, "move": Vector2.ZERO, "sprint": false, "stalk": false}
-	await _wait(0.4)
-	await _shot("gameplay_wide")
-	# (c) The lounge: cat teleported onto the garden chair, Willy flop.
+	# (b) Aggie close-up: she lounges on the garden chair; anchor the
+	# camera on her and come in close from her front-left.
+	_anchor_at(_game.aggie.global_position + Vector3(0, 0.10, 0))
+	_game.cam_dist = 0.7
+	_game.cam_pitch = -0.30
+	_game.cam_yaw = -2.0
+	await _wait(0.7)
+	await _shot("aggie_closeup")
+	# (c) Both cats: Willie staged on the lawn in front of Aggie's
+	# chair, looking up at her; wide enough to read both at once.
 	_game.cat.velocity = Vector3.ZERO
-	_game.cat.global_position = Vector3(4.5, 0.55, 4.5)
-	_game.cat.rotation.y = 0.8
+	_game.cat.global_position = Vector3(3.45, 0.08, 3.30)
+	_game.cat.rotation.y = 2.45
+	_anchor_at(Vector3(4.05, 0.30, 3.95))
+	_game.cam_dist = 2.5
+	_game.cam_pitch = -0.40
+	_game.cam_yaw = -2.35
+	await _wait(0.8)
+	await _shot("both_cats")
+	# (d) The lounge: Willie flopped on the porch deck.
+	_game.cam_anchor = null
+	_game.cat.velocity = Vector3.ZERO
+	_game.cat.global_position = Vector3(2.5, 0.34, -8.7)
+	_game.cat.rotation.y = PI # face into the yard
 	await _wait(0.5)
 	_game.cat.set_lounge(true)
-	_game.cam_yaw = -2.36
+	_game.cam_yaw = 2.75
 	_game.cam_dist = 1.5
 	_game.cam_pitch = -0.35
 	await _wait(1.0)
