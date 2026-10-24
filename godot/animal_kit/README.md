@@ -102,30 +102,41 @@ ours scale the Java divisor table 150/100/50 into rate multipliers
 
 ## Bird mode: GTA Fredericton provenance
 
-Studied in GTA Fredericton (read-only) before writing any of this:
+Studied in GTA Fredericton (read-only) before writing any of this. An
+accuracy note first: GTA's bird mode (TODO #87, still unchecked) is a
+**demo-stage, pure-logic module set** — it shipped in PR #270 as design
+and numbers, with no bird scene, input binding, or camera/flight loop
+integrated into the game. What PvK reused is that design, reimplemented
+fresh in 2D — not GTA code. The real source files, all under
+`scripts/bird/`:
 
-- `scenes/player/bird.gd` — the bird player controller (velocity-aligned
-  flight, landing-spot dive, fish snatch).
-- `scenes/player/player.gd` — the mode state machine and possession
-  broker (switching to the bird leaves the human in the world as an NPC).
-- `resources/bird_species.tres` + `data/bird_species.gd` — bird species
-  as data: id, tint, scale, max speed, turn rate, per-species dive FX.
-- `scripts/systems/animal.gd` — the prey registry (birds strike animals
-  through a shared registry, not ad-hoc lookups).
-- `scenes/ui/bird_hud.gd`, `data/tuning.gd` — mode HUD and global tuning.
+- `bird_mode.gd` — the mode controller: species table, start/end,
+  score, landing rules.
+- `flight.gd` — velocity + stamina integrator: cruise 10 m/s, dive
+  20 m/s, stamina 100 draining 2.0/s while flapping.
+- `scoring.gd` — splat table 10/25/40/50/75, direct hits x2, 5-second
+  combo x2; hunt scores: fish 100, rabbit/squirrel 60.
+- `spawns.gd` — spawn points: nest, airborne, Carleton Park.
+- `species.gd` — `BirdSpecies` resource: eagle 1.2x speed and hunts,
+  osprey best climb and hunts, gull fastest with a splat cooldown and
+  no hunting.
+- `bird_hud.gd` — score label only.
 
-Ported concepts: possession swap with the original creature persisting as
-an NPC; species-as-data driving one controller; the dive as a committed
-descent to a ground point with a proximity resolution (their talon-splash
-radius → our `snatch_radius`); straight-line lead-pursuit steering for
-NPC dives; the "helpless prey" list discipline (only true prey species
-can be snatched — our `prey` group); altitude + shadow as the readable
-ground truth in place of their 3D camera work.
+Ported concepts: species-as-data driving one controller; the flight and
+stamina numbers above as the starting tuning; the dive as a committed
+descent to a ground point resolved by proximity (our `snatch_radius`);
+the prey discipline (only true prey species can be hunted — our `prey`
+group). PvK's own additions, which GTA does not have yet: the possession
+swap itself (press B, the kitten stays in the world as an NPC), the
+altitude + ground-shadow readability model, dive resolution against
+live actors, and NPC dive AI. If this kit is lifted back into GTA, the
+bird mode there gains a working flight loop, not just the logic it has
+now.
 
-Not ported: poop scoring (+10/+25/+50, moving targets ×2.5) — PvK has no
-score, only kills; thermal soaring/energy; the 3D pitch-and-bank flight
-model; the grounded bird FSM (walk/hop/takeoff states). All four are
-natural v0.4 extensions if the mode grows.
+Not ported: the splat scoring table (10/25/40/50/75, direct x2, combo
+x2 — PvK counts kills, not score); thermal soaring/energy beyond the
+stamina integrator; the 3D pitch-and-bank flight model; grounded bird
+states (walk/hop/takeoff). All natural v0.4 extensions if the mode grows.
 
 ## Lifting this kit into GTA Fredericton
 
