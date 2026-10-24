@@ -1,0 +1,31 @@
+; Engine configuration file.
+; Puppies vs Kittens — Godot edition. Best edited using the editor UI.
+
+config_version=5
+
+[application]
+
+config/name="Puppies vs Kittens"
+config/description="Godot revamp (v0.3) of the 2020 JavaFX original. You are the kitten: hunt every mouse, avoid the puppies. Web + mobile friendly, with a reusable animal kit and a bird mode adapted from GTA Fredericton's bird mode design."
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+config/icon="res://assets/KvPlogo.png"
+
+[display]
+
+window/size/viewport_width=1000
+window/size/viewport_height=1000
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation="sensor"
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=true
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true
+environment/defaults/default_clear_color=Color(1, 0.937, 0.835, 1)

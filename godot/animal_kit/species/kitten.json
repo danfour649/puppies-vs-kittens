@@ -1,0 +1,1 @@
+{"body_radius":92.0,"brain":"player","display_name":"Kitten","id":"kitten","max_hp":100,"npc_brain":"wanderer","shadow_width":300.0,"show_hp_bar":true,"speed":305.0,"sprite_width":400.0,"sprites":{"action":"k.png","dead":"k3.png","idle":"k2.png"},"strike_cooldown":0.45,"strike_radius":104.0,"strike_range":108.0}
