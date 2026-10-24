@@ -276,8 +276,11 @@ func _physics_process(delta: float) -> void:
 	var dist := INF
 	if target_cat != null and is_instance_valid(target_cat):
 		to_cat = target_cat.global_position - global_position
-		to_cat.y = 0.0
-		dist = to_cat.length()
+		if absf(to_cat.y) > 0.6:
+			to_cat = Vector3.ZERO # another floor: never aggro/bite through it
+		else:
+			to_cat.y = 0.0
+			dist = to_cat.length()
 
 	# Flee: alone (no packmates near) and down to the last hit point.
 	if state != "flee" and hp <= 1 and dist < aggro_radius and _packmates_nearby() == 0:

@@ -161,6 +161,8 @@ func _shadow_cat(delta: float) -> void:
 	if target_cat == null or not is_instance_valid(target_cat):
 		return
 	var to_cat := target_cat.global_position - global_position
+	if absf(to_cat.y) > 1.2:
+		return # another floor: the haunting stays downstairs
 	to_cat.y = 0.0
 	if to_cat.length() > shadow_range or to_cat.length() < 0.45:
 		return
@@ -177,6 +179,9 @@ func _update_contact(delta: float) -> void:
 	if mode == "yield" or _hiss_cd > 0.0 or target_cat == null or not is_instance_valid(target_cat):
 		_contact_t = 0.0
 		return
+	if absf(target_cat.global_position.y - global_position.y) > 1.2:
+		_contact_t = 0.0
+		return # another floor: no contact through it
 	var d := Vector2(target_cat.global_position.x - global_position.x, target_cat.global_position.z - global_position.z).length()
 	var lounging := bool(target_cat.get("is_lounging")) if target_cat != null else false
 	if d <= contact_radius and not lounging:

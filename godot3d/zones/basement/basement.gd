@@ -649,14 +649,11 @@ func register_hub_cat(cat: PvKCat) -> void:
 		return
 	if not cat.paw_swiped.is_connected(_on_paw_swiped):
 		cat.paw_swiped.connect(_on_paw_swiped)
-	for rat: PvKRat in rats:
-		rat.target_cat = cat
-	for sp: PvKSpider in spiders:
-		sp.target_cat = cat
-	for g: PvKGhost in ghosts:
-		g.target_cat = cat
 	if _voice == null:
 		_voice = HissAudio.make_voice(self)
+
+
+var _foe_target: PvKCat = null ## who the foes are wired to (in-zone only)
 
 
 func _poll_hub() -> void:
@@ -670,6 +667,19 @@ func _poll_hub() -> void:
 	# the kit capsule on the way out.
 	var mgr := get_tree().get_first_node_in_group("zone_manager")
 	var in_zone := mgr != null and String(mgr.get("current_zone")) == HouseSpec.BASEMENT
+	# Foes hunt only while the player is actually down here. Their
+	# steering is flat-XZ by design (same-floor maze), so a wired
+	# rat would otherwise bite ankles through the ceiling and a
+	# guarding ghost would hiss at the floorboards.
+	var want: PvKCat = pc if in_zone else null
+	if _foe_target != want:
+		_foe_target = want
+		for rat: PvKRat in rats:
+			rat.target_cat = want
+		for sp: PvKSpider in spiders:
+			sp.target_cat = want
+		for g: PvKGhost in ghosts:
+			g.target_cat = want
 	if in_zone and pc != null and _hub_fit_cat != pc:
 		_hub_apply_fit(pc)
 	elif not in_zone and _hub_fit_cat != null:
@@ -708,6 +718,8 @@ func _on_paw_swiped() -> void:
 	for foe in foes:
 		if foe.is_dead():
 			continue
+		if absf(foe.global_position.y - pp.y) > 1.2:
+			continue # another floor: the paw does not reach through it
 		var d := Vector2(foe.global_position.x - pp.x, foe.global_position.z - pp.z).length()
 		if d <= STRIKE_HIT_RADIUS:
 			foe.take_hit(CAT_STRIKE_DAMAGE, player_cat.global_position)
