@@ -73,8 +73,11 @@ signal; nothing here draws HUD chrome of its own.
 
 ### The lap (healing)
 
-While an occupant is seated, their lap spot is active (a small
-platform + `LapSpot` marker on the thighs). `try_mount_lap(cat)`:
+While an occupant is seated, their lap spot is active (a `LapSpot`
+marker on the thighs; the system pins the cat to it kinematically —
+there is deliberately no physics platform, an early one overlapped
+the occupant's own capsule and depenetration shoved them around).
+`try_mount_lap(cat)`:
 
 - cat settles into its lounge pose on the lap; the occupant pets it
   (animated stroking hand) and a synth purr plays (see
@@ -106,7 +109,7 @@ default 100).
 
 - `occupant.gd` — `MasseyOccupant` (CharacterBody3D): build,
   routine state machine, poses (walk/idle/seated/petting/hop/
-  stumble/shoo), lap spot + platform, debug seams for tests
+  stumble/shoo), lap spot, debug seams for tests
   (`place_at`, `set_routine`, `end_dwell_now`).
 - `occupant_system.gd` — `OccupantSystem`: interaction detection,
   score events + popups, lap sessions, purr voice.
