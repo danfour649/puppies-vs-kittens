@@ -7,6 +7,9 @@ extends Node3D
 const CatScene := preload("res://cat_kit/cat.gd")
 const MouseScene := preload("res://mouse.gd")
 const TouchScene := preload("res://touch_controls_3d.gd")
+# DUO: the two-cat iteration (sibling NPC, character select, meows,
+# and the provocation system) lives in res://duo/ and hangs off this.
+const DuoScene := preload("res://duo/duo_system.gd")
 
 const MOUSE_COUNT := 7
 const YARD := Rect2(-12.4, -9.4, 24.8, 18.8) # inside the fence
@@ -18,6 +21,14 @@ var mice: Array = []
 var caught_count := 0
 var elapsed := 0.0
 var won := false
+
+# DUO state: the duo system (null until _ready's tail), the radius
+# the paw check uses (the provoked buff widens it), and a camera
+# shake offset the flurry writes into.
+var duo: DuoSystem = null
+var catch_radius := 0.42
+var duo_shake := Vector3.ZERO
+var _mouse_seq := 0
 
 var cam_yaw := PI
 var cam_pitch := -0.48
@@ -51,19 +62,18 @@ func _ready() -> void:
 	cat.global_position = Vector3(2.5, 0.1, -6.2)
 	cat.rotation.y = PI # face into the yard (+Z); model forward is -Z
 	cat.paw_swiped.connect(_on_paw_swiped)
-	aggie = CatScene.new()
-	aggie.set_character("aggie")
-	aggie.name = "Aggie"
-	add_child(aggie)
-	aggie.global_position = CHAIR_SEAT + Vector3(0, 0.09, 0)
-	aggie.rotation.y = 0.8 # on the garden chair, aligned with its back
-	aggie.set_lounge(true)
 	_build_camera()
 	_build_hud()
 	_touch = TouchScene.new()
 	add_child(_touch)
 	_touch.strike_pressed.connect(attempt_strike)
 	_spawn_mice()
+	# DUO: sibling cat, character select, meow + provocation.
+	duo = DuoScene.new()
+	duo.name = "DuoSystem"
+	add_child(duo)
+	duo.setup(self)
+	aggie = duo.aggie_cat # shots seam: main's Aggie handle is the duo sibling
 
 
 # --- materials / boxes (wildlife.gd idiom, shadows on for a diorama) --------
@@ -266,17 +276,33 @@ func _hud_label(parent: Node, text: String, pos: Vector2) -> Label:
 
 func _spawn_mice() -> void:
 	for i in MOUSE_COUNT:
-		var m: PvKMouse = MouseScene.new()
-		m.name = "Mouse%d" % (i + 1)
-		add_child(m)
-		var pos := Vector3(_rng.randf_range(-10.0, 11.0), 0, _rng.randf_range(-6.0, 8.5))
-		m.global_position = pos
-		m.home = pos
-		m.bounds = YARD
-		m.cat = cat
-		m.rotation.y = _rng.randf() * TAU
-		m.was_caught.connect(_on_mouse_caught)
-		mice.append(m)
+		_spawn_one_mouse()
+
+
+func _spawn_one_mouse() -> void:
+	_mouse_seq += 1
+	var m: PvKMouse = MouseScene.new()
+	m.name = "Mouse%d" % _mouse_seq
+	add_child(m)
+	var pos := Vector3(_rng.randf_range(-10.0, 11.0), 0, _rng.randf_range(-6.0, 8.5))
+	m.global_position = pos
+	m.home = pos
+	m.bounds = YARD
+	m.cat = cat
+	m.rotation.y = _rng.randf() * TAU
+	m.was_caught.connect(_on_mouse_caught)
+	mice.append(m)
+
+
+## DUO: Aggie's flurry makes Willie DROP a catch — the counter ticks
+## down by one (min 0) and the mouse escapes back into the yard, so
+## the total stays catchable and the win stays reachable. Annoying,
+## not punishing.
+func drop_caught_mouse() -> void:
+	if won or caught_count <= 0:
+		return
+	caught_count -= 1
+	_spawn_one_mouse()
 
 
 func attempt_strike() -> void:
@@ -293,7 +319,7 @@ func _on_paw_swiped() -> void:
 		if mouse.state == "caught":
 			continue
 		var d := Vector2(mouse.global_position.x - pp.x, mouse.global_position.z - pp.z).length()
-		if d <= 0.42:
+		if d <= catch_radius: # DUO: the provoked buff widens this
 			mouse.get_caught()
 
 
@@ -343,6 +369,11 @@ func _physics_process(_delta: float) -> void:
 		dir = _cam_relative(Vector2(ix, iz))
 		sprint = Input.is_physical_key_pressed(KEY_SHIFT)
 		stalk = Input.is_physical_key_pressed(KEY_CTRL) or Input.is_physical_key_pressed(KEY_C)
+		# DUO: while the character select is up, the cat waits.
+		# (The input_override seam above is deliberately not locked:
+		# the smoke test drives straight through it.)
+		if duo != null and duo.input_locked():
+			dir = Vector3.ZERO
 	cat.set_move_input(dir, sprint, stalk)
 
 
@@ -371,6 +402,9 @@ func _unhandled_input(event: InputEvent) -> void:
 					attempt_strike()
 				KEY_L:
 					cat.toggle_lounge()
+				KEY_M: # DUO: meow (provoke responsibly)
+					if duo != null:
+						duo.player_meow()
 				KEY_R:
 					restart_game()
 	elif event is InputEventMouseButton:
@@ -390,7 +424,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	if not won:
 		elapsed += delta
-	var target := cat.global_position + Vector3(0, 0.3, 0)
+	var target := cat.global_position + Vector3(0, 0.3, 0) + duo_shake # DUO shake
 	if cam_anchor != null:
 		target = cam_anchor.global_position
 	_rig.global_position = _rig.global_position.lerp(target, 1.0 - exp(-8.0 * delta))
