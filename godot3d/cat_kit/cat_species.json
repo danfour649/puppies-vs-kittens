@@ -1,1 +1,207 @@
-{"characters":{"aggie":{"build":{"chest_dia":[0.285,0.275,0.32],"haunch_dia":[0.15,0.225,0.28],"leg_len":0.32,"leg_r_bot":0.033,"leg_r_top":0.044,"profile":"wiry","tail_k":0.72,"torso_dia":[0.3,0.295,0.88]},"character":{"build":"wiry","fight_style":"burst_and_flee","provocation_trigger":"willie_meowing","temperament":"Chill but vicious: small, quiet and unbothered — until she is provoked, and the provocation is her brother Willie's constant meowing. Then she beats him up; she always wins their fights, despite weighing half what he does.","weight_vs_willie":0.5,"wins_vs_willie":true},"game":{"sprint_speed":6.0,"stalk_speed":1.6,"stamina_drain":26.0,"stamina_max":100.0,"stamina_regen":16.0,"strike_cooldown":0.25,"strike_range":0.5,"walk_speed":2.2},"name":"Aggie","palette":{"base":[0.141,0.11,0.09],"eye":[0.541,0.604,0.231],"inner_ear":[0.4,0.29,0.22],"mottle":{"head":12,"legs":8,"seed":20261024,"tail":9,"torso":46},"mottle_cream":[0.749,0.659,0.478],"mottle_orange":[0.69,0.431,0.173],"nose":[0.1,0.075,0.06],"pattern":"tortoiseshell","provenance":"From Daniel's photos of the real Aggie (cat_kit/reference/reference-aggie-drawer.jpg and reference-aggie-plant.jpg): a dark tortoiseshell (Daniel says calico; the photos show tortie) — warm black-brown base #241C17 (photo median) with irregular orange #B06E2C and cream #BFA87A mottling over the whole coat, a mostly dark face with orange mottling and a cream/orange throat and chest, a dark tail with orange running through it, and green-gold eyes like her brother's. The mottle is a seeded scatter of small flattened ellipsoid shells in the two tones over the dark base, denser on the torso; mottle.seed makes her build identically every run."},"scale":0.25,"sex":"female"},"willie":{"build":{"chest_dia":[0.42,0.4,0.38],"haunch_dia":[0.23,0.34,0.37],"leg_len":0.3,"leg_r_bot":0.05,"leg_r_top":0.066,"profile":"plush","tail_k":1.3,"torso_dia":[0.44,0.42,0.95]},"character":{"build":"plush","meowing":"constant","signature_moves":["knock_drinks_over","knock_own_water_bowl_over","scratch_furniture","litter_box_near_miss","constant_meowing"],"temperament":"A total asshole (the owner's words, affectionate): knocks drinks and his own water bowl everywhere, scratches the fuck out of the furniture, shits right beside the litter box in the basement, and meows constantly, like a shithead."},"game":{"sprint_speed":5.0,"stalk_speed":1.2,"stamina_drain":22.0,"stamina_max":100.0,"stamina_regen":14.0,"strike_cooldown":0.38,"strike_range":0.55,"walk_speed":2.4},"name":"Willie","palette":{"coat":[1.0,1.0,1.0],"eye":[0.541,0.604,0.231],"ginger":[0.78,0.439,0.125],"ginger_dark":[0.592,0.329,0.09],"inner_ear":[0.89,0.65,0.56],"nose":[0.851,0.549,0.478],"pattern":"bicolor","provenance":"From Daniel's photos of the real Willie (cat_kit/reference/reference-willie-basket.jpg and reference-willie-table.jpg), which override the v0.1 hand-drawn art where they differ: pure white face blaze, muzzle, chest, belly, legs and paws; rich orange tabby as a cap wrapping the top of the head around the ears and down the sides of the cheeks, a LARGE saddle over the whole back and upper sides, and a substantially ginger, ringed tail; green-gold (hazel) eyes; small pink nose. Ginger albedo is #C97020, inside the #C26D1E-#CD7A2A band Daniel specified ('definitely darker orange' than the v0.1 art's #E8AF54): raw photo medians sample muted (#A68041-ish) because of indoor light and shadow, and the game's ACES tonemapping + midday sun desaturate further, so the albedo is set rich and tuned BY EYE against the photos in the standing willie_closeup shot. Tabby striping (ginger_dark #975417) is a fainter, darker banding inside the saddle, cap and tail rings. Tonemapping compensation: albedo picked ~one shade deeper than the naive daylight sample for exactly this reason; if the close-up still reads pale, deepen ginger before touching the lights."},"scale":0.35,"sex":"male"}},"gta":{"coat_in_gta":[0.85,0.55,0.25],"flee":3.5,"habitat":"URBAN","hostile":{"cd":1.0,"chance":0.04,"chase":2.4,"dmg":4.0,"hp":18.0,"notice":8.0,"reach":0.9},"shape":"quad","spd":1.2,"weight":4.0,"willow_reference":{"chill":true,"idle_bias":4.0,"leash":3.0,"lounge_body_scale":[1.05,0.7,1.0],"persistent":true}},"source":"Construction idiom: GTA Fredericton scripts/world/wildlife.gd: SPECIES[stray_cat] (line 33), HOSTILE[stray_cat] (line 79), _spawn_river_cat() (line 217), _build_mesh() quad branch (line 776). Colouring: each cat's own, from Daniel's photos of the real cats (see characters.<id>.palette.provenance).","species":"stray_cat"}
+{
+  "characters": {
+    "aggie": {
+      "build": {
+        "chest_dia": [
+          0.285,
+          0.275,
+          0.32
+        ],
+        "haunch_dia": [
+          0.15,
+          0.225,
+          0.28
+        ],
+        "leg_len": 0.32,
+        "leg_r_bot": 0.033,
+        "leg_r_top": 0.044,
+        "profile": "wiry",
+        "tail_k": 0.72,
+        "torso_dia": [
+          0.3,
+          0.295,
+          0.88
+        ]
+      },
+      "character": {
+        "build": "wiry",
+        "fight_style": "burst_and_flee",
+        "provocation_trigger": "willie_meowing",
+        "temperament": "Chill but vicious: small, quiet and unbothered \u2014 until she is provoked, and the provocation is her brother Willie's constant meowing. Then she beats him up; she always wins their fights, despite weighing half what he does.",
+        "weight_vs_willie": 0.5,
+        "wins_vs_willie": true
+      },
+      "game": {
+        "sprint_speed": 6.0,
+        "stalk_speed": 1.6,
+        "stamina_drain": 26.0,
+        "stamina_max": 100.0,
+        "stamina_regen": 16.0,
+        "strike_cooldown": 0.25,
+        "strike_range": 0.5,
+        "walk_speed": 2.2
+      },
+      "name": "Aggie",
+      "palette": {
+        "base": [
+          0.141,
+          0.11,
+          0.09
+        ],
+        "eye": [
+          0.541,
+          0.604,
+          0.231
+        ],
+        "inner_ear": [
+          0.4,
+          0.29,
+          0.22
+        ],
+        "mottle": {
+          "head": 14,
+          "legs": 8,
+          "seed": 20261024,
+          "tail": 9,
+          "torso": 64
+        },
+        "mottle_cream": [
+          0.749,
+          0.659,
+          0.478
+        ],
+        "mottle_orange": [
+          0.69,
+          0.431,
+          0.173
+        ],
+        "nose": [
+          0.1,
+          0.075,
+          0.06
+        ],
+        "pattern": "tortoiseshell",
+        "provenance": "From Daniel's photos of the real Aggie (cat_kit/reference/reference-aggie-drawer.jpg and reference-aggie-plant.jpg): a dark tortoiseshell (Daniel says calico; the photos show tortie) \u2014 warm black-brown base #241C17 (photo median) with irregular orange #B06E2C and cream #BFA87A mottling over the whole coat, a mostly dark face with orange mottling and a cream/orange throat and chest, a dark tail with orange running through it, and green-gold eyes like her brother's. The mottle is a seeded scatter of small flattened ellipsoid shells in the two tones over the dark base, denser on the torso; mottle.seed makes her build identically every run."
+      },
+      "scale": 0.25,
+      "sex": "female"
+    },
+    "willie": {
+      "build": {
+        "chest_dia": [
+          0.42,
+          0.4,
+          0.38
+        ],
+        "haunch_dia": [
+          0.23,
+          0.34,
+          0.37
+        ],
+        "leg_len": 0.3,
+        "leg_r_bot": 0.05,
+        "leg_r_top": 0.066,
+        "profile": "plush",
+        "tail_k": 1.3,
+        "torso_dia": [
+          0.44,
+          0.42,
+          0.95
+        ]
+      },
+      "character": {
+        "build": "plush",
+        "meowing": "constant",
+        "signature_moves": [
+          "knock_drinks_over",
+          "knock_own_water_bowl_over",
+          "scratch_furniture",
+          "litter_box_near_miss",
+          "constant_meowing"
+        ],
+        "temperament": "A total asshole (the owner's words, affectionate): knocks drinks and his own water bowl everywhere, scratches the fuck out of the furniture, shits right beside the litter box in the basement, and meows constantly, like a shithead."
+      },
+      "game": {
+        "sprint_speed": 5.0,
+        "stalk_speed": 1.2,
+        "stamina_drain": 22.0,
+        "stamina_max": 100.0,
+        "stamina_regen": 14.0,
+        "strike_cooldown": 0.38,
+        "strike_range": 0.55,
+        "walk_speed": 2.4
+      },
+      "name": "Willie",
+      "palette": {
+        "coat": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "eye": [
+          0.541,
+          0.604,
+          0.231
+        ],
+        "ginger": [
+          0.78,
+          0.439,
+          0.125
+        ],
+        "ginger_dark": [
+          0.592,
+          0.329,
+          0.09
+        ],
+        "inner_ear": [
+          0.89,
+          0.65,
+          0.56
+        ],
+        "nose": [
+          0.851,
+          0.549,
+          0.478
+        ],
+        "pattern": "bicolor",
+        "provenance": "From Daniel's photos of the real Willie (cat_kit/reference/reference-willie-basket.jpg and reference-willie-table.jpg), which override the v0.1 hand-drawn art where they differ: pure white face blaze, muzzle, chest, belly, legs and paws; rich orange tabby as a cap wrapping the top of the head around the ears and down the sides of the cheeks, a LARGE saddle over the whole back and upper sides, and a substantially ginger, ringed tail; green-gold (hazel) eyes; small pink nose. Ginger albedo is #C97020, inside the #C26D1E-#CD7A2A band Daniel specified ('definitely darker orange' than the v0.1 art's #E8AF54): raw photo medians sample muted (#A68041-ish) because of indoor light and shadow, and the game's ACES tonemapping + midday sun desaturate further, so the albedo is set rich and tuned BY EYE against the photos in the standing willie_closeup shot. Tabby striping (ginger_dark #975417) is a fainter, darker banding inside the saddle, cap and tail rings. Tonemapping compensation: albedo picked ~one shade deeper than the naive daylight sample for exactly this reason; if the close-up still reads pale, deepen ginger before touching the lights."
+      },
+      "scale": 0.35,
+      "sex": "male"
+    }
+  },
+  "gta": {
+    "coat_in_gta": [
+      0.85,
+      0.55,
+      0.25
+    ],
+    "flee": 3.5,
+    "habitat": "URBAN",
+    "hostile": {
+      "cd": 1.0,
+      "chance": 0.04,
+      "chase": 2.4,
+      "dmg": 4.0,
+      "hp": 18.0,
+      "notice": 8.0,
+      "reach": 0.9
+    },
+    "shape": "quad",
+    "spd": 1.2,
+    "weight": 4.0,
+    "willow_reference": {
+      "chill": true,
+      "idle_bias": 4.0,
+      "leash": 3.0,
+      "lounge_body_scale": [
+        1.05,
+        0.7,
+        1.0
+      ],
+      "persistent": true
+    }
+  },
+  "source": "Construction idiom: GTA Fredericton scripts/world/wildlife.gd: SPECIES[stray_cat] (line 33), HOSTILE[stray_cat] (line 79), _spawn_river_cat() (line 217), _build_mesh() quad branch (line 776). Colouring: each cat's own, from Daniel's photos of the real cats (see characters.<id>.palette.provenance).",
+  "species": "stray_cat"
+}

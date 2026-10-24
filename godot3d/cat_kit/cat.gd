@@ -260,7 +260,7 @@ func _build_model() -> void:
 ## tabby striping inside the saddle.
 func _build_bicolor_body() -> void:
 	_saddle_patch = _ell(_body, Vector3(0, 0.612, 0.04), Vector3(0.468, 0.335, 0.82), ginger)
-	_ell(_body, Vector3(0, 0.598, 0.335), Vector3(0.445, 0.295, 0.36), ginger)
+	_ell(_body, Vector3(0, 0.605, 0.335), Vector3(0.46, 0.31, 0.38), ginger)
 	_ell(_body, Vector3(0, 0.60, -0.44), Vector3(0.15, 0.19, 0.10), ginger, Vector3(-0.35, 0, 0))
 	# Back stripes: flattened darker shells lying across the saddle.
 	for i in 6:
@@ -285,7 +285,7 @@ func _build_tortie_body() -> void:
 	_ell(_body, Vector3(0, 0.585, -0.42), Vector3(0.13, 0.17, 0.09), mottle_cream, Vector3(-0.35, 0, 0))
 	_ell(_body, Vector3(0.05, 0.63, -0.40), Vector3(0.09, 0.11, 0.07), mottle_orange, Vector3(-0.3, 0, 0))
 	var rng := _mottle_rng()
-	_scatter(_body, Vector3(0, 0.55, 0.02), torso_dia * 0.5, int(mottle_cfg.get("torso", 46)), rng, 0.05, 0.13)
+	_scatter(_body, Vector3(0, 0.55, 0.02), torso_dia * 0.5, int(mottle_cfg.get("torso", 64)), rng, 0.04, 0.11)
 
 
 func _mottle_rng() -> RandomNumberGenerator:

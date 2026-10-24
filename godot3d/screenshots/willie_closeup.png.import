@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://1rw8c506623h"
-path="res://.godot/imported/gameplay_wide.png-0eff53b378e4b47a5a9c0e53a40049f1.ctex"
+uid="uid://cri0dvq0rulle"
+path="res://.godot/imported/willie_closeup.png-4661c324859fdd066f7071933c1aacda.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://screenshots/gameplay_wide.png"
-dest_files=["res://.godot/imported/gameplay_wide.png-0eff53b378e4b47a5a9c0e53a40049f1.ctex"]
+source_file="res://screenshots/willie_closeup.png"
+dest_files=["res://.godot/imported/willie_closeup.png-4661c324859fdd066f7071933c1aacda.ctex"]
 
 [params]
 

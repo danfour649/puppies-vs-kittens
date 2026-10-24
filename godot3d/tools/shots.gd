@@ -53,9 +53,9 @@ func _run() -> void:
 		sun.light_energy = 1.05
 	# (b) Aggie close-up: she lounges on the garden chair; anchor the
 	# camera on her and come in close from her front-left.
-	_anchor_at(_game.aggie.global_position + Vector3(0, 0.10, 0))
-	_game.cam_dist = 0.7
-	_game.cam_pitch = -0.30
+	_anchor_at(_game.aggie.global_position + Vector3(0, 0.13, 0))
+	_game.cam_dist = 0.45
+	_game.cam_pitch = -0.25
 	_game.cam_yaw = -2.0
 	await _wait(0.7)
 	await _shot("aggie_closeup")
@@ -65,8 +65,8 @@ func _run() -> void:
 	_game.cat.global_position = Vector3(3.45, 0.08, 3.30)
 	_game.cat.rotation.y = 2.45
 	_anchor_at(Vector3(4.05, 0.30, 3.95))
-	_game.cam_dist = 2.5
-	_game.cam_pitch = -0.40
+	_game.cam_dist = 2.0
+	_game.cam_pitch = -0.38
 	_game.cam_yaw = -2.35
 	await _wait(0.8)
 	await _shot("both_cats")
@@ -77,8 +77,8 @@ func _run() -> void:
 	_game.cat.rotation.y = PI # face into the yard
 	await _wait(0.5)
 	_game.cat.set_lounge(true)
-	_game.cam_yaw = 2.75
-	_game.cam_dist = 1.5
+	_game.cam_yaw = 0.5
+	_game.cam_dist = 1.2
 	_game.cam_pitch = -0.35
 	await _wait(1.0)
 	await _shot("lounge")
