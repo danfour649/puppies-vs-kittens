@@ -1,5 +1,5 @@
 extends Node3D
-## Puppies vs Kittens 3D — cat-first edition (v0.4).
+## Willie and Aggie — the Massey Street cat game.
 ## You are the cat: Willie, built by cat_kit from GTA's
 ## Fredericton's stray_cat. Catch every mouse in the backyard.
 ## No birds. Puppies are Phase 2 (see README.md).
@@ -15,6 +15,10 @@ const DuoScene := preload("res://duo/duo_system.gd")
 # OUTSIDE: the Massey outside zone (zones/outside/) hangs off main
 # the same way the duo system does.
 const OutsideScene := preload("res://zones/outside/outside_system.gd")
+# OCCUPANTS: Daniel + Folasade in the ground-floor hub (occupants/).
+const OccupantScript := preload("res://occupants/occupant.gd")
+const OccupantSystemScript := preload("res://occupants/occupant_system.gd")
+const OccupantsRoomScript := preload("res://occupants/occupants_room.gd")
 
 const MOUSE_COUNT := 7
 const YARD := Rect2(-12.4, -9.4, 24.8, 18.8) # inside the fence
@@ -43,6 +47,7 @@ var _lbl_hp: Label
 var _hp_bar: ProgressBar
 var _lbl_lives: Label
 var outside: OutsideSystem = null # OUTSIDE
+var occupants: OccupantSystem = null # OCCUPANTS (hub)
 var catch_radius := 0.42
 var duo_shake := Vector3.ZERO
 var _mouse_seq := 0
@@ -404,6 +409,13 @@ func _build_zones() -> void:
 	for id: String in [HouseSpec.GROUND_FLOOR, HouseSpec.BASEMENT, HouseSpec.ATTIC]:
 		var inst := (load(String(HouseSpec.ZONE_SCENES[id])) as PackedScene).instantiate()
 		inst.position = HouseSpec.zone_origin(id)
+		if id == HouseSpec.BASEMENT:
+			# The hub owns the cats, HP and travel: the basement
+			# runs in hub mode (no stand-in cat, no local HP ledger).
+			inst.set("spawn_standalone_cat", false)
+			inst.set("standalone_drive", false)
+			inst.set("use_follow_cam", false)
+			inst.set("track_cat_hp", false)
 		house.add_child(inst)
 		_zone_roots[id] = inst
 	# The outside entry (on the porch) — main IS the outside zone.
@@ -429,6 +441,77 @@ func _build_zones() -> void:
 	hud.name = "ObjectivesHUD"
 	add_child(hud)
 	hud.setup(objectives, zones)
+	_build_occupants()
+
+
+
+
+# --- Occupants in the hub ---------------------------------------------------------
+
+## Daniel + Folasade move into the ground floor: routines on
+## stations routed through the divider gap, the sit station at the
+## sofa's cushion edge (HouseSpec SOFA_POS; the seat slab in
+## house_builder.gd is shaped so they can arrive). Score events
+## land in the objectives registry with the shipped values.
+func _build_occupants() -> void:
+	var gf := _zone_roots[HouseSpec.GROUND_FLOOR] as Node3D
+	var origin := HouseSpec.zone_origin(HouseSpec.GROUND_FLOOR)
+	var daniel := OccupantScript.new() as MasseyOccupant
+	daniel.name = "Daniel"
+	gf.add_child(daniel)
+	daniel.place_at(origin + Vector3(-1.5, 0, 2.8), 0.0)
+	daniel.setup(OccupantsRoomScript.daniel_look(), _occupant_stations(4.25, origin))
+	var folasade := OccupantScript.new() as MasseyOccupant
+	folasade.name = "Folasade"
+	gf.add_child(folasade)
+	folasade.place_at(origin + Vector3(3.9, 0, -0.4), PI)
+	var f_stations := _occupant_stations(5.35, origin)
+	f_stations.push_front(f_stations.pop_at(2)) # she starts at the couch
+	folasade.setup(OccupantsRoomScript.folasade_look(), f_stations)
+	occupants = OccupantSystemScript.new() as OccupantSystem
+	occupants.name = "OccupantSystem"
+	gf.add_child(occupants)
+	occupants.register_occupant(daniel)
+	occupants.register_occupant(folasade)
+	occupants.set_player_cat(cat)
+	occupants.score_event.connect(_on_occupant_score)
+	objectives.declare("occupants:ankle_assassin", HouseSpec.GROUND_FLOOR, "Ankle assassin x5", 5)
+	objectives.declare("occupants:trip_hazard", HouseSpec.GROUND_FLOOR, "Trip hazard x3", 3)
+	objectives.declare("occupants:lap_full_heal", HouseSpec.GROUND_FLOOR, "Full heal from lap pets", 1)
+
+
+## Station loop in HouseSpec-local points (converted to world):
+## kitchen counter -> the divider gap -> the sofa -> the front
+## door -> the gap again -> the kitchen sun patch. Legs never cross
+## the divider away from its gap.
+func _occupant_stations(seat_x: float, origin: Vector3) -> Array:
+	var local: Array = [
+		{"pos": Vector3(-4.3, 0, -3.85), "yaw": 0.0, "action": "stand", "dwell": 6.0},
+		{"pos": Vector3(-1.8, 0, 0.0), "yaw": -PI / 2.0, "action": "stand", "dwell": 1.5},
+		{"pos": Vector3(seat_x, 0, -3.45), "yaw": PI, "action": "sit", "dwell": 16.0},
+		{"pos": Vector3(2.5, 0, 2.9), "yaw": PI, "action": "stand", "dwell": 5.0},
+		{"pos": Vector3(-1.8, 0, 0.0), "yaw": PI / 2.0, "action": "stand", "dwell": 1.5},
+		{"pos": Vector3(-3.2, 0, 3.2), "yaw": 0.0, "action": "stand", "dwell": 2.5},
+	]
+	var out: Array = []
+	for st: Variant in local:
+		var d := (st as Dictionary).duplicate()
+		d["pos"] = origin + (d["pos"] as Vector3)
+		out.append(d)
+	return out
+
+
+func _on_occupant_score(event_name: String, points: int, _pos: Vector3) -> void:
+	if objectives == null:
+		return
+	objectives.add_score(event_name, points)
+	match event_name:
+		"ankle_attack":
+			objectives.add_progress("occupants:ankle_assassin", 1)
+		"trip_hazard":
+			objectives.add_progress("occupants:trip_hazard", 1)
+		"lap_full_heal":
+			objectives.set_progress("occupants:lap_full_heal", 1)
 
 
 func snap_camera() -> void:

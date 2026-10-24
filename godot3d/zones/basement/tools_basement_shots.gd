@@ -101,7 +101,7 @@ func _run() -> void:
 	# Let the ghost's contact timer force the hiss itself, then catch
 	# the arch at its peak — the ghost has only begun to yield.
 	var waited := 0.0
-	while not (cat as PvKHissCat).is_hissing() and waited < 4.0:
+	while not (cat as PvKCat).is_hissing() and waited < 4.0:
 		await _wait(0.1)
 		waited += 0.1
 	await _wait(0.55)

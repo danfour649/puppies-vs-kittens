@@ -57,8 +57,8 @@ is vertically honest — stairs and hatch line up in world space.
 |---|---|
 | outside | `EntryFrontDoor` (2.5, 0.30, −8.45), faces the yard |
 | ground_floor | `EntryFrontDoor` (2.5, 0, 3.55) · `EntryStairsTop` (−6.5, 0, −1.55) · `EntryHatchBottom` (6.5, 0, −1.7) |
-| basement | `EntryStairs` (−6.5, 0, −1.55) |
-| attic | `EntryHatch` (6.5, 0, −1.7) |
+| basement | `EntryStairs` (2.85, 0, 4.5) — landing by the built south-wall stair (foot (4.35, 5.35)) |
+| attic | `EntryHatch` (3.9, 0, 3.9) — foot of the built crate stair up to the hatch (5.05, 3.55) |
 
 ### Connector volumes (walk-in triggers, local to each zone)
 
@@ -197,7 +197,7 @@ obj.declare("attic:raccoons", "attic", "Run off the raccoon family", 4, "raccoon
 - Kill counting also lands in `Objectives.total_kills` if a zone
   wants a "vicious animals defeated" flavour line.
 
-### Score events (reserved for the occupants lane)
+### Score events (occupants; values as shipped, adopted at integration)
 
 The registry also owns the game **score**: `Objectives.score`,
 advanced ONLY through named events —
@@ -206,10 +206,12 @@ advanced ONLY through named events —
 
 | Event | Default points | Emitter |
 |---|---|---|
-| `ankle_attack` | 50 | occupants (a paw lands on an ankle) |
-| `underfoot` | 25 | occupants (cat darts in front of a walker) |
-| `trip_hazard` | 100 | occupants (the stumble bonus) |
-| `lap_purr` | 10 | occupants (per lap-petting tick; heals via `cat.heal()`) |
+| `ankle_attack` | 25 | occupants (a paw lands on an ankle) |
+| `underfoot` | 15 | occupants (a genuine front-crossing under a walker) |
+| `trip_hazard` | 50 | occupants (dead-centre in a walker's path) |
+| `lap_purr` | 5 | occupants (per 4 s lap-petting tick, capped per session; heals via `cat.heal()`) |
+| `ankle_shoo` | 10 | occupants (the shoo after repeated ankle attacks) |
+| `lap_full_heal` | 0 | occupants (progress event: healed to full on a lap) |
 
 Emission is `get_tree().call_group("objectives", "add_score",
 "ankle_attack")` or a direct call on the registry node. The
@@ -338,7 +340,21 @@ above-cell LINKED pattern, basement 260 = below-grade LINKED,
 | water bowl | (−2.35, 2.7) | (0.362, 0.781) | (−1.49, 4.10) |
 | sofa / lap seat | (4.8, −3.85) | (0.782, 0.099) | (3.05, −5.85) |
 | scratch post | (7.9, 0.9) | (0.965, 0.594) | (5.02, 1.37) |
-| attic perch | (7.3, −0.6) | (0.929, 0.438) | (4.63, −0.91) |
+| attic perch | (5.30, 0.0) | (0.812, 0.500) | (3.37, 0.00) |
+| attic hatch | (5.05, 3.55) | (0.797, 0.870) | (3.21, 5.40) |
+| attic entry landing | (3.9, 3.9) | (0.729, 0.906) | (2.48, 5.93) |
+| basement entry landing | (2.85, 4.5) | (0.668, 0.969) | (1.81, 6.85) |
+| basement stair foot | (4.35, 5.35) | (0.756, 1.057) | (2.77, 8.13) |
+| basement heart (Alpha den) | (1.0, −2.0) | (0.559, 0.292) | (0.64, −3.04) |
+| basement litter box | (−7.35, −3.9) | (0.068, 0.094) | (−4.67, −5.93) |
+| basement Aggie gap (cell 11,2) | (4.35, −2.5) | (0.756, 0.240) | (2.77, −3.80) |
+| basement feather toy | (6.3, −2.6) | (0.871, 0.229) | (4.00, −3.96) |
+
+Basement/attic interior anchors are the built rooms' content
+points in the same frame. The basement room (16 × 12) is larger
+than the footprint, so some (u, v) fall outside [0, 1] — they
+extrapolate on the same formulas, and a GTA host re-fits them
+into its own cell at integration time.
 
 Vertical mapping: PvK floor heights are honest (−2.6 / 0 / +2.9)
 because PvK stacks real storeys; in GTA each floor is its own
@@ -380,17 +396,17 @@ The module provides, as data first and code second:
   provocation numbers), ankle/underfoot/lap tuning + score table.
 - **Objectives text + ids** in the §5 shape.
 
-### 9.4 Module contents inventory (as of this PR)
+### 9.4 Module contents inventory (integrated state, PR #10)
 
 | Contents | State | Where |
 |---|---|---|
 | Ground floor (kitchen/living, drawer, bowl, sofa) | built (PvK host) | house_builder.gd |
-| Basement shell + entry room | stub; lane content in flight | zones/basement |
-| Attic shell + perch block | stub; lane content in flight | zones/attic |
-| Outside yard + street frontage | existing yard; lane in flight | main.tscn, zones/outside (lane) |
+| Basement (box labyrinth, rats/spiders/ghosts, litter box) | built + integrated | zones/basement |
+| Attic (raccoon family, window perch, insulation field) | built + integrated | zones/attic |
+| Outside yard + street (trees/squirrels, feeder birds, road, dogs) | built + integrated | main.tscn, zones/outside |
 | Cats (Willie/Aggie: data, controller, health, hiss) | built (PvK host) | cat_kit/, duo/ |
-| Occupants (Daniel + Folasade NPCs + interactions) | lane in flight, contract §4/§5 | occupants lane |
-| Encounters (rats/spiders/ghosts; raccoon family; squirrels/birds/cars) | enemy base built; species are lane content | combat/, zone lanes |
+| Occupants (Daniel + Folasade NPCs + interactions) | built + integrated into the hub | occupants/ |
+| Encounters (rats/spiders/ghosts; raccoon family; squirrels/birds/cars/dogs) | built per-zone on the enemy base | combat/, zones/* |
 | Damage/score/objective tables | built, host-agnostic data | combat_data.gd, objectives.gd |
 
 ### 9.5 What is NOT module-shaped yet (the honest re-fit list)

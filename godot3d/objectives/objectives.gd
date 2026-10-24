@@ -10,13 +10,18 @@ signal changed
 signal score_changed(score: int)
 signal kill_registered(species_id: String)
 
-## Reserved score events (occupants lane): name -> default points.
+## Score events (occupants lane): name -> default points.
+## INTEGRATION: these are the values the occupants lane SHIPPED
+## (Daniel's spec: ankle +25 / underfoot +15 / trip +50 / purr tick
+## +5), adopted over the foundation's reserved placeholders.
 ## Zones may append names in their own branches; never rename these.
 const SCORE_EVENTS := {
-	"ankle_attack": 50,
-	"underfoot": 25,
-	"trip_hazard": 100,
-	"lap_purr": 10,
+	"ankle_attack": 25,
+	"underfoot": 15,
+	"trip_hazard": 50,
+	"lap_purr": 5,
+	"ankle_shoo": 10,
+	"lap_full_heal": 0,
 }
 
 var items: Array = [] # {id, zone, title, target, count, done, kill_species}

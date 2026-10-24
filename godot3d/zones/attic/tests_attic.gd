@@ -87,14 +87,14 @@ func _run() -> void:
 	spare.queue_free()
 	await frames(3)
 
-	# --- harness jump (stand-in for the foundation cat pass) ---------------
+	# --- the jump (the real PvKCat jump since integration) ------------------
 	var y0: float = _cat.global_position.y
 	_cat.jump()
 	var ymax := y0
 	for i in 50:
 		await get_tree().physics_frame
 		ymax = maxf(ymax, _cat.global_position.y)
-	check(ymax > y0 + 0.8, "harness cat jumps (rose %.2f m)" % (ymax - y0))
+	check(ymax > y0 + 0.7, "cat jumps (rose %.2f m; real PvKCat apex ~0.77)" % (ymax - y0))
 	var landed := false
 	for i in 90:
 		await get_tree().physics_frame

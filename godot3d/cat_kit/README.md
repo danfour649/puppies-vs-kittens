@@ -170,7 +170,7 @@ Three ways in, in increasing order of ambition:
    0.25 here; GTA's own strays use 0.32 — forward -Z). GTA's dictionary brain, habitats, hostility
    and hitbox attach unchanged. The palette travels as data
    (`cat_species.json`), so the port is unaffected by colouring: a
-   swapped-in cat can wear Willy's white-and-ginger or be restyled
+   swapped-in cat can wear Willie's white-and-ginger or be restyled
    per species without touching the builder. Willow gets leg swings and a real
    lounge for free, because the kit's pivots accept the same
    body-bob writes `_step()` already makes.

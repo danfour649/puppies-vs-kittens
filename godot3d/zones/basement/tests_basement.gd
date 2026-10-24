@@ -12,7 +12,7 @@ const RatScript := preload("res://zones/basement/rat.gd")
 var _pass := 0
 var _fail := 0
 var _zone = null
-var _cat: PvKHissCat = null
+var _cat: PvKCat = null
 
 
 func check(cond: bool, label: String) -> void:
@@ -54,7 +54,7 @@ func _run() -> void:
 	_zone.use_follow_cam = false
 	add_child(_zone)
 	await frames(12)
-	_cat = _zone.player_cat as PvKHissCat
+	_cat = _zone.player_cat as PvKCat
 
 	# --- build & data ------------------------------------------------------
 	check(_cat != null, "standalone cat spawned")

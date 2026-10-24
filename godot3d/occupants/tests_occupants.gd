@@ -234,11 +234,10 @@ func _test_lap() -> void:
 	var cat = room.cat
 	fola.dwell_scale = 0.05 # she stays seated for the whole test
 	room.daniel.dwell_scale = 0.05
-	var health = CatHealthScript.new()
-	health.name = "CatHealth"
-	cat.add_child(health)
 	await frames(3)
-	health.hp = 40.0
+	# INTEGRATION: the foundation cat owns real HP — the lap heals
+	# through PvKCat.heal(); no CatHealth stand-in needed.
+	cat.hp = 40.0
 	var sat := await until(func() -> bool: return fola.is_seated(), 900)
 	check(sat, "Folasade seated for the lap test")
 	if not sat:
@@ -251,10 +250,10 @@ func _test_lap() -> void:
 	check(sys.try_mount_lap(cat), "cat mounts the lap")
 	check(sys.lap_session_active(fola), "lap session active")
 	check(bool(cat.get_meta("on_lap", false)), "cat flagged safe on the lap")
-	await frames(180) # 3 s at +10%/s from 40 -> ~70
-	check(health.hp >= 62.0, "petting heals: hp %.1f after 3 s (from 40)" % health.hp)
+	await frames(180) # 3 s at +10%/s of max (120) from 40 -> ~76
+	check(cat.hp >= 62.0, "petting heals: hp %.1f after 3 s (from 40)" % cat.hp)
 	await frames(420) # -> full
-	check(health.hp >= 99.9, "healed to full on the lap (hp %.1f)" % health.hp)
+	check(cat.hp >= cat.max_hp - 0.1, "healed to full on the lap (hp %.1f)" % cat.hp)
 	check(sys.event_count("lap_full_heal") >= 1, "lap_full_heal objective event fired")
 	await frames(300)
 	check(sys.event_count("lap_purr") >= 2, "purr score ticks while being petted (%d)" % sys.event_count("lap_purr"))
@@ -274,7 +273,7 @@ func _test_lap() -> void:
 	var sat2 := await until(func() -> bool: return fola.is_seated(), 900)
 	check(sat2, "Folasade sits again for the attack test")
 	if sat2:
-		health.hp = 50.0
+		cat.hp = 50.0
 		cat.global_position = Vector3(3.27, 0.05, -1.15)
 		cat.rotation.y = 0.0
 		await frames(5)

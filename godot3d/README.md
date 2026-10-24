@@ -1,6 +1,6 @@
-# Puppies vs Kittens 3D — cat-first edition (v0.4)
+# Willie and Aggie — the Massey Street cat game
 
-The 3D revamp of Puppies vs Kittens, rebuilt in Godot 4.7 in the visual
+The cats own 3D game, rebuilt in Godot 4.7 in the visual
 language of GTA Fredericton: procedural flat-colour meshes, real
 metre scale, directional sun + sky ambience, light fog — the yard in
 GTA's box idiom, the cat modelled smooth from ellipsoids and tapered
@@ -29,13 +29,13 @@ designed to be lifted back into GTA Fredericton (for example for TODO
 
 Two cats, one yard — see `duo/README.md` for the full tour.
 
-- **Character select** at game start: play as **Willy** (big, plush,
+- **Character select** at game start: play as **Willie** (big, plush,
   meows constantly) or as his sister **Aggie** (small, wiry, chill
   but vicious — faster, with a burst strike). Keys **1 / 2**, mouse,
   or touch. The other cat is in the yard with you as a sibling NPC,
   lounging and wandering.
 - **Meow** — **M** key or the **MEOW** touch button. Procedural
-  audio, no assets. NPC Willy meows on his own every 6–10 s.
+  audio, no assets. NPC Willie meows on his own every 6–10 s.
 - **Provocation** — Willie's meowing fills Aggie's meter (watch the
   bar, top-left). At the threshold, NPC Aggie dashes in, flurries
   him (he drops a catch), and flees; player Aggie instead gets a

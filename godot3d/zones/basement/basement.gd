@@ -133,7 +133,6 @@ var _input_lock_t := 0.0
 var _voice: AudioStreamPlayer3D = null
 
 const CatScript := preload("res://cat_kit/cat.gd")
-const HissCatScript := preload("res://zones/basement/hiss_cat.gd")
 const RatScript := preload("res://zones/basement/rat.gd")
 const SpiderScript := preload("res://zones/basement/spider.gd")
 const ToyScript := preload("res://zones/basement/toy.gd")
@@ -226,6 +225,12 @@ func _ready() -> void:
 	_build_props()
 	_build_lights()
 	_spawn_actors()
+	if not spawn_standalone_cat:
+		# INTEGRATION (hub mode): the foundation hub owns the cats,
+		# HP and travel. Provide the entry/connector contract from
+		# HouseSpec (positions reconciled — docs/massey-zones.md §9).
+		HouseBuilder.add_entries(self, HouseSpec.BASEMENT)
+		HouseBuilder.add_connectors(self, HouseSpec.BASEMENT)
 	if use_follow_cam:
 		_cam = Camera3D.new()
 		_cam.name = "FollowCam"
@@ -233,7 +238,7 @@ func _ready() -> void:
 		_cam.current = true
 		_cam.position = ENTRY_POS + Vector3(0, 1.6, 2.4)
 	if spawn_standalone_cat:
-		var cat := HissCatScript.new() as PvKCat
+		var cat := CatScript.new() as PvKCat
 		cat.set_character(standalone_character)
 		add_child(cat)
 		attach_cat(cat)
@@ -602,6 +607,97 @@ func attach_cat(cat: PvKCat) -> void:
 
 # --- combat / interaction ---------------------------------------------------------------------
 
+
+# --- hub integration (the foundation game) -------------------------------------------------------
+
+## The zone-root contract (docs/massey-zones.md §2), provided
+## directly rather than via ZoneRoot: this zone predates the base
+## class and builds its own shell; the entry/connector nodes come
+## from HouseSpec (see _ready).
+func get_entry(entry_name: String) -> Node3D:
+	return get_node_or_null(entry_name) as Node3D
+
+
+## Sibling lounge spots: all on fully open rows of the MAP, so the
+## sibling can always amble to one through the corridors.
+func get_lounge_spots() -> Array:
+	var out: Array = []
+	for p: Vector3 in [Vector3(4.35, 0.02, 4.5), Vector3(-6.5, 0.02, 2.5), Vector3(6.5, 0.02, 0.5)]:
+		out.append(to_global(p))
+	return out
+
+
+func get_wander_rect() -> Rect2:
+	var r := Rect2(-7.6, -5.6, 15.2, 11.2)
+	return Rect2(r.position + Vector2(global_position.x, global_position.z), r.size)
+
+
+var _hub_fit_cat: PvKCat = null ## cat currently wearing the fit capsule
+var _hub_orig_capsule := {} ## cat -> [shape, position] before the fit swap
+
+
+## Hub registration: track the game's player cat WITHOUT placing
+## it (the ZoneManager owns placement) and without freeing the
+## previous cat (it is the game's other cat, not a stand-in).
+func register_hub_cat(cat: PvKCat) -> void:
+	if player_cat == cat:
+		return
+	if player_cat != null and is_instance_valid(player_cat) and player_cat.paw_swiped.is_connected(_on_paw_swiped):
+		player_cat.paw_swiped.disconnect(_on_paw_swiped)
+	player_cat = cat
+	if cat == null:
+		return
+	if not cat.paw_swiped.is_connected(_on_paw_swiped):
+		cat.paw_swiped.connect(_on_paw_swiped)
+	for rat: PvKRat in rats:
+		rat.target_cat = cat
+	for sp: PvKSpider in spiders:
+		sp.target_cat = cat
+	for g: PvKGhost in ghosts:
+		g.target_cat = cat
+	if _voice == null:
+		_voice = HissAudio.make_voice(self)
+
+
+func _poll_hub() -> void:
+	if spawn_standalone_cat:
+		return
+	var pc := get_tree().get_first_node_in_group("player_cat") as PvKCat
+	if pc != player_cat:
+		register_hub_cat(pc)
+	# The Aggie gap is honest only while the player wears the
+	# build-data fit capsule; swap it in for this zone and restore
+	# the kit capsule on the way out.
+	var mgr := get_tree().get_first_node_in_group("zone_manager")
+	var in_zone := mgr != null and String(mgr.get("current_zone")) == HouseSpec.BASEMENT
+	if in_zone and pc != null and _hub_fit_cat != pc:
+		_hub_apply_fit(pc)
+	elif not in_zone and _hub_fit_cat != null:
+		_hub_restore_fit()
+
+
+func _hub_apply_fit(cat: PvKCat) -> void:
+	_hub_restore_fit()
+	for child in cat.get_children():
+		if child is CollisionShape3D and (child as CollisionShape3D).shape is CapsuleShape3D:
+			_hub_orig_capsule[cat] = [(child as CollisionShape3D).shape, (child as CollisionShape3D).position]
+			break
+	apply_fit_capsule(cat)
+	_hub_fit_cat = cat
+
+
+func _hub_restore_fit() -> void:
+	var cat := _hub_fit_cat
+	_hub_fit_cat = null
+	if cat == null or not is_instance_valid(cat) or not _hub_orig_capsule.has(cat):
+		return
+	var saved: Array = _hub_orig_capsule[cat]
+	for child in cat.get_children():
+		if child is CollisionShape3D and (child as CollisionShape3D).shape is CapsuleShape3D:
+			(child as CollisionShape3D).shape = saved[0]
+			(child as CollisionShape3D).position = saved[1]
+			break
+
 func _on_paw_swiped() -> void:
 	if player_cat == null:
 		return
@@ -621,6 +717,11 @@ func _on_paw_swiped() -> void:
 
 func _on_enemy_bite(_target: Node3D, damage: int) -> void:
 	if not track_cat_hp:
+		# Hub mode: the foundation cat owns HP. Forward the bite in
+		# this zone's own proportion of a life (damage / CAT_MAX_HP).
+		var t := _target as PvKCat
+		if t != null and t.has_method("take_damage"):
+			t.take_damage(float(damage) * t.max_hp / float(CAT_MAX_HP), t.global_position)
 		return
 	cat_hp = maxi(0, cat_hp - damage)
 	cat_hp_changed.emit(cat_hp, CAT_MAX_HP)
@@ -643,9 +744,7 @@ func _on_hiss_triggered(ghost: PvKGhost, cat: Node3D) -> void:
 		cat.hiss()
 	_input_lock_t = 1.5 # zone-side lock for cats without their own
 	cat_hissed.emit(cat)
-	if _voice != null and cat is PvKHissCat:
-		pass # the HissCat plays its own voice; the zone voice is a fallback
-	elif _voice != null:
+	if _voice != null:
 		_voice.global_position = cat.global_position if cat != null else _voice.global_position
 		_voice.play()
 	# The hiss is LOUD: spiders bolt up their threads, rats freeze.
@@ -682,6 +781,7 @@ func _physics_process(_delta: float) -> void:
 
 
 func _process(delta: float) -> void:
+	_poll_hub()
 	_time += delta
 	for pair: Array in _bulbs:
 		var pivot := pair[0] as Node3D

@@ -237,8 +237,14 @@ static func build_ground_floor(k: Kit) -> Dictionary:
 	# Living room: sofa (the LAP seat — occupants target the spot at
 	# HouseSpec SOFA_POS, seat top y 0.60), coffee table, rug, TV.
 	var sp := HouseSpec.SOFA_POS
-	var sofa := k.box(Vector3(2.3, 0.48, 1.0), Vector3(sp.x, 0.24, sp.z), fabric, true)
+	var sofa := k.box(Vector3(2.3, 0.48, 1.0), Vector3(sp.x, 0.24, sp.z), fabric, false)
 	sofa.name = "Sofa"
+	# INTEGRATION: the sofa's collider is a seat slab whose front
+	# edge stops 0.2 short of the visual front — an occupant walking
+	# to the sit station at the cushion edge can arrive (their
+	# capsule meets the slab, not a full-depth block), while the
+	# seat top (y 0.60, the cushion tops) stays solid for the cats.
+	k.static_box(Vector3(2.3, 0.60, 0.80), Vector3(sp.x, 0.30, sp.z - 0.10))
 	k.box(Vector3(1.05, 0.12, 0.88), Vector3(sp.x - 0.55, 0.54, sp.z), fabric_lt, false)
 	k.box(Vector3(1.05, 0.12, 0.88), Vector3(sp.x + 0.55, 0.54, sp.z), fabric_lt, false)
 	k.box(Vector3(2.3, 0.85, 0.24), Vector3(sp.x, 0.68, sp.z - 0.42), fabric, true)

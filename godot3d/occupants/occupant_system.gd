@@ -353,6 +353,12 @@ func _popup(pos: Vector3, text: String, color: Color) -> void:
 
 
 func _process(delta: float) -> void:
+	# Hub integration: character select swaps which cat is the
+	# player; the "player_cat" group tracks it. (In the standalone
+	# room the group is empty and this never fires.)
+	var pc := get_tree().get_first_node_in_group("player_cat")
+	if pc != null and pc != _cat:
+		set_player_cat(pc as Node3D)
 	var done: Array = []
 	for p in _popups:
 		var d: Dictionary = p

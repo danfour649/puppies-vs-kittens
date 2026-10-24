@@ -504,7 +504,9 @@ func is_pouncing() -> bool:
 ## — vehicle_hit) and launch (pop the cat up hard). Returns true if
 ## the hit landed (brief invulnerability swallows the rest).
 func take_damage(amount: float, from_position: Vector3, profile: Dictionary = {}) -> bool:
-	if is_fainted or _invuln_t > 0.0:
+	if is_fainted:
+		return false
+	if _invuln_t > 0.0 and not bool(profile.get("ignore_invuln", false)):
 		return false
 	var dmg := amount
 	if profile.has("damage_frac"):

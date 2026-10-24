@@ -1,6 +1,6 @@
 # The Basement — under 255 Massey Street
 
-A zone of **Willie and Aggie** (Puppies vs Kittens 3D): the secret
+A zone of **Willie and Aggie**: the secret
 tunnel/labyrinth in the basement of the cats' own house. A maze of
 stacked cardboard boxes and shelf units, moody bulb light, things
 that bite in the dark — and things that can't bite at all, which is

@@ -19,13 +19,15 @@ extends Node
 ##     bush / region / outrun escape valves and a grab-and-shake
 ##
 ## Placements are ALL in outside_layout.gd (named constants
-## relative to the house footprint). Damage goes through the
-## local contract in apply_damage() — the foundation lane owns
-## cat HP/nine-lives; values live in OutsideLayout (DMG_*) and
-## the coordinator reconciles. The cat climb and the vehicle
-## launch are STUB harnesses (the foundation lane's pounce/climb
-## API replaces them): while active, this system drives the cat
-## and the cat's own physics sleeps.
+## relative to the house footprint). Damage goes through
+## apply_damage(): the ledger values live in OutsideLayout
+## (DMG_*, percents of a life) and INTEGRATION forwards every hit
+## to the foundation cat, which owns real HP/nine-lives (vehicles
+## via the CombatData profile). Climb entry is the cat's real paw
+## (a strike or pounce at a trunk — _on_player_paw); the climb
+## itself and the vehicle launch stay pin/arc harnesses by
+## design: while one is active, this system drives the cat and
+## the cat's own physics sleeps.
 
 const SquirrelScene := preload("res://zones/outside/squirrel.gd")
 const BirdScene := preload("res://zones/outside/bird.gd")
@@ -473,7 +475,9 @@ func cat_hidden(c: Node3D) -> bool:
 	var v := Vector3.ZERO
 	if c is CharacterBody3D:
 		v = (c as CharacterBody3D).velocity
-	return v.length() < OutsideLayout.BUSH_HIDE_SPEED or String(c.get("anim_state")) == "stalk"
+	# Flat speed: the foundation cat's ground stick holds
+	# velocity.y at -1.0 while standing, which is not "moving".
+	return Vector2(v.x, v.z).length() < OutsideLayout.BUSH_HIDE_SPEED or String(c.get("anim_state")) == "stalk"
 
 
 func cat_climbing_tree() -> Variant:
@@ -993,23 +997,39 @@ func dog_bite_check(d: PvKDog) -> void:
 
 # --- damage contract (LOCAL — foundation owns the real profile) ---------------------------
 
-func apply_damage(amount: float, kind: String, _from_pos: Vector3) -> void:
+func apply_damage(amount: float, kind: String, from_pos: Vector3) -> void:
 	last_damage = amount
 	last_damage_kind = kind
 	damage_log.append({"amount": amount, "kind": kind, "t": _time})
 	var pc := player_cat()
+	# INTEGRATION: the foundation cat owns real HP. Forward the
+	# hit in this zone's proportions (the ledger numbers are
+	# percents of a life): vehicles use the CombatData profile
+	# (its 60% damage_frac drives; this zone's own curb launch
+	# owns the arc, so the profile's launch flag is off), and a
+	# dog's grab bypasses the cat's invulnerability window (a new
+	# event, not a repeat hit). The ledger below remains the
+	# zone's own bookkeeping for objectives/HUD/tests.
 	if pc != null and pc.has_method("take_damage"):
-		pc.call("take_damage", amount, kind) # foundation contract, when it lands
-		return
+		var prof: Dictionary = {}
+		var dmg := amount * (pc.max_hp / OutsideLayout.CAT_HP_MAX)
+		if kind == "vehicle":
+			prof = CombatData.profile("vehicle_hit").duplicate()
+			prof["launch"] = false
+			dmg = 0.0 # damage_frac drives
+		elif kind == "dog_grab":
+			prof = {"ignore_invuln": true}
+		pc.take_damage(dmg, from_pos, prof)
 	hp = maxf(hp - amount, 0.0)
 	if kind == "vehicle":
 		crossings_this_life = 0 # a hit ends the life for "Highway cat"
 	if hp <= 0.0:
-		# Local nine-lives stub: back to the porch, full hearts.
 		lives_lost += 1
 		hp = OutsideLayout.CAT_HP_MAX
 		crossings_this_life = 0
-		if pc != null:
+		if pc != null and not pc.is_fainted:
+			# Local nine-lives stub: back to the porch, full hearts.
+			# (Skipped when the real faint flow already owns the cat.)
 			pc.global_position = Vector3(OutsideLayout.DOOR_X, 0.3, -8.7)
 			pc.velocity = Vector3.ZERO
 

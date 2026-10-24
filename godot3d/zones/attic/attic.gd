@@ -1,7 +1,7 @@
 class_name PvKAttic
 extends Node3D
 ## THE ATTIC of 255 Massey, at cat scale — the raccoons' floor.
-## A self-contained zone for Willie and Aggie (Puppies vs Kittens):
+## A self-contained zone for Willie and Aggie:
 ## sloped roof, walkable collar beams, insulation piles that slow the
 ## cat, the hatch-corner entrance, and a raccoon family guarding the
 ## nest corner. Objective: "Reclaim the attic" — see
@@ -107,6 +107,10 @@ func _ready() -> void:
 	_build_props()
 	_build_lights()
 	_spawn_family()
+	# INTEGRATION: the zone-root contract (entry node + return
+	# connector) comes from HouseSpec — docs/massey-zones.md §9.
+	HouseBuilder.add_entries(self, HouseSpec.ATTIC)
+	HouseBuilder.add_connectors(self, HouseSpec.ATTIC)
 
 
 func _load_objectives() -> void:
@@ -127,6 +131,8 @@ func get_objective(id: String) -> Dictionary:
 ## Wire the player cat in: paw strikes resolve against the family,
 ## the family gets the cat as its target.
 func setup(p_cat: Node3D) -> void:
+	if cat != null and cat != p_cat and cat.has_signal("paw_swiped") and cat.paw_swiped.is_connected(_on_cat_paw):
+		cat.paw_swiped.disconnect(_on_cat_paw)
 	cat = p_cat
 	for e in _family():
 		e.set_target(cat)
@@ -142,6 +148,39 @@ func _family() -> Array:
 		fam.append(mother)
 	fam.append_array(kits)
 	return fam
+
+
+
+# --- hub contract (docs/massey-zones.md §2/§9) ---------------------------------------
+
+func get_entry(entry_name: String) -> Node3D:
+	return get_node_or_null(entry_name) as Node3D
+
+
+## Sibling lounge spots: the window perch (the prize) plus two
+## floor spots clear of the crate stacks and the nest corner.
+func get_lounge_spots() -> Array:
+	var out: Array = []
+	for p: Vector3 in [PERCH_POS + Vector3(0, 0.03, 0), Vector3(0.2, 0.08, 1.6), Vector3(-5.0, 0.02, -2.0)]:
+		out.append(to_global(p))
+	return out
+
+
+func get_wander_rect() -> Rect2:
+	var r := Rect2(-5.6, -4.1, 11.2, 8.2)
+	return Rect2(r.position + Vector2(global_position.x, global_position.z), r.size)
+
+
+## Raccoons damage their target through take_hit (the harness
+## contract); the foundation cat's verb is take_damage. The
+## damaged_target signal always fires, so route it here, in the
+## attic's own proportion of a life (harness scale: 10 HP). A
+## target with take_hit (the harness) is untouched by this — the
+## raccoon already applied its hit directly.
+func _on_raccoon_damaged(amount: int, from_pos: Vector3) -> void:
+	var t := cat as PvKCat
+	if t != null and not t.has_method("take_hit") and t.has_method("take_damage"):
+		t.take_damage(float(amount) * t.max_hp / 10.0, from_pos)
 
 
 func _on_cat_paw() -> void:
@@ -187,6 +226,7 @@ func _spawn_family() -> void:
 	mother.home = mother.global_position
 	mother.died.connect(_on_mother_died)
 	mother.staggered.connect(_on_mother_staggered)
+	mother.damaged_target.connect(_on_raccoon_damaged)
 	var kit_offsets: Array = [Vector3(0.9, 0, 0.5), Vector3(-0.4, 0, 0.95), Vector3(0.55, 0, -0.75)]
 	for i in 3:
 		var kit: PvKRaccoon = RaccoonScene.new()
@@ -197,6 +237,7 @@ func _spawn_family() -> void:
 		kit.mother = mother
 		kit.home = kit.global_position
 		kit.refuges = REFUGES.duplicate()
+		kit.damaged_target.connect(_on_raccoon_damaged)
 		kits.append(kit)
 
 
@@ -523,6 +564,11 @@ func _build_lights() -> void:
 
 
 func _process(delta: float) -> void:
+	# Hub: follow player swaps (character select swaps which cat
+	# is the player; the "player_cat" group tracks it).
+	var pc := get_tree().get_first_node_in_group("player_cat")
+	if pc != null and pc != cat:
+		setup(pc)
 	_time += delta
 	# Dust motes drift slowly inside the shaft.
 	for i in _dust.size():

@@ -140,7 +140,7 @@ func _run() -> void:
 	check(obj.is_done("outside:mice"), "mice objective completes from the catch count")
 	obj.add_score("ankle_attack")
 	obj.add_score("lap_purr")
-	check(obj.score == 60, "score events land (ankle 50 + lap 10 = %d)" % obj.score)
+	check(obj.score == 30, "score events land (ankle 25 + lap 5 = %d)" % obj.score)
 	var hud := _game.get_node("ObjectivesHUD") as ObjectivesHUD
 	check(hud != null and not hud.panel_visible(), "objectives panel starts hidden")
 	hud.toggle()

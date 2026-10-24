@@ -1,11 +1,11 @@
 ; Engine configuration file.
-; Puppies vs Kittens 3D — cat-first Godot revamp (see README.md).
+; Willie and Aggie — the Massey Street cat game (see README.md).
 
 config_version=5
 
 [application]
 
-config/name="Puppies vs Kittens 3D"
+config/name="Willie and Aggie"
 run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
