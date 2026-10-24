@@ -63,6 +63,7 @@ func setup(game_node: Node) -> void:
 	# character data, and only then add her to the tree (the kit
 	# builds its model in _ready).
 	aggie_cat = CatScene.new()
+	aggie_cat.set_character("aggie") # kit loads her real record (tortie, wiry, 0.25)
 	DuoCharacters.apply(aggie_cat, chars.get("aggie", {}))
 	aggie_cat.name = String(chars.get("aggie", {}).get("name", "Aggie"))
 	game.add_child(aggie_cat)

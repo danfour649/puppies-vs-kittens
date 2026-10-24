@@ -135,7 +135,7 @@ static func _overlay(chars: Dictionary, id: String, e: Dictionary) -> void:
 		base["scale"] = float(e["scale"])
 	elif e.has("model_scale"):
 		base["scale"] = float(e["model_scale"])
-	var coat_v: Variant = pal.get("coat", e.get("coat", e.get("color", [])))
+	var coat_v: Variant = pal.get("coat", pal.get("base", e.get("coat", e.get("color", []))))
 	base["coat"] = _col(coat_v, base["coat"])
 	base["patch"] = _col(pal.get("ginger", e.get("patch", e.get("ginger", []))), base["patch"])
 	base["nose"] = _col(pal.get("nose", e.get("nose", [])), base["nose"])

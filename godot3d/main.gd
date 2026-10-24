@@ -62,13 +62,6 @@ func _ready() -> void:
 	cat.global_position = Vector3(2.5, 0.1, -6.2)
 	cat.rotation.y = PI # face into the yard (+Z); model forward is -Z
 	cat.paw_swiped.connect(_on_paw_swiped)
-	aggie = CatScene.new()
-	aggie.set_character("aggie")
-	aggie.name = "Aggie"
-	add_child(aggie)
-	aggie.global_position = CHAIR_SEAT + Vector3(0, 0.09, 0)
-	aggie.rotation.y = 0.8 # on the garden chair, aligned with its back
-	aggie.set_lounge(true)
 	_build_camera()
 	_build_hud()
 	_touch = TouchScene.new()
@@ -80,6 +73,7 @@ func _ready() -> void:
 	duo.name = "DuoSystem"
 	add_child(duo)
 	duo.setup(self)
+	aggie = duo.aggie_cat # shots seam: main's Aggie handle is the duo sibling
 
 
 # --- materials / boxes (wildlife.gd idiom, shadows on for a diorama) --------

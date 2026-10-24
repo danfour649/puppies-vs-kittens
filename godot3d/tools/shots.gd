@@ -35,6 +35,9 @@ func _run() -> void:
 	_game = load("res://main.tscn").instantiate()
 	add_child(_game)
 	await _wait(1.0)
+	if _game.duo != null and _game.duo.select_visible():
+		_game.duo.choose("willie")
+		await _wait(0.4)
 	var suns: Array = _game.find_children("*", "DirectionalLight3D")
 	var sun: DirectionalLight3D = null
 	if suns.size() > 0:
