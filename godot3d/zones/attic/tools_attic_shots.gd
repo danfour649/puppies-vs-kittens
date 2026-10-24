@@ -57,9 +57,9 @@ func _run() -> void:
 	var mother = _attic.mother
 	var kits: Array = _attic.kits
 
-	# (a) Overview: from above the hatch corner, down the room toward
-	# the nest — window shaft crossing the frame.
-	_aim(Vector3(5.6, 2.55, 4.95), Vector3(-1.6, 0.55, -1.3))
+	# (a) Overview: INSIDE the room, high near the hatch end of the
+	# ridge, looking down the length of the attic to the nest corner.
+	_aim(Vector3(2.9, 1.45, 2.2), Vector3(-2.5, 0.4, -1.6))
 	await _wait(0.6)
 	await _shot("attic_overview")
 

@@ -348,7 +348,7 @@ func _build_shell() -> void:
 	cyl.radial_segments = 28
 	glass.mesh = cyl
 	glass.rotation.x = PI * 0.5
-	glass.material_override = _glow_mat(Color(1.0, 0.88, 0.66), 2.2)
+	glass.material_override = _glow_mat(Color(1.0, 0.88, 0.66), 1.35)
 	win.add_child(glass)
 	_visual(win, Vector3(0.05, WINDOW_R * 2.0, 0.03), Vector3.ZERO, Color(0.55, 0.48, 0.40))
 	_visual(win, Vector3(WINDOW_R * 2.0, 0.05, 0.03), Vector3.ZERO, Color(0.55, 0.48, 0.40))
@@ -356,7 +356,7 @@ func _build_shell() -> void:
 	# The light shaft: a translucent frustum from the window down into
 	# the room, matched by the SpotLight3D in _build_lights.
 	var shaft_mat := StandardMaterial3D.new()
-	shaft_mat.albedo_color = Color(1.0, 0.9, 0.7, 0.09)
+	shaft_mat.albedo_color = Color(1.0, 0.9, 0.7, 0.06)
 	shaft_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	shaft_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	shaft_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
@@ -373,8 +373,8 @@ func _build_shell() -> void:
 	add_child(shaft)
 	# Dust motes drifting in the shaft.
 	for i in 14:
-		var mote := _ell(self, Vector3(3.6 + randf_range(-0.7, 0.7), 1.5 + randf_range(-0.8, 0.9), randf_range(-0.7, 0.7)), Vector3.ONE * 0.022, Color(1, 0.95, 0.8))
-		mote.material_override = _glow_mat(Color(1, 0.95, 0.8), 0.8)
+		var mote := _ell(self, Vector3(3.6 + randf_range(-0.7, 0.7), 1.5 + randf_range(-0.8, 0.9), randf_range(-0.7, 0.7)), Vector3.ONE * 0.012, Color(1, 0.95, 0.8))
+		mote.material_override = _glow_mat(Color(1, 0.95, 0.8), 0.5)
 		_dust.append(mote)
 
 
