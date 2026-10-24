@@ -1,0 +1,1 @@
+{"body_radius":34.0,"brain":"prey","display_name":"Mouse","flee_radius":215.0,"flee_speed":330.0,"graze_pause_chance":0.25,"id":"mouse","max_hp":1,"separation_radius":48.0,"separation_weight":90.0,"shadow_width":95.0,"sprite_width":120.0,"sprites":{"action":"m2.png","idle":"m.png"},"wander_reroll":0.22,"wound_speed_factor":0.45,"wound_ttl":3.0}
