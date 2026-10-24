@@ -12,6 +12,9 @@ const TouchScene := preload("res://touch_controls_3d.gd")
 const DuoScene := preload("res://duo/duo_system.gd")
 # MASSEY: the house zones (docs/massey-zones.md). Zone scenes are
 # loaded by path from HouseSpec so this file stays the only root.
+# OUTSIDE: the Massey outside zone (zones/outside/) hangs off main
+# the same way the duo system does.
+const OutsideScene := preload("res://zones/outside/outside_system.gd")
 
 const MOUSE_COUNT := 7
 const YARD := Rect2(-12.4, -9.4, 24.8, 18.8) # inside the fence
@@ -39,6 +42,7 @@ var _banner_t := 0.0
 var _lbl_hp: Label
 var _hp_bar: ProgressBar
 var _lbl_lives: Label
+var outside: OutsideSystem = null # OUTSIDE
 var catch_radius := 0.42
 var duo_shake := Vector3.ZERO
 var _mouse_seq := 0
@@ -90,6 +94,13 @@ func _ready() -> void:
 	aggie = duo.aggie_cat # shots seam: main's Aggie handle is the duo sibling
 	cat.add_to_group("player_cat") # enemies hunt this group
 	_build_zones()
+	# OUTSIDE: trees + squirrels, feeder birds + ambush, the street
+	# frontage (hostile traffic, the Corolla island, the fish
+	# treat) and pedestrians walking dogs.
+	outside = OutsideScene.new()
+	outside.name = "OutsideSystem"
+	add_child(outside)
+	outside.setup(self)
 
 
 # --- materials / boxes (wildlife.gd idiom, shadows on for a diorama) --------
