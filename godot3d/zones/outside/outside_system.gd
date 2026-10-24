@@ -212,7 +212,7 @@ func _build_frontage() -> void:
 	var statics := StaticBody3D.new()
 	statics.name = "OutsideStatics"
 	zone_root.add_child(statics)
-	_static(statics, Vector3(26.4, 0.2, 2.9), Vector3(0, -0.1, -11.85)) # front lawn
+	_static(statics, Vector3(36.4, 0.2, 2.9), Vector3(0, -0.1, -11.85)) # front lawn, full width (neighbour lawns included — no falling off the world at the street ends)
 	_static(statics, Vector3(36.0, 0.2, 10.6), Vector3(0, -0.1, -18.5)) # sidewalk+street+far slab
 	_static(statics, Vector3(0.5, 1.0, 2.9), Vector3(-13.45, 0.5, -11.85))
 	_static(statics, Vector3(0.5, 1.0, 2.9), Vector3(13.45, 0.5, -11.85))
@@ -1222,6 +1222,7 @@ func debug_clear_cars() -> void:
 		if is_instance_valid(c):
 			c.queue_free()
 	cars.clear()
+	_car_spawn_t = 9999.0 # hold the ambient spawner for staged tests
 
 
 func debug_spawn_bird_near(pos: Vector3) -> PvKBird:
@@ -1250,6 +1251,10 @@ func debug_clear_birds() -> void:
 	birds.clear()
 
 
+func debug_resume_birds() -> void:
+	_bird_spawn_t = 0.3
+
+
 func debug_spawn_walker(dir: float, size: String) -> PvKWalker:
 	_walker_t = 9999.0 # hold the ambient spawner while a staged pair is out
 	return _spawn_walker(dir, size)
@@ -1261,6 +1266,9 @@ func debug_clear_walkers() -> void:
 
 func debug_reset_road() -> void:
 	debug_clear_cars()
+	last_damage = 0.0
+	last_damage_kind = ""
+	_cat_iframes = 0.0
 	hp = OutsideLayout.CAT_HP_MAX
 	crossings_this_life = 0
 	damage_log.clear()

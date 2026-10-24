@@ -256,17 +256,28 @@ func _step_chase(delta: float) -> void:
 	if _flat_dist(global_position, cat.global_position) > OutsideLayout.DOG_GIVE_UP_DIST or chase_t > OutsideLayout.DOG_GIVE_UP_TIME:
 		start_return("outrun")
 		return
-	# Pursuit: turn-rate-limited steering at chase speed.
+	# Pursuit: turn-rate-limited steering at range (the arcs are
+	# the character — a big dog turns like a truck), easing off as
+	# it closes so the turning circle shrinks inside the gap, and
+	# a direct lunge for the last stretch. Without the ease and
+	# the lunge, the turn circle (~2.7 m for the big dog) is wider
+	# than the bite range and the dog orbits a still cat forever.
 	var speed := float(OutsideLayout.DOG_CHASE_SPEED[size])
 	var turn := float(OutsideLayout.DOG_TURN_RATE[size])
 	var to := cat.global_position - global_position
 	to.y = 0.0
-	if to.length() > 0.05:
+	var dist := to.length()
+	if dist > 0.45:
 		var want_yaw := atan2(-to.x, -to.z)
 		rotation.y = lerp_angle(rotation.y, want_yaw, 1.0 - exp(-turn * delta))
-		var fwd := -global_transform.basis.z
-		fwd.y = 0.0
-		global_position += fwd.normalized() * speed * delta
+		if dist < 1.2:
+			var goal := Vector3(cat.global_position.x, global_position.y, cat.global_position.z)
+			global_position = global_position.move_toward(goal, speed * 0.8 * delta)
+		else:
+			var fwd := -global_transform.basis.z
+			fwd.y = 0.0
+			var spd := speed * clampf(dist / 2.4, 0.5, 1.0)
+			global_position += fwd.normalized() * spd * delta
 		_phase += delta * speed * 3.0
 		_body.position.y = absf(sin(_phase)) * 0.05
 	sys.dog_bite_check(self)

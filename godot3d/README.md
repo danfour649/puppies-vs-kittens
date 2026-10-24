@@ -81,6 +81,22 @@ An Android preset is defined (arm64, unsigned build not produced here).
 - `godot3d/screenshots/` — standing shots from one Xvfb pass:
   Willie close-up, Aggie close-up, both cats, the lounge.
 
+## The Massey outside zone — "Willie and Aggie" outdoors
+
+`godot3d/zones/outside/` grows the backyard into the full 255 Massey
+outside: three climbable trees with squirrels that flee up the trunk
+and taunt from the branch (the cat can climb up after them), a bird
+feeder with a constant bird stream and a bush-ambush mechanic
+(stillness meter; Willie meowing in the bush scatters the flock),
+the Massey Street frontage — where the traffic actively tries to
+hit a cat on the road, honking as it swerves, with the parked 2018
+Corolla as a safe island and a healing fish treat across the
+street — and neighbours walking dogs that alert, strain at the
+leash, slip it, and chase. Full placements, tuning and the local
+damage contract: `godot3d/zones/outside/README.md`. Headless checks:
+`godot3d/zones/outside/tests_outside.tscn` (67 assertions); shot
+pass: `godot3d/zones/outside/tools_outside_shots.tscn`.
+
 ## Phase 2 (not in this PR)
 
 - Puppies: procedural 3D dogs (GTA `stray_dog` definition, quad frame

@@ -66,7 +66,7 @@ const FAR_SIDEWALK_FAR := -20.6
 const FAR_YARD_NEAR := -20.6
 const FAR_YARD_FAR := -23.6
 const STREET_X_END := 18.0 ## cars/walkers spawn and despawn at |x| here
-const FRONT_REGION := Rect2(-14.5, -24.0, 29.0, 14.1) ## z from -24 to -9.9: dogs alert here, never in the back yard
+const FRONT_REGION := Rect2(-18.5, -24.0, 37.0, 14.1) ## the whole street frontage, z from -24 to -9.9: dogs alert here, never in the back yard
 
 ## Driveway + the parked, indestructible silver 2018 Corolla: a safe
 ## island mid-crossing. Cars path around the driveway mouth and will
@@ -75,7 +75,7 @@ const DRIVEWAY_MIN_X := 5.9
 const DRIVEWAY_MAX_X := 8.5
 const COROLLA_POS := Vector3(7.2, 0, -12.6) ## centre, nose toward the street
 const COROLLA_SIZE := Vector3(1.7, 0, 3.6) ## x width, z length (diorama scale)
-const COROLLA_SHELTER := Rect2(6.0, -16.4, 2.4, 2.3) ## x 6.0..8.4, z -16.4..-14.1: no targeting inside
+const COROLLA_SHELTER := Rect2(6.0, -15.15, 2.4, 1.05) ## the driveway-mouth strip: traffic biases wide around the driveway here, so a tucked-in cat is physically clear of the lane ## x 6.0..8.4, z -16.4..-14.1: no targeting inside
 
 ## The prize across the street: a fish treat that fully heals,
 ## on the far front-yard strip, on the door axis.
