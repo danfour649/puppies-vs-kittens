@@ -10,6 +10,8 @@ const TouchScene := preload("res://touch_controls_3d.gd")
 # DUO: the two-cat iteration (sibling NPC, character select, meows,
 # and the provocation system) lives in res://duo/ and hangs off this.
 const DuoScene := preload("res://duo/duo_system.gd")
+# MASSEY: the house zones (docs/massey-zones.md). Zone scenes are
+# loaded by path from HouseSpec so this file stays the only root.
 
 const MOUSE_COUNT := 7
 const YARD := Rect2(-12.4, -9.4, 24.8, 18.8) # inside the fence
@@ -26,6 +28,17 @@ var won := false
 # the paw check uses (the provoked buff widens it), and a camera
 # shake offset the flurry writes into.
 var duo: DuoSystem = null
+# MASSEY state: the zone manager, the objectives registry, and the
+# nine-lives counter (flavour — a faint is never a game-over).
+var zones: ZoneManager = null
+var objectives: PvKObjectives = null
+var lives := 9
+var _zone_roots := {}
+var _faint_t := -1.0
+var _banner_t := 0.0
+var _lbl_hp: Label
+var _hp_bar: ProgressBar
+var _lbl_lives: Label
 var catch_radius := 0.42
 var duo_shake := Vector3.ZERO
 var _mouse_seq := 0
@@ -67,6 +80,7 @@ func _ready() -> void:
 	_touch = TouchScene.new()
 	add_child(_touch)
 	_touch.strike_pressed.connect(attempt_strike)
+	_touch.pounce_pressed.connect(_jump_or_pounce)
 	_spawn_mice()
 	# DUO: sibling cat, character select, meow + provocation.
 	duo = DuoScene.new()
@@ -74,6 +88,8 @@ func _ready() -> void:
 	add_child(duo)
 	duo.setup(self)
 	aggie = duo.aggie_cat # shots seam: main's Aggie handle is the duo sibling
+	cat.add_to_group("player_cat") # enemies hunt this group
+	_build_zones()
 
 
 # --- materials / boxes (wildlife.gd idiom, shadows on for a diorama) --------
@@ -233,6 +249,24 @@ func _build_hud() -> void:
 	_lbl_left = _hud_label(layer, "Mice Left: %d" % MOUSE_COUNT, Vector2(18, 12))
 	_lbl_caught = _hud_label(layer, "Caught: 0", Vector2(18, 48))
 	_lbl_time = _hud_label(layer, "Time: 0.0", Vector2(18, 84))
+	_lbl_hp = _hud_label(layer, "HP", Vector2(18, 176))
+	_hp_bar = ProgressBar.new()
+	_hp_bar.position = Vector2(62, 182)
+	_hp_bar.size = Vector2(150, 14)
+	_hp_bar.min_value = 0.0
+	_hp_bar.max_value = 100.0
+	_hp_bar.value = 100.0
+	_hp_bar.show_percentage = false
+	var hp_bg := StyleBoxFlat.new()
+	hp_bg.bg_color = Color(0, 0, 0, 0.55)
+	hp_bg.set_corner_radius_all(4)
+	_hp_bar.add_theme_stylebox_override("background", hp_bg)
+	var hp_fill := StyleBoxFlat.new()
+	hp_fill.bg_color = Color(0.85, 0.30, 0.25)
+	hp_fill.set_corner_radius_all(4)
+	_hp_bar.add_theme_stylebox_override("fill", hp_fill)
+	layer.add_child(_hp_bar)
+	_lbl_lives = _hud_label(layer, "Lives x 9", Vector2(224, 176))
 	var restart := Button.new()
 	restart.text = "RESTART"
 	restart.add_theme_font_size_override("font_size", 22)
@@ -311,6 +345,7 @@ func attempt_strike() -> void:
 
 
 func _on_paw_swiped() -> void:
+	CombatDirector.check_paw_hits(get_tree(), cat)
 	var pp := cat.paw_point()
 	for m: Variant in mice:
 		if not is_instance_valid(m):
@@ -334,6 +369,79 @@ func _on_mouse_caught(_m: PvKMouse) -> void:
 
 func restart_game() -> void:
 	get_tree().reload_current_scene()
+
+
+## MASSEY: Space / POUNCE — jump on the ground, pounce mid-air.
+func _jump_or_pounce() -> void:
+	if won or cat == null:
+		return
+	if duo != null and duo.input_locked():
+		return
+	if cat.is_on_floor():
+		cat.jump()
+	else:
+		cat.pounce()
+
+
+# --- Massey zones ---------------------------------------------------------------
+
+func _build_zones() -> void:
+	var house := Node3D.new()
+	house.name = "HouseInterior"
+	add_child(house)
+	_zone_roots[HouseSpec.OUTSIDE] = self
+	for id: String in [HouseSpec.GROUND_FLOOR, HouseSpec.BASEMENT, HouseSpec.ATTIC]:
+		var inst := (load(String(HouseSpec.ZONE_SCENES[id])) as PackedScene).instantiate()
+		inst.position = HouseSpec.zone_origin(id)
+		house.add_child(inst)
+		_zone_roots[id] = inst
+	# The outside entry (on the porch) — main IS the outside zone.
+	var entry := Node3D.new()
+	entry.name = "EntryFrontDoor"
+	var et: Transform3D = HouseSpec.entries(HouseSpec.OUTSIDE)["EntryFrontDoor"]
+	entry.transform = et
+	add_child(entry)
+	var door := ZoneConnector.new()
+	add_child(door)
+	door.setup(HouseSpec.connectors(HouseSpec.OUTSIDE)[0])
+	zones = ZoneManager.new()
+	zones.name = "ZoneManager"
+	add_child(zones)
+	zones.setup(self)
+	for id: String in _zone_roots:
+		zones.register_zone(id, _zone_roots[id])
+	objectives = PvKObjectives.new()
+	objectives.name = "Objectives"
+	add_child(objectives)
+	objectives.declare("outside:mice", HouseSpec.OUTSIDE, "Catch all 7 mice in the yard", MOUSE_COUNT)
+	var hud := ObjectivesHUD.new()
+	hud.name = "ObjectivesHUD"
+	add_child(hud)
+	hud.setup(objectives, zones)
+
+
+func snap_camera() -> void:
+	if _rig != null and cat != null:
+		_rig.global_position = cat.global_position + Vector3(0, 0.3, 0)
+
+
+func on_zone_changed(zone_id: String) -> void:
+	snap_camera()
+	if duo != null and _zone_roots.has(zone_id):
+		duo.relocate_sibling(_zone_roots[zone_id] as Node)
+
+
+# The outside zone root API (interior zones: zones/zone_root.gd).
+func get_entry(entry_name: String) -> Node3D:
+	return get_node_or_null(entry_name) as Node3D
+
+
+func get_lounge_spots() -> Array:
+	return DuoSystem.LOUNGE_SPOTS.duplicate()
+
+
+func get_wander_rect() -> Rect2:
+	return HouseSpec.wander_rect(HouseSpec.OUTSIDE)
 
 
 func mice_left() -> int:
@@ -398,7 +506,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		var k := event as InputEventKey
 		if k.pressed and not k.echo:
 			match k.keycode:
-				KEY_SPACE:
+				KEY_SPACE: # MASSEY: jump on the ground, pounce mid-air
+					_jump_or_pounce()
+				KEY_F:
 					attempt_strike()
 				KEY_L:
 					cat.toggle_lounge()
@@ -434,3 +544,31 @@ func _process(delta: float) -> void:
 	_lbl_left.text = "Mice Left: %d" % mice_left()
 	_lbl_caught.text = "Caught: %d" % caught_count
 	_lbl_time.text = "Time: %.1f" % elapsed
+	if objectives != null:
+		objectives.set_progress("outside:mice", caught_count)
+	if _hp_bar != null and cat != null and cat.max_hp > 0.0:
+		_hp_bar.value = 100.0 * cat.hp / cat.max_hp
+		_lbl_lives.text = "Lives x %d" % lives
+	# The faint flow: flop for a beat, then wake up at the hub with
+	# a life spent. Never a game-over — cats have nine (and spares).
+	if cat != null and cat.is_fainted:
+		_faint_t += delta
+		if _faint_t >= 1.5 and zones != null and not zones.travelling:
+			_faint_t = -1.0
+			lives -= 1
+			var fresh := false
+			if lives < 0:
+				lives = 9
+				fresh = true
+			zones.travel(HouseSpec.GROUND_FLOOR, "EntryFrontDoor")
+			cat.heal_full()
+			if not won:
+				_banner.text = ("%s used up all nine?! A fresh set of lives, then." % cat.species_name) if fresh else ("Oof — %s shakes it off at home. Lives x %d" % [cat.species_name, lives])
+				_banner.visible = true
+				_banner_t = 2.4
+	elif _faint_t > 0.0:
+		_faint_t = -1.0
+	if _banner_t > 0.0:
+		_banner_t -= delta
+		if _banner_t <= 0.0 and not won:
+			_banner.visible = false

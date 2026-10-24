@@ -45,6 +45,7 @@ above that zone's own floor.
 | Kitchen / living split | divider at x = −1.8, doorway gap z ∈ [−0.6, 0.6] |
 | The drawer | (−5.2, ·, −4.15), its top is a sibling lounge spot (y 0.50) |
 | Willie's water bowl | (−2.35, ·, 2.7) |
+| The sofa (the LAP seat) | (4.8, ·, −3.85), seat top y 0.60 — the occupants' seated/lap state targets this spot; keep it clear of other props |
 
 Zone origins: outside (0, 0, 0) · ground floor (0, 0, −200) ·
 basement (0, −2.6, −200) · attic (0, +2.9, −200). The interior stack
@@ -162,6 +163,9 @@ Both cats expose (zone lanes may rely on all of these):
 - `pounce()` — mid-jump only: the paw strike with a forward lunge
   and ~1.6× paw range. Space = jump / pounce; F or the PAW button =
   ground strike; POUNCE touch button mirrors Space.
+- `heal(amount) -> float` — partial heal (returns what actually
+  landed). THE heal seam: the occupants' lap petting and the
+  outside lane's fish treat both call this. Never un-faints.
 - `hiss() -> bool` — the startle state (the basement's ghosts force
   it): full arched-back pose — spine arched up, tail puffed, head
   low — ~**1.5 s control lock**, **no damage**, then back to normal.
@@ -192,6 +196,25 @@ obj.declare("attic:raccoons", "attic", "Run off the raccoon family", 4, "raccoon
   `outside:mice` wired to the yard game; zones add theirs.
 - Kill counting also lands in `Objectives.total_kills` if a zone
   wants a "vicious animals defeated" flavour line.
+
+### Score events (reserved for the occupants lane)
+
+The registry also owns the game **score**: `Objectives.score`,
+advanced ONLY through named events —
+`add_score("ankle_attack")` (points default from the table;
+`add_score(name, points)` overrides). Reserved event names:
+
+| Event | Default points | Emitter |
+|---|---|---|
+| `ankle_attack` | 50 | occupants (a paw lands on an ankle) |
+| `underfoot` | 25 | occupants (cat darts in front of a walker) |
+| `trip_hazard` | 100 | occupants (the stumble bonus) |
+| `lap_purr` | 10 | occupants (per lap-petting tick; heals via `cat.heal()`) |
+
+Emission is `get_tree().call_group("objectives", "add_score",
+"ankle_attack")` or a direct call on the registry node. The
+objectives HUD shows the running score; zones may add their own
+event names to this table in their PRs (append, never rename).
 
 ## 6. Lighting & performance budgets (the web build is the target)
 
