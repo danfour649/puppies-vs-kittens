@@ -1,47 +1,56 @@
 class_name PvKCat
 extends CharacterBody3D
-## PvKCat — a procedural 3D cat: Willy, Daniel's boy.
+## The kit cat actor: a smooth-primitive procedural cat for Godot 4.7,
+## built to GTA Fredericton's stray_cat construction idiom (unit ~1 m
+## frame, forward -Z, Body group as child 0, legs parented to the root
+## under hip pivots, species scale on the model root). See
+## cat_kit/README.md for the GTA provenance and the port path.
 ##
-## Construction keeps the GTA Fredericton wildlife idiom's architecture —
-## a unit (~1 m) frame, forward = -Z, a Body group as child 0 that
-## carries the gait bob, legs parented to the model root under hip
-## pivots, the head under a neck pivot, the tail under a base pivot, and
-## the whole model scaled by the species scale (stray_cat s = 0.32) —
-## so the port path back into GTA (see README.md) is unchanged. But the
-## parts are SMOOTH primitives (ellipsoids, tapered cylinders, capsule
-## paws, a segmented-sphere tail), not GTA's flat boxes: Willy is a
-## modelled cat, not a voxel toy.
+## Characters (cat_species.json -> characters): `willie` (default) and
+## `aggie`. Call set_character("aggie") right after new(), before
+## add_child — the model is built in _ready from the character record.
+## Colouring is each cat's own, from Daniel's photos of the real cats
+## (reference/ in this folder): Willie is white with rich-orange tabby
+## patches (cap, big saddle, ringed tail, faint darker striping);
+## Aggie is a dark tortoiseshell — a seeded scatter of orange/cream
+## mottle shells over a warm black-brown base.
 ##
-## Colouring is Willy's own, sampled from the original v0.1 hand-drawn
-## kitten art (cat_kit/reference-willy-v01.png — the same sprite ships
-## in every version): a WHITE coat with GINGER patches (#E8AF54) — a
-## saddle along the spine sweeping into the tail, a cap on top of the
-## head, a small chest bib — dark eyes and a small pink nose. It is
-## deliberately NOT GTA stray_cat's solid orange (0.85, 0.55, 0.25);
-## that palette belongs to a different cat. The lounge pose is still
-## wildlife.gd's own trick — body.scale = (1.05, 0.7, 1.0), "low and
-## long, tail wrapped" (_spawn_river_cat).
-##
-## Animation is all in code: idle breathing, diagonal-pair walk cycle,
-## stalk crouch, paw-strike lunge, sprint, and the LOUNGE flop.
-##
-## Controller contract: call set_move_input() every physics frame, then
-## strike() / set_lounge() on events. paw_swiped fires at the moment the
-## paw lands; the host game checks catches around paw_point().
+## Animation is entirely code-driven pose math (idle breathing, gait,
+## crouch, lounge flop, strike), in the spirit of wildlife.gd's
+## _step()-driven actor transforms.
 
 signal paw_swiped
 
 const DATA_PATH := "res://cat_kit/cat_species.json"
-const LEG_H := 0.35 ## wildlife.gd quad leg height (unit space)
+const LEG_H := 0.35 # unit-space leg anchor height (GTA stray_cat leg_h)
 
-var species_name := "Willy"
-var coat := Color(1.0, 1.0, 1.0) ## Willy's white, from the v0.1 art
-var ginger := Color(0.9098, 0.6863, 0.3294) ## sampled ginger #E8AF54
-var nose_color := Color(0.851, 0.549, 0.478) ## pink #D98C7A
-var eye_color := Color(0.10, 0.08, 0.07) ## near-black brown
-var model_scale := 0.32
+# --- character identity / palette (from cat_species.json) -------------------
+var character_id := "willie"
+var species_name := "Willie"
+var coat := Color(1, 1, 1)
+var ginger := Color(0.780, 0.439, 0.125)
+var ginger_dark := Color(0.592, 0.329, 0.090)
+var mottle_orange := Color(0.690, 0.431, 0.173)
+var mottle_cream := Color(0.749, 0.659, 0.478)
+var nose_color := Color(0.851, 0.549, 0.478)
+var eye_color := Color(0.541, 0.604, 0.231)
+var inner_ear_color := Color(0.89, 0.65, 0.56)
+var pattern := "bicolor"
+var model_scale := 0.35
+var mottle_cfg: Dictionary = {}
+
+# --- build profile (unit-space diameters; the silhouette lives here) --------
+var torso_dia := Vector3(0.44, 0.42, 0.95)
+var chest_dia := Vector3(0.42, 0.40, 0.38)
+var haunch_dia := Vector3(0.23, 0.34, 0.37)
+var leg_len := 0.30
+var leg_r_top := 0.066
+var leg_r_bot := 0.050
+var tail_k := 1.3
+
+# --- game tuning (from cat_species.json) -------------------------------------
 var walk_speed := 2.4
-var stalk_speed := 1.2 ## = GTA stray_cat spd: a hunting cat is a slow cat
+var stalk_speed := 1.2
 var sprint_speed := 5.0
 var strike_range := 0.55
 var strike_cooldown := 0.38
@@ -49,66 +58,92 @@ var stamina_max := 100.0
 var stamina_drain := 22.0
 var stamina_regen := 14.0
 
-## Read-only state for hosts/tests.
+# --- read-only state (the controller contract) -------------------------------
 var anim_state := "idle"
 var stamina := 100.0
 var is_lounging := false
 
-var _move_dir := Vector3.ZERO
-var _want_sprint := false
-var _want_stalk := false
-var _cur_speed := 0.0
-var _strike_t := -1.0
-var _swipe_fired := false
-var _cooldown := 0.0
-var _phase := 0.0
-var _time := 0.0
-var _exhausted := false
-var _lounge_k := 0.0 ## 0 = normal pose, 1 = full Willy lounge, eased
+# --- structure verification handles (smoke test) ------------------------------
+var mottle_count := 0
+var stripe_count := 0
 
+var _torso: MeshInstance3D
+var _saddle_patch: MeshInstance3D
+var _eyes: Array = []
+var _mottles: Array = []
+var _stripes: Array = []
+
+# --- rig ----------------------------------------------------------------------
 var _model: Node3D
 var _body: Node3D
 var _head: Node3D
 var _tail: Node3D
-var _torso: MeshInstance3D
-var _saddle_patch: MeshInstance3D
-var _legs := {}
+var _hips := {}
 var _mats := {}
-var _sphere_mesh: SphereMesh
-var _cyl_meshes := {}
+var _sphere: SphereMesh
+var _cyls := {}
+
+var _input_dir := Vector3.ZERO
+var _input_sprint := false
+var _input_stalk := false
+var _phase := 0.0
+var _time := 0.0
+var _strike_t := -1.0
+var _strike_cd := 0.0
+var _swipe_fired := false
+var _lounge_k := 0.0
+
+static var _doc: Dictionary = {}
+static var _doc_loaded := false
+
+
+static func _species_doc() -> Dictionary:
+	if not _doc_loaded:
+		_doc_loaded = true
+		var f := FileAccess.open(DATA_PATH, FileAccess.READ)
+		if f != null:
+			var parsed: Variant = JSON.parse_string(f.get_as_text())
+			if typeof(parsed) == TYPE_DICTIONARY:
+				_doc = parsed
+	return _doc
+
+
+func set_character(id: String) -> void:
+	character_id = id
+	_apply_character()
 
 
 func _init() -> void:
-	_load_data()
+	_apply_character()
 
 
-func _json_color(a: Variant, fallback: Color) -> Color:
-	if typeof(a) == TYPE_ARRAY and (a as Array).size() >= 3:
-		var arr: Array = a
-		return Color(float(arr[0]), float(arr[1]), float(arr[2]))
-	return fallback
-
-
-func _load_data() -> void:
-	if not FileAccess.file_exists(DATA_PATH):
+func _apply_character() -> void:
+	var chars: Dictionary = _species_doc().get("characters", {})
+	var c: Dictionary = chars.get(character_id, {})
+	if c.is_empty():
 		return
-	var f := FileAccess.open(DATA_PATH, FileAccess.READ)
-	if f == null:
-		return
-	var parsed: Variant = JSON.parse_string(f.get_as_text())
-	if typeof(parsed) != TYPE_DICTIONARY:
-		return
-	var d: Dictionary = parsed
-	species_name = String(d.get("name", species_name))
-	coat = _json_color(d.get("color", []), coat)
-	var pal: Dictionary = d.get("palette", {})
-	if not pal.is_empty():
-		coat = _json_color(pal.get("coat", []), coat)
-		ginger = _json_color(pal.get("ginger", []), ginger)
-		nose_color = _json_color(pal.get("nose", []), nose_color)
-		eye_color = _json_color(pal.get("eye", []), eye_color)
-	model_scale = float(d.get("scale", model_scale))
-	var g: Dictionary = d.get("game", {})
+	species_name = String(c.get("name", species_name))
+	model_scale = float(c.get("scale", model_scale))
+	var pal: Dictionary = c.get("palette", {})
+	pattern = String(pal.get("pattern", pattern))
+	coat = _json_color(pal.get("coat", pal.get("base", [])), coat)
+	ginger = _json_color(pal.get("ginger", []), ginger)
+	ginger_dark = _json_color(pal.get("ginger_dark", []), ginger_dark)
+	mottle_orange = _json_color(pal.get("mottle_orange", []), mottle_orange)
+	mottle_cream = _json_color(pal.get("mottle_cream", []), mottle_cream)
+	nose_color = _json_color(pal.get("nose", []), nose_color)
+	eye_color = _json_color(pal.get("eye", []), eye_color)
+	inner_ear_color = _json_color(pal.get("inner_ear", []), inner_ear_color)
+	mottle_cfg = pal.get("mottle", {})
+	var b: Dictionary = c.get("build", {})
+	torso_dia = _json_vec3(b.get("torso_dia", []), torso_dia)
+	chest_dia = _json_vec3(b.get("chest_dia", []), chest_dia)
+	haunch_dia = _json_vec3(b.get("haunch_dia", []), haunch_dia)
+	leg_len = float(b.get("leg_len", leg_len))
+	leg_r_top = float(b.get("leg_r_top", leg_r_top))
+	leg_r_bot = float(b.get("leg_r_bot", leg_r_bot))
+	tail_k = float(b.get("tail_k", tail_k))
+	var g: Dictionary = c.get("game", {})
 	walk_speed = float(g.get("walk_speed", walk_speed))
 	stalk_speed = float(g.get("stalk_speed", stalk_speed))
 	sprint_speed = float(g.get("sprint_speed", sprint_speed))
@@ -120,22 +155,36 @@ func _load_data() -> void:
 	stamina = stamina_max
 
 
+func _json_color(v: Variant, fallback: Color) -> Color:
+	if typeof(v) == TYPE_ARRAY and (v as Array).size() >= 3:
+		var a: Array = v
+		return Color(float(a[0]), float(a[1]), float(a[2]))
+	return fallback
+
+
+func _json_vec3(v: Variant, fallback: Vector3) -> Vector3:
+	if typeof(v) == TYPE_ARRAY and (v as Array).size() >= 3:
+		var a: Array = v
+		return Vector3(float(a[0]), float(a[1]), float(a[2]))
+	return fallback
+
+
 func _ready() -> void:
 	_build_model()
-	var cs := CollisionShape3D.new()
+	var col := CollisionShape3D.new()
 	var cap := CapsuleShape3D.new()
 	cap.radius = 0.15
 	cap.height = 0.46
-	cs.shape = cap
-	cs.position = Vector3(0, 0.23, 0)
-	add_child(cs)
-	floor_snap_length = 0.25
-	safe_margin = 0.04
+	col.shape = cap
+	col.position = Vector3(0, 0.23, 0)
+	add_child(col)
+	floor_snap_length = 0.2
+	motion_mode = MOTION_MODE_GROUNDED
 
 
-# --- construction (smooth primitives on the GTA anchor layout) -------------
+# --- model --------------------------------------------------------------------
 
-func _mat(c: Color, rough := 0.9) -> StandardMaterial3D:
+func _mat(c: Color, rough := 0.95) -> StandardMaterial3D:
 	var key := c.to_html() + "|" + str(rough)
 	if not _mats.has(key):
 		var m := StandardMaterial3D.new()
@@ -145,17 +194,17 @@ func _mat(c: Color, rough := 0.9) -> StandardMaterial3D:
 	return _mats[key]
 
 
-## One shared unit sphere (diameter 1); ellipsoids are instances scaled
-## to their diameters, so parts blend instead of butting like boxes.
-func _ell(parent: Node3D, pos: Vector3, dia: Vector3, c: Color, rot := Vector3.ZERO, rough := 0.9) -> MeshInstance3D:
-	if _sphere_mesh == null:
-		_sphere_mesh = SphereMesh.new()
-		_sphere_mesh.radius = 0.5
-		_sphere_mesh.height = 1.0
-		_sphere_mesh.radial_segments = 32
-		_sphere_mesh.rings = 16
+## One shared unit sphere (radius 0.5), scaled per part into smooth
+## ellipsoids — the remodel's answer to the GTA box frame.
+func _ell(parent: Node3D, pos: Vector3, dia: Vector3, c: Color, rot := Vector3.ZERO, rough := 0.95) -> MeshInstance3D:
+	if _sphere == null:
+		_sphere = SphereMesh.new()
+		_sphere.radius = 0.5
+		_sphere.height = 1.0
+		_sphere.radial_segments = 32
+		_sphere.rings = 16
 	var mi := MeshInstance3D.new()
-	mi.mesh = _sphere_mesh
+	mi.mesh = _sphere
 	mi.material_override = _mat(c, rough)
 	mi.position = pos
 	mi.scale = dia
@@ -165,16 +214,16 @@ func _ell(parent: Node3D, pos: Vector3, dia: Vector3, c: Color, rot := Vector3.Z
 
 
 func _taper(parent: Node3D, pos: Vector3, top_r: float, bot_r: float, h: float, c: Color) -> MeshInstance3D:
-	var key := "%f|%f|%f" % [top_r, bot_r, h]
-	if not _cyl_meshes.has(key):
+	var key := "%s|%s|%s" % [top_r, bot_r, h]
+	if not _cyls.has(key):
 		var cm := CylinderMesh.new()
 		cm.top_radius = top_r
 		cm.bottom_radius = bot_r
 		cm.height = h
 		cm.radial_segments = 16
-		_cyl_meshes[key] = cm
+		_cyls[key] = cm
 	var mi := MeshInstance3D.new()
-	mi.mesh = _cyl_meshes[key]
+	mi.mesh = _cyls[key]
 	mi.material_override = _mat(c)
 	mi.position = pos
 	parent.add_child(mi)
@@ -188,92 +237,193 @@ func _build_model() -> void:
 	add_child(_model)
 	_body = Node3D.new()
 	_body.name = "Body"
-	_model.add_child(_body)
-	# Torso: a long ellipsoid with a chest sphere at the front and two
-	# haunch spheres at the rear, all blended into one body mass.
-	_torso = _ell(_body, Vector3(0, 0.55, 0.02), Vector3(0.38, 0.37, 0.92), coat)
-	_ell(_body, Vector3(0, 0.545, -0.30), Vector3(0.365, 0.355, 0.36), coat) # chest
-	for hx: float in [-0.088, 0.088]:
-		_ell(_body, Vector3(hx, 0.565, 0.29), Vector3(0.20, 0.30, 0.34), coat) # haunches
-	# Willy's ginger saddle: flattened ellipsoid shells hugging the back,
-	# sweeping from mid-back to the tail base (v0.1 art layout).
-	_saddle_patch = _ell(_body, Vector3(0, 0.615, 0.06), Vector3(0.395, 0.27, 0.68), ginger)
-	_ell(_body, Vector3(0, 0.60, 0.33), Vector3(0.37, 0.24, 0.30), ginger) # rear saddle
-	# Small ginger chest bib at the throat (v0.1 art).
-	_ell(_body, Vector3(0, 0.60, -0.435), Vector3(0.15, 0.19, 0.10), ginger, Vector3(-0.35, 0, 0))
-	# Head group under a neck pivot (same anchor as the GTA build).
+	_model.add_child(_body) # Body stays child 0 (GTA contract)
+
+	# Torso mass: main ellipsoid + blended chest + haunches (coat/base).
+	_torso = _ell(_body, Vector3(0, 0.55, 0.02), torso_dia, coat)
+	_ell(_body, Vector3(0, 0.545, -0.30), chest_dia, coat)
+	var hx := torso_dia.x * 0.22
+	for sx: float in [-1.0, 1.0]:
+		_ell(_body, Vector3(sx * hx, 0.565, 0.29), haunch_dia, coat)
+
+	if pattern == "tortoiseshell":
+		_build_tortie_body()
+	else:
+		_build_bicolor_body()
+	_build_head()
+	_build_legs()
+	_build_tail()
+
+
+## Willie's markings: a LARGE ginger saddle over the whole back and
+## upper sides (photo truth), a small chest bib, and faint darker
+## tabby striping inside the saddle.
+func _build_bicolor_body() -> void:
+	_saddle_patch = _ell(_body, Vector3(0, 0.612, 0.04), Vector3(0.468, 0.335, 0.82), ginger)
+	_ell(_body, Vector3(0, 0.605, 0.335), Vector3(0.46, 0.31, 0.38), ginger)
+	_ell(_body, Vector3(0, 0.60, -0.44), Vector3(0.15, 0.19, 0.10), ginger, Vector3(-0.35, 0, 0))
+	# Back stripes: flattened darker shells lying across the saddle.
+	for i in 6:
+		var z := -0.22 + i * 0.115
+		var yy := 0.775 - 0.16 * pow(absf(z - 0.05) / 0.30, 2.0)
+		_stripe(_body, Vector3(0, yy, z), Vector3(0.40, 0.05, 0.08), Vector3(0.04 * (1 if i % 2 == 0 else -1), 0.05 * (1 if i % 3 == 0 else -1), 0.05 * (1 if i % 2 == 0 else -1)))
+	# Flank stripes on the saddle's upper sides.
+	for sx: float in [-1.0, 1.0]:
+		for z in [-0.08, 0.10, 0.26]:
+			_stripe(_body, Vector3(sx * 0.205, 0.66, z), Vector3(0.045, 0.17, 0.085), Vector3(0.10, 0, sx * 0.10))
+
+
+func _stripe(parent: Node3D, pos: Vector3, dia: Vector3, rot: Vector3) -> void:
+	_stripes.append(_ell(parent, pos, dia, ginger_dark, rot))
+	stripe_count = _stripes.size()
+
+
+## Aggie's coat: the dark base shows through a seeded scatter of
+## orange/cream mottle shells, denser on the torso, plus her cream
+## throat/chest. Deterministic — same seed, same cat, every build.
+func _build_tortie_body() -> void:
+	_ell(_body, Vector3(0, 0.585, -0.42), Vector3(0.13, 0.17, 0.09), mottle_cream, Vector3(-0.35, 0, 0))
+	_ell(_body, Vector3(0.05, 0.63, -0.40), Vector3(0.09, 0.11, 0.07), mottle_orange, Vector3(-0.3, 0, 0))
+	var rng := _mottle_rng()
+	_scatter(_body, Vector3(0, 0.55, 0.02), torso_dia * 0.5, int(mottle_cfg.get("torso", 64)), rng, 0.04, 0.11)
+
+
+func _mottle_rng() -> RandomNumberGenerator:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(mottle_cfg.get("seed", 1))
+	return rng
+
+
+## Scatter `count` small flattened two-tone shells over an ellipsoid
+## surface (center + radii in the parent's space). Every random draw
+## comes from the caller's seeded RNG, so the whole cat is a pure
+## function of the seed.
+func _scatter(parent: Node3D, center: Vector3, radii: Vector3, count: int, rng: RandomNumberGenerator, smin: float, smax: float) -> void:
+	var tones: Array = [mottle_orange, mottle_cream]
+	for i in count:
+		var theta := rng.randf() * TAU
+		var y := lerpf(-0.7, 1.0, rng.randf()) # bias up: more mottle on top/sides
+		var r := sqrt(maxf(0.0, 1.0 - y * y))
+		var dir := Vector3(cos(theta) * r, y, sin(theta) * r)
+		var pos := center + Vector3(dir.x * radii.x, dir.y * radii.y, dir.z * radii.z)
+		var s := rng.randf_range(smin, smax)
+		var tone: Color = tones[rng.randi() % tones.size()]
+		var mi := _ell(parent, pos, Vector3(s, s * 0.38, s * rng.randf_range(0.7, 1.1)), tone, Vector3(rng.randf_range(-0.4, 0.4), rng.randf() * TAU, rng.randf_range(-0.4, 0.4)))
+		_mottles.append(mi)
+	mottle_count = _mottles.size()
+
+
+func _build_head() -> void:
 	_head = Node3D.new()
 	_head.name = "Head"
 	_head.position = Vector3(0, LEG_H + 0.38, -0.5)
 	_body.add_child(_head)
 	_ell(_head, Vector3(0, 0.03, -0.05), Vector3(0.30, 0.28, 0.29), coat) # skull
 	_ell(_head, Vector3(0, -0.035, -0.155), Vector3(0.185, 0.135, 0.155), coat) # muzzle
-	# Ginger cap on top of the head, between the ears (v0.1 art).
-	_ell(_head, Vector3(0, 0.095, -0.045), Vector3(0.295, 0.175, 0.285), ginger)
-	# Ears: pinched spheres tilted out, pale inner ear on the front face.
-	for ex: float in [-0.088, 0.088]:
-		var tilt := Vector3(0.06, 0, -signf(ex) * 0.14)
-		_ell(_head, Vector3(ex, 0.165, -0.01), Vector3(0.085, 0.15, 0.05), coat, tilt)
-		_ell(_head, Vector3(ex, 0.16, -0.038), Vector3(0.05, 0.09, 0.02), Color(0.89, 0.65, 0.56), tilt)
-	# Dark eyes, slightly proud; tiny pink nose.
-	for ex: float in [-0.067, 0.067]:
-		_ell(_head, Vector3(ex, 0.045, -0.178), Vector3(0.034, 0.034, 0.034), eye_color, Vector3.ZERO, 0.25)
+	if pattern == "tortoiseshell":
+		# Mostly dark face, orange mottling. Each scattered part
+		# re-seeds (seed + part offset) so counts can change
+		# independently without reshuffling the other parts.
+		var rng := RandomNumberGenerator.new()
+		rng.seed = int(mottle_cfg.get("seed", 1)) + 101
+		_scatter(_head, Vector3(0, 0.03, -0.05), Vector3(0.145, 0.135, 0.14), int(mottle_cfg.get("head", 12)), rng, 0.035, 0.08)
+	else:
+		# The cap: wraps the top of the head, around the ears, and
+		# down the sides of the cheeks; the face blaze stays white.
+		_ell(_head, Vector3(0, 0.092, -0.04), Vector3(0.315, 0.185, 0.30), ginger)
+		for sx: float in [-1.0, 1.0]:
+			_ell(_head, Vector3(sx * 0.117, 0.0, -0.05), Vector3(0.105, 0.175, 0.20), ginger, Vector3(0, -sx * 0.10, -sx * 0.12))
+		_stripe(_head, Vector3(0, 0.205, -0.02), Vector3(0.17, 0.045, 0.06), Vector3(0, 0, 0.04))
+		_stripe(_head, Vector3(0, 0.195, 0.06), Vector3(0.15, 0.04, 0.055), Vector3(0, 0, -0.03))
+	# Ears: pinched spheres; Willie's sit inside his ginger cap,
+	# Aggie's are her dark base. Pale inset on the front face.
+	var ear_col := ginger if pattern != "tortoiseshell" else coat
+	for sx: float in [-1.0, 1.0]:
+		var ear := _ell(_head, Vector3(sx * 0.088, 0.155, -0.01), Vector3(0.085, 0.15, 0.05), ear_col, Vector3(0.06, 0, -sx * 0.14))
+		ear.scale.z = 0.05
+		_ell(_head, Vector3(sx * 0.088, 0.15, -0.032), Vector3(0.05, 0.09, 0.02), inner_ear_color)
+	# Eyes: green-gold/hazel for both cats (photo truth).
+	for sx: float in [-1.0, 1.0]:
+		_eyes.append(_ell(_head, Vector3(sx * 0.067, 0.045, -0.178), Vector3(0.034, 0.034, 0.034), eye_color, Vector3.ZERO, 0.25))
 	_ell(_head, Vector3(0, -0.018, -0.222), Vector3(0.042, 0.028, 0.026), nose_color, Vector3.ZERO, 0.5)
-	# Legs on the model root (as in GTA), each under a hip pivot for
-	# gait: hip blend sphere, tapered leg, capsule paw. All white.
-	for lx: float in [-0.12, 0.12]:
-		for lz: float in [-0.32, 0.32]:
-			var pivot := Node3D.new()
-			pivot.position = Vector3(lx, LEG_H, lz)
-			_model.add_child(pivot)
-			_ell(pivot, Vector3(0, -0.02, 0), Vector3(0.145, 0.13, 0.145), coat)
-			_taper(pivot, Vector3(0, -0.175, 0), 0.060, 0.044, 0.34, coat)
-			_ell(pivot, Vector3(0, -0.332, -0.016), Vector3(0.10, 0.06, 0.13), coat)
-			_legs[_leg_key(lx, lz)] = pivot
-	# Tail under a base pivot: a curved chain of shrinking spheres.
-	# White at the base and tip, ginger along the rear (v0.1 art).
+
+
+func _leg_key(sx: float, sz: float) -> String:
+	return ("F" if sz < 0.0 else "B") + ("L" if sx < 0.0 else "R")
+
+
+func _build_legs() -> void:
+	var rng: RandomNumberGenerator = null
+	if pattern == "tortoiseshell":
+		rng = _mottle_rng()
+		rng.seed = int(mottle_cfg.get("seed", 1)) + 202
+	var per_leg := 0
+	if pattern == "tortoiseshell":
+		per_leg = int(mottle_cfg.get("legs", 8)) / 4
+	for sx: float in [-1.0, 1.0]:
+		for sz: float in [-1.0, 1.0]:
+			var hip := Node3D.new()
+			hip.position = Vector3(sx * 0.12, LEG_H, sz * 0.32)
+			_model.add_child(hip)
+			_hips[_leg_key(sx, sz)] = hip
+			_ell(hip, Vector3.ZERO, Vector3(leg_r_top * 2.3, 0.13, leg_r_top * 2.3), coat)
+			_taper(hip, Vector3(0, -(leg_len * 0.5 + 0.005), 0), leg_r_top, leg_r_bot, leg_len, coat)
+			_ell(hip, Vector3(0, -(leg_len - 0.018), -0.016), Vector3(leg_r_top * 1.6, 0.06, leg_r_top * 2.0), coat)
+			if rng != null and per_leg > 0:
+				_scatter(hip, Vector3(0, -leg_len * 0.48, 0), Vector3(leg_r_top * 1.02, leg_len * 0.40, leg_r_top * 1.02), per_leg, rng, 0.03, 0.055)
+
+
+func _build_tail() -> void:
 	_tail = Node3D.new()
 	_tail.name = "Tail"
-	_tail.position = Vector3(0, LEG_H + 0.3, 0.42)
+	_tail.position = Vector3(0, LEG_H + 0.30, 0.42)
 	_body.add_child(_tail)
-	var tail_segs := [
-		[0.02, 0.000, 0.112, coat],
-		[0.068, 0.005, 0.108, coat],
-		[0.116, 0.013, 0.103, ginger],
-		[0.164, 0.024, 0.097, ginger],
-		[0.212, 0.038, 0.090, ginger],
-		[0.260, 0.055, 0.083, ginger],
-		[0.308, 0.074, 0.075, ginger],
-		[0.356, 0.094, 0.067, ginger],
-		[0.400, 0.114, 0.058, coat],
+	# [along, up, diameter] per segment, base to tip.
+	var segs: Array = [
+		[0.02, 0.0, 0.112], [0.07, 0.002, 0.108], [0.12, 0.008, 0.102],
+		[0.17, 0.016, 0.096], [0.22, 0.027, 0.090], [0.265, 0.041, 0.082],
+		[0.31, 0.057, 0.074], [0.355, 0.079, 0.066], [0.400, 0.114, 0.058],
 	]
-	for seg: Array in tail_segs:
-		_ell(_tail, Vector3(0, float(seg[1]), float(seg[0])), Vector3.ONE * float(seg[2]), seg[3] as Color)
+	var tail_cols: Array
+	if pattern == "tortoiseshell":
+		tail_cols = [coat, coat, coat, coat, coat, coat, coat, coat, coat]
+	else: # Willie's tail: substantially ginger, ringed with the darker tone
+		tail_cols = [coat, ginger, ginger_dark, ginger, ginger_dark, ginger, ginger_dark, ginger, ginger]
+	var seg_pos: Array = []
+	for i in segs.size():
+		var s: Array = segs[i]
+		var pos := Vector3(0, float(s[1]), float(s[0]))
+		seg_pos.append([pos, float(s[2]) * tail_k])
+		_ell(_tail, pos, Vector3.ONE * float(s[2]) * tail_k, tail_cols[i])
+	if pattern == "tortoiseshell":
+		# Orange running through the dark tail (photo truth).
+		var rng := _mottle_rng()
+		rng.seed = int(mottle_cfg.get("seed", 1)) + 303
+		var tones: Array = [mottle_orange, mottle_cream]
+		for i in int(mottle_cfg.get("tail", 9)):
+			var sp: Array = seg_pos[rng.randi() % seg_pos.size()]
+			var c: Vector3 = sp[0]
+			var rad: float = float(sp[1]) * 0.5
+			var ang := rng.randf() * TAU
+			var pos := c + Vector3(cos(ang) * rad, sin(ang) * rad, rng.randf_range(-0.02, 0.02))
+			var s := rng.randf_range(0.035, 0.07)
+			var tone: Color = tones[rng.randi() % tones.size()]
+			_mottles.append(_ell(_tail, pos, Vector3(s, s * 0.45, s * 0.9), tone, Vector3(0, 0, rng.randf_range(-0.4, 0.4))))
+		mottle_count = _mottles.size()
 
 
-func _leg_key(lx: float, lz: float) -> String:
-	return ("F" if lz < 0.0 else "B") + ("L" if lx < 0.0 else "R")
 
+# --- controller -----------------------------------------------------------------
 
-# --- controller API ----------------------------------------------------------
-
-## Call every physics frame. dir is a world-space horizontal direction
-## (any length; clamped to 1). Sprint/stalk are requests, stamina rules.
 func set_move_input(dir: Vector3, sprint: bool, stalk: bool) -> void:
-	dir.y = 0.0
-	if dir.length() > 1.0:
-		dir = dir.normalized()
-	_move_dir = dir
-	_want_sprint = sprint
-	_want_stalk = stalk
+	_input_dir = dir
+	_input_sprint = sprint
+	_input_stalk = stalk
 
 
-## Start a paw strike. Returns false on cooldown / mid-strike.
 func strike() -> bool:
-	if _strike_t >= 0.0 or _cooldown > 0.0:
+	if _strike_t >= 0.0 or _strike_cd > 0.0 or is_lounging:
 		return false
-	if is_lounging:
-		set_lounge(false)
 	_strike_t = 0.0
 	_swipe_fired = false
 	return true
@@ -287,148 +437,138 @@ func toggle_lounge() -> void:
 	is_lounging = not is_lounging
 
 
-## World-space facing (model forward is -Z, as in GTA).
 func forward_dir() -> Vector3:
-	var f := -global_transform.basis.z
+	var b := global_transform.basis
+	var f := -b.z
 	f.y = 0.0
 	return f.normalized()
 
 
-## Where the front paw lands mid-strike, world space.
+## Where the striking paw lands: front-right paw, half a strike ahead.
 func paw_point() -> Vector3:
-	return global_position + forward_dir() * strike_range + Vector3(0, 0.12, 0)
+	return global_position + forward_dir() * strike_range * model_scale / 0.32
 
 
-# --- simulation --------------------------------------------------------------
+# --- physics --------------------------------------------------------------------
 
 func _physics_process(delta: float) -> void:
 	_time += delta
-	_cooldown = maxf(_cooldown - delta, 0.0)
-	var moving := _move_dir.length() > 0.05
-	if moving and is_lounging:
-		set_lounge(false)
-	var speed := 0.0
-	var sprinting := false
-	if moving and not is_lounging:
-		speed = walk_speed
-		if _want_stalk:
-			speed = stalk_speed
-		elif _want_sprint and not _exhausted:
-			speed = sprint_speed
-			sprinting = true
-	if sprinting:
-		stamina = maxf(stamina - stamina_drain * delta, 0.0)
-		if stamina <= 0.0:
-			_exhausted = true
-	else:
-		stamina = minf(stamina + stamina_regen * delta, stamina_max)
-		if _exhausted and stamina > 25.0:
-			_exhausted = false
-	var vel := velocity
-	vel.x = _move_dir.x * speed
-	vel.z = _move_dir.z * speed
+	if _strike_cd > 0.0:
+		_strike_cd -= delta
 	if _strike_t >= 0.0:
-		vel.x *= 0.25
-		vel.z *= 0.25
-	if is_on_floor():
-		vel.y = -1.0
-	else:
-		vel.y -= 22.0 * delta
-	velocity = vel
-	move_and_slide()
-	_cur_speed = Vector2(velocity.x, velocity.z).length()
-	if moving:
-		var target_yaw := atan2(-_move_dir.x, -_move_dir.z)
+		_strike_t += delta
+		if _strike_t >= 0.10 and not _swipe_fired:
+			_swipe_fired = true
+			paw_swiped.emit()
+		if _strike_t >= 0.34:
+			_strike_t = -1.0
+			_strike_cd = strike_cooldown
+
+	var want := Vector3.ZERO
+	var speed := 0.0
+	var moving := false
+	if _input_dir.length() > 0.05 and not is_lounging and _strike_t < 0.0:
+		moving = true
+		var sprinting := _input_sprint and stamina > 1.0
+		speed = stalk_speed if _input_stalk else (sprint_speed if sprinting else walk_speed)
+		want = _input_dir.normalized() * speed
+		if sprinting and not _input_stalk:
+			stamina = maxf(0.0, stamina - stamina_drain * delta)
+		var target_yaw := atan2(-_input_dir.x, -_input_dir.z)
 		rotation.y = lerp_angle(rotation.y, target_yaw, 1.0 - exp(-12.0 * delta))
+	if not moving:
+		stamina = minf(stamina_max, stamina + stamina_regen * delta)
+
+	velocity.x = want.x
+	velocity.z = want.z
+	velocity.y = -1.0 if is_on_floor() else velocity.y - 22.0 * delta
+	move_and_slide()
+
 	if _strike_t >= 0.0:
 		anim_state = "strike"
 	elif is_lounging:
 		anim_state = "lounge"
-	elif not moving:
-		anim_state = "idle"
-	elif sprinting:
-		anim_state = "sprint"
-	elif _want_stalk:
-		anim_state = "stalk"
+	elif moving:
+		anim_state = "stalk" if _input_stalk else ("sprint" if _input_sprint and stamina > 1.0 else "walk")
 	else:
-		anim_state = "walk"
+		anim_state = "idle"
 
 
-# --- animation (all in code; poses are pure functions of state + time) -------
+# --- animation (poses are pure functions of state + time) ------------------------
 
 func _process(delta: float) -> void:
-	if _model == null:
-		return
-	_lounge_k = clampf(_lounge_k + (delta / 0.35) * (1.0 if is_lounging else -1.0), 0.0, 1.0)
-	if _cur_speed > 0.05:
-		_phase += delta * _cur_speed * 5.2
-	# Defaults: upright, still, tail carried up with a slow sway.
-	var body_pos := Vector3.ZERO
+	var spd := Vector2(velocity.x, velocity.z).length()
+	if anim_state in ["walk", "stalk", "sprint"]:
+		_phase += delta * (4.2 + spd * 1.9)
+	_lounge_k = move_toward(_lounge_k, 1.0 if is_lounging else 0.0, delta * 2.2)
+
+	# Body: gait bob / stalk crouch / lounge flop.
 	var body_scale := Vector3.ONE
+	var body_y := 0.0
+	var tail_rot := Vector3(0, sin(_time * 1.7) * 0.08, 0)
 	var head_rot := Vector3.ZERO
-	var tail_rot := Vector3(-0.35 + sin(_time * 2.3) * 0.05, sin(_time * 1.3) * 0.15, 0)
-	var leg_rx := {"FL": 0.0, "FR": 0.0, "BL": 0.0, "BR": 0.0}
 	match anim_state:
 		"idle":
-			body_scale.y = 1.0 + 0.025 * sin(_time * 2.1) # breathing
-			head_rot.y = sin(_time * 0.35) * 0.18 # looking around
-		"walk", "stalk", "sprint":
-			var amp := 0.5
-			var bob := 0.05
-			if anim_state == "stalk":
-				amp = 0.3
-				bob = 0.02
-				body_pos.y = -0.1
-				body_scale.y = 0.84
-				head_rot.x = 0.15
-				tail_rot.x = -0.05
-			elif anim_state == "sprint":
-				amp = 0.75
-				bob = 0.07
-				body_pos.z = -0.03
-				tail_rot.x = -0.75
-			var s0 := sin(_phase) * amp
-			var s1 := sin(_phase + PI) * amp
-			leg_rx["FL"] = s0
-			leg_rx["BR"] = s0
-			leg_rx["FR"] = s1
-			leg_rx["BL"] = s1
-			body_pos.y += absf(sin(_phase)) * bob # GTA gait bob
+			body_scale.y = 1.0 + sin(_time * 2.1) * 0.025 # breathing
+			head_rot.y = sin(_time * 0.43) * 0.38 # look-around
+			head_rot.x = sin(_time * 0.31) * 0.06
+		"walk", "sprint":
+			body_y = absf(sin(_phase)) * (0.05 if anim_state == "walk" else 0.065)
+		"stalk":
+			body_scale.y = 0.84
+			body_y = -0.04
+			tail_rot.x = 0.42 # tail levels out behind
+			head_rot.x = 0.12
 		"strike":
-			pass # posed by the strike timeline below
+			var t := _strike_t
+			if t < 0.10: # windup: rock back
+				body_y = -0.05 * (t / 0.10)
+				head_rot.x = -0.10 * (t / 0.10)
+			elif t < 0.20: # lunge
+				var k := (t - 0.10) / 0.10
+				body_y = lerpf(-0.05, 0.035, k)
+				head_rot.x = lerpf(-0.10, 0.16, k)
+			else: # recover
+				var k := (t - 0.20) / 0.14
+				body_y = lerpf(0.035, 0.0, k)
+				head_rot.x = lerpf(0.16, 0.0, k)
+		"lounge":
+			pass
 	if _lounge_k > 0.0:
-		var k := _lounge_k
-		body_scale = body_scale.lerp(Vector3(1.05, 0.7, 1.0), k) # GTA's numbers (the river cat's lounge scale)
-		body_pos.y = lerpf(body_pos.y, -0.02, k)
-		head_rot.x = lerpf(head_rot.x, 0.3, k)
-		head_rot.z = lerpf(head_rot.z, 0.12, k)
-		tail_rot.y = lerpf(tail_rot.y, 0.85, k) # tail wrapped
-		tail_rot.x = lerpf(tail_rot.x, -0.1, k)
-		leg_rx["FL"] = lerpf(leg_rx["FL"], 1.15, k)
-		leg_rx["FR"] = lerpf(leg_rx["FR"], 1.15, k)
-		leg_rx["BL"] = lerpf(leg_rx["BL"], -1.15, k)
-		leg_rx["BR"] = lerpf(leg_rx["BR"], -1.15, k)
-	if _strike_t >= 0.0:
-		_strike_t += delta
-		var t := _strike_t
-		if not _swipe_fired and t >= 0.10:
-			_swipe_fired = true
-			paw_swiped.emit()
-		var lunge := 0.0
-		if t < 0.10:
-			lunge = -0.10 * (t / 0.10) # wind back
-		elif t < 0.20:
-			lunge = lerpf(-0.10, 0.30, (t - 0.10) / 0.10) # lunge forward
-		elif t < 0.34:
-			lunge = lerpf(0.30, 0.0, (t - 0.20) / 0.14)
-		body_pos.z = -lunge
-		leg_rx["FR"] = -1.5 * sin(clampf(t / 0.3, 0.0, 1.0) * PI) # paw slash
-		if t >= 0.34:
-			_strike_t = -1.0
-			_cooldown = strike_cooldown
-	_body.position = body_pos
+		# Willow's flop numbers (wildlife.gd _spawn_river_cat): low and
+		# long, tail wrapped — eased in by _lounge_k.
+		body_scale = body_scale.lerp(Vector3(1.05, 0.7, 1.0), _lounge_k)
+		tail_rot.y = lerpf(tail_rot.y, 0.85, _lounge_k)
+		head_rot.x = lerpf(head_rot.x, 0.22, _lounge_k)
 	_body.scale = body_scale
+	_body.position.y = body_y * (1.0 - _lounge_k)
 	_head.rotation = head_rot
 	_tail.rotation = tail_rot
-	for key: String in leg_rx:
-		(_legs[key] as Node3D).rotation.x = leg_rx[key]
+
+	# Legs: diagonal pairs; tucked away in the lounge.
+	var amp := 0.0
+	if anim_state == "walk":
+		amp = 0.55
+	elif anim_state == "sprint":
+		amp = 0.8
+	elif anim_state == "stalk":
+		amp = 0.3
+	for key in _hips:
+		var hip := _hips[key] as Node3D
+		var splay := 0.0
+		if _lounge_k > 0.0:
+			splay = (0.5 if key.begins_with("F") else -0.35) * _lounge_k
+			hip.rotation.x = lerpf(hip.rotation.x, splay, 0.5)
+			continue
+		var ph := _phase + (0.0 if key in ["FL", "BR"] else PI)
+		hip.rotation.x = sin(ph) * amp if amp > 0.0 else lerpf(hip.rotation.x, 0.0, 0.3)
+	# The strike slash: front-right leg whips through its arc.
+	if anim_state == "strike" and _hips.has("FR"):
+		var fr := _hips["FR"] as Node3D
+		var t := _strike_t
+		if t < 0.10:
+			fr.rotation.x = lerpf(0.0, 0.7, t / 0.10) # paw raised back
+		elif t < 0.22:
+			fr.rotation.x = lerpf(0.7, -1.15, (t - 0.10) / 0.12) # the slash
+		else:
+			fr.rotation.x = lerpf(-1.15, 0.0, (t - 0.22) / 0.12)

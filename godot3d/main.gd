@@ -1,6 +1,6 @@
 extends Node3D
 ## Puppies vs Kittens 3D — cat-first edition (v0.4).
-## You are the cat: Willy, built by cat_kit from GTA's
+## You are the cat: Willie, built by cat_kit from GTA's
 ## Fredericton's stray_cat. Catch every mouse in the backyard.
 ## No birds. Puppies are Phase 2 (see README.md).
 
@@ -16,6 +16,7 @@ const YARD := Rect2(-12.4, -9.4, 24.8, 18.8) # inside the fence
 const CHAIR_SEAT := Vector3(4.5, 0.46, 4.5) # top of the garden chair
 
 var cat: PvKCat
+var aggie: PvKCat
 var mice: Array = []
 var caught_count := 0
 var elapsed := 0.0
@@ -44,6 +45,8 @@ var _lbl_time: Label
 var _banner: Label
 var _touch: TouchControls3D
 var _dragging := false
+## Shots seam: when set, the camera rig tracks this node instead of the cat.
+var cam_anchor: Node3D = null
 var _rng := RandomNumberGenerator.new()
 var _mats := {}
 var _meshes := {}
@@ -54,11 +57,18 @@ func _ready() -> void:
 	_build_environment()
 	_build_lights()
 	cat = CatScene.new()
-	cat.name = "Willy"
+	cat.name = "Willie"
 	add_child(cat)
 	cat.global_position = Vector3(2.5, 0.1, -6.2)
 	cat.rotation.y = PI # face into the yard (+Z); model forward is -Z
 	cat.paw_swiped.connect(_on_paw_swiped)
+	aggie = CatScene.new()
+	aggie.set_character("aggie")
+	aggie.name = "Aggie"
+	add_child(aggie)
+	aggie.global_position = CHAIR_SEAT + Vector3(0, 0.09, 0)
+	aggie.rotation.y = 0.8 # on the garden chair, aligned with its back
+	aggie.set_lounge(true)
 	_build_camera()
 	_build_hud()
 	_touch = TouchScene.new()
@@ -323,9 +333,9 @@ func _on_mouse_caught(_m: PvKMouse) -> void:
 	caught_count += 1
 	if caught_count >= MOUSE_COUNT and not won:
 		won = true
-		_banner.text = "All mice caught in %.1f s!\nWilly approves. Press R to play again." % elapsed
+		_banner.text = "All mice caught in %.1f s!\nWillie approves. Press R to play again." % elapsed
 		_banner.visible = true
-		cat.set_lounge(true) # victory flop, Willy style
+		cat.set_lounge(true) # victory flop, Willie style
 
 
 func restart_game() -> void:
@@ -421,6 +431,8 @@ func _process(delta: float) -> void:
 	if not won:
 		elapsed += delta
 	var target := cat.global_position + Vector3(0, 0.3, 0) + duo_shake # DUO shake
+	if cam_anchor != null:
+		target = cam_anchor.global_position
 	_rig.global_position = _rig.global_position.lerp(target, 1.0 - exp(-8.0 * delta))
 	_rig.rotation.y = cam_yaw
 	_arm.rotation.x = cam_pitch
