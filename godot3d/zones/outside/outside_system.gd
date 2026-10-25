@@ -32,6 +32,7 @@ extends Node
 const SquirrelScene := preload("res://zones/outside/squirrel.gd")
 const BirdScene := preload("res://zones/outside/bird.gd")
 const TreeScene := preload("res://zones/outside/yard_tree.gd")
+const ForestScene := preload("res://zones/outside/yard_forest.gd")
 const CarScene := preload("res://zones/outside/car.gd")
 const WalkerScene := preload("res://zones/outside/walker.gd")
 const DogScene := preload("res://zones/outside/dog.gd")
@@ -125,6 +126,7 @@ func setup(game_node: Node) -> void:
 	_build_corolla()
 	_build_fish_treat()
 	_build_trees()
+	_build_forest()
 	_build_feeder()
 	_build_bushes()
 	_spawn_squirrels()
@@ -333,6 +335,13 @@ func _build_trees() -> void:
 		zone_root.add_child(t)
 		t.setup(OutsideLayout.TREE_POSITIONS[i], dirs[i])
 		trees.append(t)
+
+
+func _build_forest() -> void:
+	var forest: YardForest = ForestScene.new()
+	forest.name = "YardForest"
+	zone_root.add_child(forest)
+	forest.build(OutsideLayout.FOREST_POSITIONS)
 
 
 func _build_feeder() -> void:
