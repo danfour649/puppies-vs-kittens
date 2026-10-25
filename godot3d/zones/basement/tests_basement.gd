@@ -40,6 +40,24 @@ func _freeze_dangers() -> void:
 		sp.active = false
 
 
+func _park_rats() -> void:
+	# Frozen rats are still SOLID bodies, and rats[3] spawns at
+	# (-4.5, 0.05, -0.5) - dead centre of the ghost-block lane below.
+	# Its random pre-freeze wander (rat.gd randomize()) leaves it a
+	# few cm off the cat line: enough offset and the cat deflects
+	# around it; near zero and the cat wedges head-on, never reaches
+	# the ghost, and the whole hiss cluster fails (the basement
+	# flake, root-caused 2026-10-25; pinned-rat repro was a
+	# deterministic 45/53). Park the pack in the NE alcove before
+	# staging the ghost tests; the Aggie-gap wall pens them there
+	# when later segments reactivate them, and the rat segment
+	# teleports out the rat it borrows anyway.
+	var spots: Array[Vector3] = [Vector3(6.3, 0.05, -2.6), Vector3(6.7, 0.05, -1.4), Vector3(6.3, 0.05, -1.6), Vector3(6.7, 0.05, -2.4), Vector3(5.7, 0.05, -2.5)]
+	for i in _zone.rats.size():
+		var r = _zone.rats[i]
+		r.velocity = Vector3.ZERO
+		r.global_position = spots[i % spots.size()]
+
 func _park_ghosts() -> void:
 	for g in _zone.ghosts:
 		g.target_cat = null
@@ -148,6 +166,7 @@ func _run() -> void:
 	aggie.queue_free()
 
 	# --- ghosts: strike-through, the block, the hiss, the yield ------------------
+	_park_rats()
 	var g = _zone.ghosts[0]
 	g.set_solid(true)
 	g.global_position = Vector3(1.5, 0, -0.5) # tunnel-east choke
