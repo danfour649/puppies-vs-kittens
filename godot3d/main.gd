@@ -7,20 +7,19 @@ extends Node3D
 const CatScene := preload("res://cat_kit/cat.gd")
 const MouseScene := preload("res://mouse.gd")
 const TouchScene := preload("res://touch_controls_3d.gd")
-# DUO: the two-cat iteration (sibling NPC, character select, meows,
-# and the provocation system) lives in res://duo/ and hangs off this.
-const DuoScene := preload("res://duo/duo_system.gd")
-# MASSEY: the house zones (docs/massey-zones.md). Zone scenes are
-# loaded by path from HouseSpec so this file stays the only root.
+# MASSEY MODULE: the house, the duo and the cat start as a drop-in
+# module (module/, docs/massey-zones.md §9). main.gd is the module's
+# first host: it provides the §9.3 host surface (the cat actor, the
+# paw sink, the zone hook, the outside zone root API) and the module
+# assembles everything else. Zone scenes load by path from
+# HouseSpec, via the module.
+const MasseyModuleScene := preload("res://module/massey_module.gd")
 # OUTSIDE: the Massey outside zone (zones/outside/) hangs off main
 # the same way the duo system does.
 const OutsideScene := preload("res://zones/outside/outside_system.gd")
-# OCCUPANTS: Daniel + Folasade in the ground-floor hub (occupants/).
-const OccupantScript := preload("res://occupants/occupant.gd")
-const OccupantSystemScript := preload("res://occupants/occupant_system.gd")
-const OccupantsRoomScript := preload("res://occupants/occupants_room.gd")
 # GLENYS: the cat-chaser (glenys/) — Daniel's mother, her cane, and
-# the two poisons that are the game's only lethal hazards.
+# the two poisons that are the game's only lethal hazards. (The
+# occupants' preloads moved into the module, which assembles them.)
 const GlenysScript := preload("res://glenys/glenys.gd")
 const GlenysSystemScript := preload("res://glenys/glenys_system.gd")
 
@@ -44,7 +43,14 @@ var duo: DuoSystem = null
 var zones: ZoneManager = null
 var objectives: PvKObjectives = null
 var lives := 9
-var _zone_roots := {}
+var module: MasseyModule = null # MASSEY MODULE (§9): owns zones/objectives/occupants assembly
+## Zone roots live in the module now (MasseyModule._zone_roots, with
+## zone_root(id) as its accessor). This read-only delegation keeps
+## main's pre-module _zone_roots surface working for the harness
+## (tests/test_playtest.gd, glenys/tests_glenys.gd read it directly).
+var _zone_roots: Dictionary:
+	get:
+		return module._zone_roots if module != null else {}
 var _faint_t := -1.0
 var _banner_t := 0.0
 var _lbl_hp: Label
@@ -98,15 +104,27 @@ func _ready() -> void:
 	_touch.strike_pressed.connect(attempt_strike)
 	_touch.pounce_pressed.connect(_jump_or_pounce)
 	_spawn_mice()
-	# DUO: sibling cat, character select, meow + provocation.
-	duo = DuoScene.new()
-	duo.name = "DuoSystem"
-	add_child(duo)
-	duo.setup(self)
+	# MASSEY MODULE: the duo (sibling cat, character select, meow +
+	# provocation), the zones, the objectives registry and the
+	# occupants assemble behind the §9 host interface.
+	module = MasseyModuleScene.new()
+	module.name = "MasseyModule"
+	add_child(module)
+	module.setup(self)
+	duo = module.duo
 	aggie = duo.aggie_cat # shots seam: main's Aggie handle is the duo sibling
 	aggie.poisoned.connect(_on_cat_poisoned)
 	cat.add_to_group("player_cat") # enemies hunt this group
-	_build_zones()
+	zones = module.zones
+	objectives = module.objectives
+	objectives.declare("outside:mice", HouseSpec.OUTSIDE, "Catch all 7 mice in the yard", MOUSE_COUNT)
+	var obj_hud := ObjectivesHUD.new()
+	obj_hud.name = "ObjectivesHUD"
+	add_child(obj_hud)
+	obj_hud.setup(objectives, zones)
+	module.build_occupants()
+	occupants = module.occupants
+	_build_glenys()
 	# OUTSIDE: trees + squirrels, feeder birds + ambush, the street
 	# frontage (hostile traffic, the Corolla island, the fish
 	# treat) and pedestrians walking dogs.
@@ -477,108 +495,12 @@ func _jump_or_pounce() -> void:
 		cat.pounce()
 
 
-# --- Massey zones ---------------------------------------------------------------
-
-func _build_zones() -> void:
-	var house := Node3D.new()
-	house.name = "HouseInterior"
-	add_child(house)
-	_zone_roots[HouseSpec.OUTSIDE] = self
-	for id: String in [HouseSpec.GROUND_FLOOR, HouseSpec.BASEMENT, HouseSpec.ATTIC]:
-		var inst := (load(String(HouseSpec.ZONE_SCENES[id])) as PackedScene).instantiate()
-		inst.position = HouseSpec.zone_origin(id)
-		if id == HouseSpec.BASEMENT:
-			# The hub owns the cats, HP and travel: the basement
-			# runs in hub mode (no stand-in cat, no local HP ledger).
-			inst.set("spawn_standalone_cat", false)
-			inst.set("standalone_drive", false)
-			inst.set("use_follow_cam", false)
-			inst.set("track_cat_hp", false)
-		house.add_child(inst)
-		_zone_roots[id] = inst
-	# The outside entry (on the porch) — main IS the outside zone.
-	var entry := Node3D.new()
-	entry.name = "EntryFrontDoor"
-	var et: Transform3D = HouseSpec.entries(HouseSpec.OUTSIDE)["EntryFrontDoor"]
-	entry.transform = et
-	add_child(entry)
-	var door := ZoneConnector.new()
-	add_child(door)
-	door.setup(HouseSpec.connectors(HouseSpec.OUTSIDE)[0])
-	zones = ZoneManager.new()
-	zones.name = "ZoneManager"
-	add_child(zones)
-	zones.setup(self)
-	for id: String in _zone_roots:
-		zones.register_zone(id, _zone_roots[id])
-	objectives = PvKObjectives.new()
-	objectives.name = "Objectives"
-	add_child(objectives)
-	objectives.declare("outside:mice", HouseSpec.OUTSIDE, "Catch all 7 mice in the yard", MOUSE_COUNT)
-	var hud := ObjectivesHUD.new()
-	hud.name = "ObjectivesHUD"
-	add_child(hud)
-	hud.setup(objectives, zones)
-	_build_occupants()
-	_build_glenys()
-
-
-
-
-# --- Occupants in the hub ---------------------------------------------------------
-
-## Daniel + Folasade move into the ground floor: routines on
-## stations routed through the divider gap, the sit station at the
-## sofa's cushion edge (HouseSpec SOFA_POS; the seat slab in
-## house_builder.gd is shaped so they can arrive). Score events
-## land in the objectives registry with the shipped values.
-func _build_occupants() -> void:
-	var gf := _zone_roots[HouseSpec.GROUND_FLOOR] as Node3D
-	var origin := HouseSpec.zone_origin(HouseSpec.GROUND_FLOOR)
-	var daniel := OccupantScript.new() as MasseyOccupant
-	daniel.name = "Daniel"
-	gf.add_child(daniel)
-	daniel.place_at(origin + Vector3(-1.5, 0, 2.8), 0.0)
-	daniel.setup(OccupantsRoomScript.daniel_look(), _occupant_stations(4.25, origin))
-	var folasade := OccupantScript.new() as MasseyOccupant
-	folasade.name = "Folasade"
-	gf.add_child(folasade)
-	folasade.place_at(origin + Vector3(3.9, 0, -0.4), PI)
-	var f_stations := _occupant_stations(5.35, origin)
-	f_stations.push_front(f_stations.pop_at(2)) # she starts at the couch
-	folasade.setup(OccupantsRoomScript.folasade_look(), f_stations)
-	occupants = OccupantSystemScript.new() as OccupantSystem
-	occupants.name = "OccupantSystem"
-	gf.add_child(occupants)
-	occupants.register_occupant(daniel)
-	occupants.register_occupant(folasade)
-	occupants.set_player_cat(cat)
-	occupants.score_event.connect(_on_occupant_score)
-	objectives.declare("occupants:ankle_assassin", HouseSpec.GROUND_FLOOR, "Ankle assassin x5", 5)
-	objectives.declare("occupants:trip_hazard", HouseSpec.GROUND_FLOOR, "Trip hazard x3", 3)
-	objectives.declare("occupants:lap_full_heal", HouseSpec.GROUND_FLOOR, "Full heal from lap pets", 1)
-
-
-## Station loop in HouseSpec-local points (converted to world):
-## kitchen counter -> the divider gap -> the sofa -> the front
-## door -> the gap again -> the kitchen sun patch. Legs never cross
-## the divider away from its gap.
-func _occupant_stations(seat_x: float, origin: Vector3) -> Array:
-	var local: Array = [
-		{"pos": Vector3(-4.3, 0, -3.85), "yaw": 0.0, "action": "stand", "dwell": 6.0},
-		{"pos": Vector3(-1.8, 0, 0.0), "yaw": -PI / 2.0, "action": "stand", "dwell": 1.5},
-		{"pos": Vector3(seat_x, 0, -3.45), "yaw": PI, "action": "sit", "dwell": 16.0},
-		{"pos": Vector3(2.5, 0, 2.9), "yaw": PI, "action": "stand", "dwell": 5.0},
-		{"pos": Vector3(-1.8, 0, 0.0), "yaw": PI / 2.0, "action": "stand", "dwell": 1.5},
-		{"pos": Vector3(-3.2, 0, 3.2), "yaw": 0.0, "action": "stand", "dwell": 2.5},
-	]
-	var out: Array = []
-	for st: Variant in local:
-		var d := (st as Dictionary).duplicate()
-		d["pos"] = origin + (d["pos"] as Vector3)
-		out.append(d)
-	return out
-
+# --- Massey zones + occupants -----------------------------------------------------
+# Assembly lives in the module now (module/massey_module.gd, §9):
+# _ready creates MasseyModule, which instances the zones, the
+# ZoneManager, the objectives registry and the occupants. What
+# remains here is the host's side of the §9.3 interface: the zone
+# hook below and the outside zone root API under it.
 
 ## GLENYS moves into the ground floor: Daniel's mother, cane and
 ## all. She notices the cats once they come into HER house — after
@@ -614,18 +536,6 @@ func _on_cat_poisoned(c: PvKCat, source: String) -> void:
 	_banner_t = 0.0
 
 
-func _on_occupant_score(event_name: String, points: int, _pos: Vector3) -> void:
-	if objectives == null:
-		return
-	objectives.add_score(event_name, points)
-	match event_name:
-		"ankle_attack":
-			objectives.add_progress("occupants:ankle_assassin", 1)
-		"trip_hazard":
-			objectives.add_progress("occupants:trip_hazard", 1)
-		"lap_full_heal":
-			objectives.set_progress("occupants:lap_full_heal", 1)
-
 
 func snap_camera() -> void:
 	if _rig != null and cat != null:
@@ -634,8 +544,8 @@ func snap_camera() -> void:
 
 func on_zone_changed(zone_id: String) -> void:
 	snap_camera()
-	if duo != null and _zone_roots.has(zone_id):
-		duo.relocate_sibling(_zone_roots[zone_id] as Node)
+	if duo != null and module != null and module.zone_root(zone_id) != null:
+		duo.relocate_sibling(module.zone_root(zone_id))
 
 
 # The outside zone root API (interior zones: zones/zone_root.gd).

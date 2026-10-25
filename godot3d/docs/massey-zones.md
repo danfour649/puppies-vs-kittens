@@ -421,3 +421,73 @@ The module provides, as data first and code second:
 - The PvK ground floor's exact furniture placement is in PvK
   metres inside house_builder.gd; anchors (§9.2) are the
   portable form, and new placement work should go anchor-first.
+
+### 9.6 Amendments (2026-10-25 — module lane, PR #17)
+
+The §9 text above stands as written when the contract was
+authored; this block records what re-verification against the
+current tree changed, so the history stays readable. The
+mapping asserts live in `tests/test_module.gd`.
+
+- **§9.2 re-verified; ONE row corrected.** All 18 rows of the
+  mapping table were recomputed from their authoritative source
+  constants (HouseSpec constants, `PvKBasement` / `PvKAttic`
+  constants, spec entries). Seventeen reproduce within the
+  table's rounding (≤ 0.002 in (u, v), ≤ 0.02 m in GTA
+  cell-local). The exception: **basement Aggie gap (cell 11, 2)**
+  — the printed row reads PvK (4.35, −2.5) → (0.756, 0.240) →
+  GTA (2.77, −3.80), but the built gap is
+  `PvKBasement.cell_center(11, 2)` = **(4.5, −2.5) →
+  (0.765, 0.240) → GTA (2.86, −3.80)**. (The printed x, 4.35,
+  is the basement stair foot's x — a copy slip.) The corrected
+  row is the one the tests lock.
+- **§9.4 inventory reconciled.** The table is accurate for main
+  as of the PR #11 merge, with these additions/notes:
+  (a) the **module root + cat start** now exist
+  (`module/massey_module.gd` + `module/module_manifest.gd`,
+  this PR) — the §9.3 assembly is code, not just contract;
+  (b) PR #11 added a **§4 surface extension**: `PvKCat`'s
+  `speed_multiplier` seam, which zones use to slow cats (the
+  attic's insulation field); it resets when the cat leaves the
+  zone's floor level;
+  (c) **Glenys is PENDING**: the cat-chaser (pursuit, struggle
+  grab, chocolate, basement rat poison, extra basement clutter)
+  exists only in PR #14 (branch `glenys`) at this writing — she
+  joins this inventory when that PR merges, and the manifest's
+  inventory marks her `pending` until then;
+  (d) the realism pass (PR #12, also open at this writing) is a
+  visual/animation layer over the same contents — no inventory
+  change.
+- **Lounge/wander authority.** `HouseSpec.lounge_spots()` /
+  `wander_rect()` values for the basement and attic are the
+  foundation stubs of §2 and are **shadowed by the built zones'
+  overrides** (`PvKBasement` / `PvKAttic` `get_lounge_spots` /
+  `get_wander_rect`) — the built values are authoritative (e.g.
+  the attic perch lounge spot is `PERCH_POS` (5.30, 1.52, 0)
+  + 0.03, not the stub's (7.3, 0.57, −0.6); the basement's
+  wander rect is its room, 15.2 × 11.2). The ground floor has
+  no override and uses the HouseSpec values.
+- **Objectives realization.** The basement and attic carry
+  their objectives as **zone-local JSON data**
+  (`zones/basement/objectives.json`,
+  `zones/attic/attic_objectives.json`) read by the zones
+  themselves; the hub registry (`PvKObjectives`) carries the
+  outside + occupants declarations. §5's declare-from-`_ready`
+  remains the pattern for registry objectives; the JSON files
+  are the zones' objective text + ids in data form (§9.3).
+- **Appearance data superseded (Daniel's ruling, 2026-10-25).**
+  Willie's canonical appearance is his recorded spec: ginger
+  **#E8AF54**, **dark eyes**, tail **white with ginger
+  rear/underside**; Aggie is a **calico**. The photo-tuned
+  values previously carried in `cat_kit/cat_species.json`
+  (#C97020 / #975417, green-gold eyes, ringed tail) are
+  **superseded** and are being reverted in `cat_kit` — the
+  single source of truth — with spec-lock assertions. §9 and
+  the module quote no coat values; hosts read appearance from
+  `cat_kit` at integration time and inherit the canonical data.
+- **§9.5 update.** The module root, the manifest, and the
+  travel pairing table (as data, via the manifest) now ship as
+  module content behind the §9.3 host surface, proven by a
+  standalone empty-host test (`tests/test_module.tscn`). What
+  §9.5 lists as host machinery stays host machinery: the PvKCat
+  controller, the travel mechanism, nine lives.
