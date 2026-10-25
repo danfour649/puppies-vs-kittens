@@ -10,6 +10,11 @@ extends RefCounted
 ## Willie: the classic two-tone — rises, then the long falling "ow"
 ## (~0.45 s, 825 -> 425 Hz). Aggie: a short, high chirp (~0.18 s);
 ## she rarely bothers.
+##
+## HEAT: Aggie's YOWL ("aggie_yowl") — the chirp's big sibling. Over
+## a second long, louder than anything else she makes, a wide climb
+## and a slow wailing fall with a heavier vibrato. Unmistakable:
+## it is supposed to carry across the whole yard at 2 a.m.
 
 const RATE := 22050
 
@@ -20,7 +25,9 @@ static func stream_for(kind: String) -> AudioStreamWAV:
 	if _cache.has(kind):
 		return _cache[kind]
 	var s: AudioStreamWAV
-	if kind == "aggie":
+	if kind == "aggie_yowl":
+		s = _synth(1.15, 690.0, 1240.0, 470.0, 0.38, 7.0, 1.0)
+	elif kind == "aggie":
 		s = _synth(0.18, 1120.0, 1310.0, 870.0, 0.30, 13.0, 0.55)
 	else:
 		s = _synth(0.45, 655.0, 825.0, 425.0, 0.35, 11.0, 0.8)

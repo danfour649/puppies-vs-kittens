@@ -76,6 +76,15 @@ var speed_multiplier := 1.0
 var anim_state := "idle"
 var stamina := 100.0
 var is_lounging := false
+## HEAT: the courtship pose blend (Aggie's solicitation -- a rocking
+## roll, front dipped, tail swung aside) and a performed act pose
+## ("groom" -- Willie's pointed self-grooming). Poses are garnish on
+## the state machine: they compose in _process like the hiss arch.
+var courtship_k := 0.0
+var courtship_target := 0.0
+var act_pose := ""
+var act_pose_k := 0.0
+var _roll_phase := 0.0
 var hp := 120.0
 var is_fainted := false
 var is_poisoned := false ## GLENYS/POISON: the run-ending state (eat_poison)
@@ -705,6 +714,16 @@ func set_lounge(on: bool) -> void:
 	is_lounging = on
 
 
+## HEAT: blend the courtship pose in or out.
+func set_courtship(on: bool) -> void:
+	courtship_target = 1.0 if on else 0.0
+
+
+## HEAT: a brief performed pose ("" clears). Only "groom" exists.
+func set_act_pose(pose: String) -> void:
+	act_pose = pose
+
+
 func toggle_lounge() -> void:
 	is_lounging = not is_lounging
 
@@ -959,6 +978,10 @@ func _update_pose(delta: float) -> void:
 	_hiss_k = move_toward(_hiss_k, 1.0 if _hiss_t >= 0.0 else 0.0, delta * (5.0 if _hiss_t >= 0.0 else 2.5))
 	_faint_k = move_toward(_faint_k, 1.0 if is_fainted else 0.0, delta * 3.0)
 	_lounge_k = move_toward(_lounge_k, 1.0 if is_lounging else 0.0, delta * 2.2)
+	courtship_k = move_toward(courtship_k, courtship_target, delta * 2.4)
+	act_pose_k = move_toward(act_pose_k, 1.0 if act_pose != "" else 0.0, delta * 3.2)
+	if courtship_k > 0.01:
+		_roll_phase += delta * 5.2
 
 	# --- observed motion (read-only: the physics layer owns these) ---
 	var spd := Vector2(velocity.x, velocity.z).length()
@@ -1095,14 +1118,25 @@ func _update_pose(delta: float) -> void:
 		body_y += 0.05 * _hiss_k
 		head_rot.x = lerpf(head_rot.x, 0.34, _hiss_k)
 		tail_rot.x = lerpf(tail_rot.x, -0.85, _hiss_k)
+	if courtship_k > 0.0:
+		# Solicitation: crouch a little, dip the head, swing the
+		# tail aside; the roll itself lands on the body below.
+		body_scale.y *= 1.0 - 0.13 * courtship_k
+		head_rot.x = lerpf(head_rot.x, 0.30, courtship_k)
+		tail_rot.y += 0.95 * courtship_k
+	if act_pose_k > 0.0 and act_pose == "groom":
+		# Pointed self-grooming: head right down to the paw.
+		head_rot.x = lerpf(head_rot.x, 0.55, act_pose_k)
 	# Head stabilisation: the head counters ~2/3 of the body's pitch and
 	# ~half its roll, so the gaze stays level while the body works.
 	head_rot.x -= body_pitch * 0.65
 	head_rot.y -= body_roll * 0.4
 	_body.scale = body_scale
 	_body.position.y = body_y * (1.0 - _lounge_k)
-	_body.rotation.z = body_roll
-	_body.rotation.x = body_pitch * (1.0 - _lounge_k)
+	# body_roll already carries the faint flop (0.85 * _faint_k) as its
+	# base; the heat roll rocks on top of it.
+	_body.rotation.z = body_roll + sin(_roll_phase) * 0.38 * courtship_k # + HEAT roll
+	_body.rotation.x = body_pitch * (1.0 - _lounge_k) - 0.10 * courtship_k # + HEAT present dip
 	_head.rotation = head_rot
 	_tail.rotation = tail_rot
 	# Tail puff for the hiss (segments recorded at build time).
@@ -1200,3 +1234,7 @@ func _update_legs(land_dip: float, w_walk: float, w_trot: float, w_bound: float,
 			fr.rotation.x = lerpf(0.7, -1.15, (t - 0.10) / 0.12) # the slash
 		else:
 			fr.rotation.x = lerpf(-1.15, 0.0, (t - 0.22) / 0.12)
+	# The groom pose raises the front-right paw to the dipped head.
+	if act_pose_k > 0.0 and act_pose == "groom" and _hips.has("FR"):
+		var gfr := _hips["FR"] as Node3D
+		gfr.rotation.x = lerpf(gfr.rotation.x, -0.95, act_pose_k * 0.65)

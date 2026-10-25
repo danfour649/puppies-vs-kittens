@@ -197,6 +197,21 @@ func emit_meow(cat: PvKCat) -> void:
 		prov.hear_meow(cat)
 
 
+## HEAT: Aggie's yowl — the meow synth's big sibling, plus bubble.
+## NOT a Willie meow: the provocation meter never hears it (and
+## hear_meow would ignore her anyway).
+func emit_yowl(cat: PvKCat) -> void:
+	var voice := _voices.get(cat) as AudioStreamPlayer3D
+	if voice != null:
+		voice.stream = MeowAudio.stream_for("aggie_yowl")
+		voice.play()
+	var bubble := _bubbles.get(cat) as Label3D
+	if bubble != null:
+		bubble.text = "YOOOWL!"
+		bubble.visible = true
+		_bubble_t[cat] = 1.2
+
+
 # --- provocation effects (called by Provocation) --------------------------------
 
 func show_flash() -> void:
