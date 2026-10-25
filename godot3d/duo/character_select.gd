@@ -6,7 +6,10 @@ extends CanvasLayer
 ## The highlighted cat stands RENDERED on a spotlight stage (the real
 ## cat_kit model, idle-animated in a SubViewport), its NAME and ONE
 ## trait line beside it, and its start marked on a house-and-yard
-## minimap with the start's name. Nothing else lives here: no stats,
+## minimap with the start's name. The roster cells carry tight
+## rendered portraits of each cat's own model (duo/portraits/, from
+## duo/tools_portrait_shots.gd) — in MK the cells are the fighters'
+## faces. Nothing else lives here: no stats,
 ## no lore, no menus, no settings. The polish is in the type, the
 ## spacing, the backdrop and the light.
 ##
@@ -21,9 +24,17 @@ signal chosen(id: String)
 const StageScene := preload("res://duo/select_stage.gd")
 const MinimapScene := preload("res://duo/select_minimap.gd")
 
+## Roster-cell portraits: tight head-and-shoulders renders of the REAL
+## cat_kit models, captured by duo/tools_portrait_shots.gd — in MK the
+## cells are the fighters' faces, so here they are the cats' faces.
+const PORTRAITS := {
+	"willie": preload("res://duo/portraits/willie.png"),
+	"aggie": preload("res://duo/portraits/aggie.png"),
+}
+
 const GOLD := Color(1.0, 0.80, 0.38)
 const CREAM := Color(1.0, 0.97, 0.88)
-const FAINT := Color(0.60, 0.63, 0.70)
+const FAINT := Color(0.68, 0.70, 0.77)
 
 var _ids: Array = []
 var _chars: Dictionary = {}
@@ -39,6 +50,7 @@ var _start_l: Label
 var _minimap: SelectMinimap
 var _cells: Array = [] # PanelContainer per roster id
 var _cell_names: Array = [] # Label inside each cell
+var _cell_portraits: Array = [] # TextureRect inside each cell
 
 
 func _init() -> void:
@@ -93,7 +105,7 @@ func _build() -> void:
 	# Backdrop: near-black radial falloff, lit a breath behind the stage.
 	var grad := Gradient.new()
 	grad.offsets = PackedFloat32Array([0.0, 1.0])
-	grad.colors = PackedColorArray([Color(0.115, 0.12, 0.15), Color(0.012, 0.012, 0.02)])
+	grad.colors = PackedColorArray([Color(0.135, 0.108, 0.082), Color(0.010, 0.010, 0.016)])
 	var gtex := GradientTexture2D.new()
 	gtex.gradient = grad
 	gtex.fill = GradientTexture2D.FILL_RADIAL
@@ -103,7 +115,27 @@ func _build() -> void:
 	backdrop.texture = gtex
 	backdrop.stretch_mode = TextureRect.STRETCH_SCALE
 	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_content.add_child(backdrop)
+
+	# A soft warm glow pooled behind the stage side of the screen, so
+	# the spotlight panel sits in light instead of on a black field.
+	var glow_grad := Gradient.new()
+	glow_grad.offsets = PackedFloat32Array([0.0, 1.0])
+	glow_grad.colors = PackedColorArray(
+		[Color(1.0, 0.80, 0.42, 0.22), Color(1.0, 0.80, 0.42, 0.0)]
+	)
+	var glow_tex := GradientTexture2D.new()
+	glow_tex.gradient = glow_grad
+	glow_tex.fill = GradientTexture2D.FILL_RADIAL
+	glow_tex.fill_from = Vector2(0.5, 0.5)
+	glow_tex.fill_to = Vector2(1.0, 0.5)
+	var glow := TextureRect.new()
+	glow.texture = glow_tex
+	glow.stretch_mode = TextureRect.STRETCH_SCALE
+	glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_place(glow, -0.06, -0.12, 0.74, 0.80)
+	_content.add_child(glow)
 
 	var spaced := FontVariation.new()
 	spaced.base_font = _content.get_theme_default_font()
@@ -112,16 +144,16 @@ func _build() -> void:
 	# The stage: the highlighted cat, rendered, in a spotlight.
 	_viewport = SubViewport.new()
 	_viewport.own_world_3d = true
-	_viewport.size = Vector2i(880, 620)
+	_viewport.size = Vector2i(1024, 600)
 	_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	var frame := PanelContainer.new()
+	frame.add_theme_stylebox_override("panel", _frame_style())
+	_place(frame, 0.010, 0.022, 0.620, 0.664)
+	_content.add_child(frame)
 	var svc := SubViewportContainer.new()
 	svc.stretch = true
 	svc.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	svc.anchor_left = 0.015
-	svc.anchor_top = 0.03
-	svc.anchor_right = 0.615
-	svc.anchor_bottom = 0.845
-	_content.add_child(svc)
+	frame.add_child(svc)
 	svc.add_child(_viewport)
 	_stage = StageScene.new()
 	_viewport.add_child(_stage)
@@ -129,6 +161,11 @@ func _build() -> void:
 
 	# Name + the one line.
 	_name_l = _label(58, CREAM, spaced)
+	_name_l.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.55))
+	_name_l.add_theme_constant_override("shadow_offset_x", 3)
+	_name_l.add_theme_constant_override("shadow_offset_y", 3)
+	_name_l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.35))
+	_name_l.add_theme_constant_override("outline_size", 6)
 	_place(_name_l, 0.655, 0.085, 0.975, 0.20)
 	_content.add_child(_name_l)
 	_line_l = _label(20, FAINT, null)
@@ -156,11 +193,11 @@ func _build() -> void:
 	# Roster strip: move the highlight by hovering, click to pick.
 	var strip := HBoxContainer.new()
 	strip.alignment = BoxContainer.ALIGNMENT_CENTER
-	strip.add_theme_constant_override("separation", 18)
-	strip.anchor_left = 0.5
-	strip.anchor_top = 0.885
-	strip.anchor_right = 0.5
-	strip.anchor_bottom = 0.965
+	strip.add_theme_constant_override("separation", 20)
+	strip.anchor_left = 0.435
+	strip.anchor_top = 0.688
+	strip.anchor_right = 0.435
+	strip.anchor_bottom = 0.968
 	strip.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	strip.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_content.add_child(strip)
@@ -168,16 +205,30 @@ func _build() -> void:
 		var id := String(_ids[i])
 		var ch: Dictionary = _chars.get(id, {})
 		var cell := PanelContainer.new()
-		cell.custom_minimum_size = Vector2(300, 66)
+		cell.custom_minimum_size = Vector2(238, 248)
 		cell.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		var nm := _label(24, CREAM, spaced)
+		var vb := VBoxContainer.new()
+		vb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		vb.add_theme_constant_override("separation", 6)
+		cell.add_child(vb)
+		var pic := TextureRect.new()
+		pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if PORTRAITS.has(id):
+			pic.texture = PORTRAITS[id]
+		pic.custom_minimum_size = Vector2(218, 192)
+		pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		vb.add_child(pic)
+		var nm := _label(22, CREAM, spaced)
+		nm.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		nm.text = String(ch.get("name", id)).to_upper()
 		nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		nm.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		cell.add_child(nm)
+		vb.add_child(nm)
 		strip.add_child(cell)
 		_cells.append(cell)
 		_cell_names.append(nm)
+		_cell_portraits.append(pic)
 		cell.mouse_entered.connect(func() -> void: _set_highlight(i))
 		cell.gui_input.connect(
 			func(event: InputEvent) -> void:
@@ -236,14 +287,27 @@ func _apply_highlight() -> void:
 		(_cell_names[i] as Label).add_theme_color_override(
 			"font_color", GOLD if on else CREAM
 		)
+		(_cell_portraits[i] as TextureRect).modulate = (
+			Color(1, 1, 1, 1) if on else Color(0.60, 0.60, 0.67, 1)
+		)
+
+
+func _frame_style() -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.028, 0.028, 0.040, 0.92)
+	sb.set_corner_radius_all(14)
+	sb.set_content_margin_all(8)
+	sb.set_border_width_all(2)
+	sb.border_color = Color(0.44, 0.35, 0.16)
+	return sb
 
 
 func _cell_style(on: bool) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.10, 0.09, 0.06, 0.96) if on else Color(0.05, 0.05, 0.07, 0.92)
-	sb.set_corner_radius_all(10)
+	sb.bg_color = Color(0.13, 0.105, 0.05, 0.97) if on else Color(0.038, 0.038, 0.052, 0.94)
+	sb.set_corner_radius_all(12)
 	sb.set_content_margin_all(10)
-	sb.set_border_width_all(2 if on else 1)
+	sb.set_border_width_all(3 if on else 1)
 	sb.border_color = GOLD if on else Color(0.30, 0.31, 0.37)
 	return sb
 
