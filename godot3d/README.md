@@ -122,6 +122,14 @@ An Android preset is defined (arm64, unsigned build not produced here).
   + vehicle launch + heal seam, hiss timing, jump apex + 0.5 m
   ledge landing, pounce range, faint → hub respawn with a life
   spent, and the module anchor mapping (61 checks).
+- `godot3d/tests/test_playtest.tscn` — headless PLAYTEST tests:
+  the four bugs Daniel's 2026-10-24 playtest found in the
+  integrated game while every other suite was green — the mouse
+  catch window (staged strikes + a scripted sprint chase), the
+  sibling fence clamping the sibling's z indoors, the z-flipped
+  attic hatch shaft, the raccoon family spawning in the yard, and
+  the provocation lounge-lock (Aggie must attack with NO manual
+  un-lounge).
 - `godot3d/screenshots/` — standing shots from one Xvfb pass:
   Willie close-up, Aggie close-up, both cats, the lounge, plus
   the Massey hub + front door (`tools/massey_shots.tscn`).

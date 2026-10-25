@@ -58,6 +58,13 @@ var _lunge_t := -1.0
 var _lunge_dir := Vector3.ZERO
 var _lunge_hit_done := true
 var _flee_lock := 0.0
+## Unstick: straight-line steering wedges forever on a body parked
+## dead ahead (slide projection cancels ~all motion when the approach
+## is head-on). Accumulate near-zero progress while trying to move;
+## on a wedge, sidestep around the blocker for a short burst.
+var _stuck_t := 0.0
+var _sidestep_t := 0.0
+var _sidestep_sign := 1.0
 var _flash_t := 0.0
 var _kb := Vector3.ZERO ## knockback impulse, decays fast
 var _time := 0.0
@@ -291,10 +298,29 @@ func _physics_process(delta: float) -> void:
 				_flee_lock = 2.0
 				_target = null
 
+	# Sidestep while wedged (see _stuck_t below): steer around the
+	# blocker instead of pushing straight into it forever.
+	if _sidestep_t > 0.0 and state != "attack":
+		_sidestep_t -= delta
+		want = want.rotated(Vector3.UP, _sidestep_sign * 1.1)
 	velocity.x = want.x + _kb.x
 	velocity.z = want.z + _kb.z
 	velocity.y = _kb.y if _kb.y > 0.5 else (-1.0 if is_on_floor() else velocity.y - GRAVITY * delta)
 	move_and_slide()
+	# Wedge detection: states that steer somewhere (not the lunge,
+	# which is ballistic) but make almost no real progress.
+	if state == "chase" or state == "wander" or state == "flee":
+		var real := Vector2(get_real_velocity().x, get_real_velocity().z).length()
+		if want.length() > 0.5 and real < 0.2 * want.length():
+			_stuck_t += delta
+			if _stuck_t >= 0.30:
+				_stuck_t = 0.0
+				_sidestep_t = 0.45
+				_sidestep_sign = -_sidestep_sign
+		else:
+			_stuck_t = 0.0
+	else:
+		_stuck_t = 0.0
 	if want.length() > 0.1:
 		var yaw := atan2(-want.x, -want.z)
 		rotation.y = lerp_angle(rotation.y, yaw, 1.0 - exp(-10.0 * delta))

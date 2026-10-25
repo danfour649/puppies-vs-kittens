@@ -17,7 +17,7 @@ at y = 0, ridge along X.
 | `EAVE_H` | 0.95 m | knee-wall height; the roof springs here |
 | `RIDGE_H` | 3.30 m | underside of the ridge |
 | roof pitch | ≈ 27.6° | derived: `atan2(RIDGE_H-EAVE_H, FOOTPRINT.y/2)` |
-| `HATCH_POS` | (+5.05, 0, +3.55) | floor hatch, entrance from below |
+| `HATCH_POS` | (+5.05, 0, -3.55) | floor hatch, entrance from below |
 | `NEST_POS` | (−4.85, 0, −3.35) | the raccoons' corner |
 | `WINDOW_POS` / `WINDOW_R` | (+5.98, 2.25, 0), r 0.55 | round window, +x gable |
 | `PERCH_POS` | (+5.30, 1.52, 0) | ledge under the window |

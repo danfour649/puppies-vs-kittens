@@ -19,7 +19,7 @@ extends Node3D
 ##   EAVE_H       0.95 m — knee-wall height where the roof springs
 ##   RIDGE_H      3.30 m — underside of the ridge
 ##   ROOF_PITCH  ~27.6 deg, from EAVE_H/RIDGE_H over the half-span
-##   HATCH_POS    +x/+z floor corner (entrance from the house below)
+##   HATCH_POS    +x/-z floor corner (entrance from the house below)
 ##   NEST_POS     -x/-z corner (the raccoons' corner)
 ##   WINDOW       round window, +x gable, centre y 2.25, radius 0.55
 ##
@@ -35,7 +35,7 @@ const FOOTPRINT := Vector2(12.0, 9.0)
 const EAVE_H := 0.95
 const RIDGE_H := 3.30
 const WALL_T := 0.15
-const HATCH_POS := Vector3(5.05, 0.0, 3.55)
+const HATCH_POS := Vector3(5.05, 0.0, -3.55)
 const NEST_POS := Vector3(-4.85, 0.0, -3.35)
 const WINDOW_POS := Vector3(5.98, 2.25, 0.0)
 const WINDOW_R := 0.55
@@ -76,7 +76,7 @@ const BEAM_XS: Array = [-3.2, 0.4, 3.6]
 const BEAM_TOP := 1.62
 # Kit refuges under the eaves.
 const REFUGES: Array = [
-	Vector3(-5.25, 0.0, 4.0), Vector3(5.25, 0.0, -4.0),
+	Vector3(-5.25, 0.0, 4.0), Vector3(5.25, 0.0, 4.0),
 	Vector3(-5.3, 0.0, -3.95), Vector3(0.6, 0.0, 4.1),
 ]
 
@@ -276,22 +276,31 @@ func _spawn_family() -> void:
 	mother.name = "MotherRaccoon"
 	mother.set_role("mother")
 	add_child(mother)
-	mother.global_position = NEST_POS + Vector3(0.35, 0.05, 0.35)
+	# PLAYTEST FIX (bug 3): NEST_POS is attic-LOCAL — set the local
+	# position. Setting global_position landed the family in the
+	# yard: in the integrated scene this root sits at (0, 2.9, -200).
+	mother.position = NEST_POS + Vector3(0.35, 0.05, 0.35)
 	mother.rotation.y = -2.2 # facing into the room
 	mother.home = mother.global_position
 	mother.died.connect(_on_mother_died)
 	mother.staggered.connect(_on_mother_staggered)
 	mother.damaged_target.connect(_on_raccoon_damaged)
 	var kit_offsets: Array = [Vector3(0.9, 0, 0.5), Vector3(-0.4, 0, 0.95), Vector3(0.55, 0, -0.75)]
+	# REFUGES are attic-local; raccoon.gd consumes them as WORLD
+	# targets, so convert through this root's transform (final by
+	# _ready — main sets the zone origin before add_child).
+	var world_refuges: Array = []
+	for r in REFUGES:
+		world_refuges.append(global_transform * (r as Vector3))
 	for i in 3:
 		var kit: PvKRaccoon = RaccoonScene.new()
 		kit.name = "Kit%d" % (i + 1)
 		kit.set_role("kit")
 		add_child(kit)
-		kit.global_position = NEST_POS + kit_offsets[i] + Vector3(0, 0.05, 0)
+		kit.position = NEST_POS + kit_offsets[i] + Vector3(0, 0.05, 0)
 		kit.mother = mother
 		kit.home = kit.global_position
-		kit.refuges = REFUGES.duplicate()
+		kit.refuges = world_refuges.duplicate()
 		kit.damaged_target.connect(_on_raccoon_damaged)
 		kits.append(kit)
 
@@ -511,9 +520,9 @@ func _build_props() -> void:
 	var cardboard2 := Color(0.55, 0.44, 0.30)
 
 	# Crate stairs by the hatch: floor -> stack -> the x=3.6 beam.
-	_solid(root, Vector3(0.62, 0.38, 0.62), Vector3(4.45, 0.19, 2.55), cardboard)
-	_solid(root, Vector3(0.58, 0.76, 0.58), Vector3(3.95, 0.38, 1.95), cardboard2)
-	_solid(root, Vector3(0.54, 1.14, 0.54), Vector3(3.62, 0.57, 1.30), cardboard)
+	_solid(root, Vector3(0.62, 0.38, 0.62), Vector3(4.45, 0.19, -2.55), cardboard)
+	_solid(root, Vector3(0.58, 0.76, 0.58), Vector3(3.95, 0.38, -1.95), cardboard2)
+	_solid(root, Vector3(0.54, 1.14, 0.54), Vector3(3.62, 0.57, -1.30), cardboard)
 
 	# Stored boxes: obstacles and clutter (all solid).
 	_solid(root, Vector3(0.9, 0.6, 0.9), Vector3(2.2, 0.30, -3.55), cardboard)

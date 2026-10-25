@@ -48,7 +48,7 @@ var _hp_bar: ProgressBar
 var _lbl_lives: Label
 var outside: OutsideSystem = null # OUTSIDE
 var occupants: OccupantSystem = null # OCCUPANTS (hub)
-var catch_radius := 0.42
+var catch_radius := 0.62
 var duo_shake := Vector3.ZERO
 var _mouse_seq := 0
 
