@@ -106,6 +106,11 @@ func _run() -> void:
 	_follow(aggie, 0.65, -0.3, -2.0)
 	await _wait(0.8)
 	await _shot("realism_aggie")
+	# -- 4b) Aggie at gameplay distance (blend pass 2 evidence:
+	# the same follow rig at standard play framing).
+	_follow(aggie, 2.2, -0.3, -2.0)
+	await _wait(0.8)
+	await _shot("realism_aggie_far")
 	# -- 5) Squirrel mid-bound: stage a flee run at its tree.
 	var squirrels: Array = _game.find_children("Squirrel*", "", true, false)
 	if squirrels.size() > 0:

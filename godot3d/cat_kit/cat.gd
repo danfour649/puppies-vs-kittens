@@ -239,7 +239,7 @@ func _coat_material() -> Material:
 		var m := StandardMaterial3D.new()
 		m.albedo_color = coat
 		m.roughness = 0.95
-		m.albedo_texture = _bake_coat_texture(coat, [mottle_orange, mottle_cream, coat.lightened(0.16), coat.darkened(0.25)], 707, 150)
+		m.albedo_texture = _bake_calico_texture(coat, [mottle_orange, mottle_cream, coat.lightened(0.16), coat.darkened(0.25)])
 		_coat_mat = m
 	return _coat_mat
 
@@ -280,6 +280,130 @@ func _bake_coat_texture(base: Color, tones: Array, seed_off: int, blobs := 90) -
 		var x := rng.randi_range(0, size - 1)
 		var y := rng.randi_range(0, size - 1)
 		var n := rng.randf_range(0.94, 1.06)
+		var px: Color = img.get_pixel(x, y)
+		img.set_pixel(x, y, Color(px.r * n, px.g * n, px.b * n))
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
+
+
+# --- baked calico texture (REALISM PASS 2) -----------------------------------
+# Pass 1's single layer of mid-size blobs still read as speckle at
+# close range: every patch the same scale, every edge the same
+# hardness. A real calico is marbled at SEVERAL scales at once, so
+# pass 2 bakes three layers over a 256px field:
+#   A) broad elongated blotches (smootherstep shoulders, the softest
+#      falloff), each with satellite splats so no patch stays a
+#      clean ellipse;
+#   B) mid marbling that breaks the blotches up;
+#   C) fine, low-contrast speckle grain over everything.
+# Tone multipliers preserve HUE (channels scaled together under one
+# cap) instead of pass 1's per-channel clamp, which flattened orange
+# and cream into the same bright wash so the two calico colours
+# could not separate in the fur. albedo_color stays the exact
+# palette colour; the field is still a multiplier field around 1.0.
+# A pure function of the mottle seed, like everything else here.
+
+
+## The multiplier that turns `base` toward `tone` with the tone's
+## hue intact: per-channel ratios scaled down TOGETHER when the
+## brightest exceeds `cap`, then held to pass 1's [0.55, 1.5] bounds.
+func _tone_mult(base: Color, tone: Color, cap := 1.5) -> Color:
+	var m := Color(
+		tone.r / maxf(base.r, 0.02),
+		tone.g / maxf(base.g, 0.02),
+		tone.b / maxf(base.b, 0.02))
+	var peak := maxf(m.r, maxf(m.g, m.b))
+	if peak > cap:
+		var k := cap / peak
+		m = Color(m.r * k, m.g * k, m.b * k)
+	return Color(clampf(m.r, 0.55, 1.5), clampf(m.g, 0.55, 1.5), clampf(m.b, 0.55, 1.5))
+
+
+## Elliptical splat with a smootherstep shoulder: a broad, soft
+## blotch rather than a disc. Drawn at wrapped x like _splat so the
+## sphere seam never shows a cut.
+func _splat_ellipse(img: Image, cx: int, cy: int, rx: float, ry: float, rot: float, mult: Color, strength: float, size: int) -> void:
+	var ext := int(maxf(rx, ry)) + 1
+	var cs := cos(rot)
+	var sn := sin(rot)
+	for yy in range(maxi(0, cy - ext), mini(size, cy + ext + 1)):
+		for xx in range(maxi(0, cx - ext), mini(size, cx + ext + 1)):
+			var dx := float(xx - cx)
+			var dy := float(yy - cy)
+			var lx := dx * cs + dy * sn
+			var ly := -dx * sn + dy * cs
+			var q := (lx * lx) / (rx * rx) + (ly * ly) / (ry * ry)
+			if q >= 1.0:
+				continue
+			var t := 1.0 - sqrt(q)
+			var fall := t * t * t * (t * (t * 6.0 - 15.0) + 10.0) * strength
+			var px: Color = img.get_pixel(xx, yy)
+			img.set_pixel(xx, yy, Color(
+				lerpf(px.r, px.r * mult.r, fall),
+				lerpf(px.g, px.g * mult.g, fall),
+				lerpf(px.b, px.b * mult.b, fall)))
+
+
+func _bake_calico_texture(base: Color, tones: Array) -> ImageTexture:
+	var size := 256
+	var img := Image.create(size, size, false, Image.FORMAT_RGBA8)
+	img.fill(Color(1, 1, 1))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(mottle_cfg.get("seed", 1)) + 2707
+	# Layer A: broad blotches, weighted to the true calico tones.
+	for i in 26:
+		var pick := rng.randf()
+		var tone: Color = tones[3]
+		if pick < 0.42:
+			tone = tones[0]
+		elif pick < 0.78:
+			tone = tones[1]
+		elif pick < 0.90:
+			tone = tones[2]
+		var mult := _tone_mult(base, tone)
+		var cx := rng.randi_range(0, size - 1)
+		var cy := rng.randi_range(0, size - 1)
+		var rx := rng.randf_range(30.0, 62.0)
+		var ry := rx * rng.randf_range(0.45, 0.8)
+		var rot := rng.randf() * PI
+		var strength := rng.randf_range(0.30, 0.48)
+		for ox: int in [-size, 0, size]:
+			_splat_ellipse(img, cx + ox, cy, rx, ry, rot, mult, strength, size)
+		# Satellites: two smaller splats hugging the blotch break its
+		# clean elliptical outline (calico patches cluster).
+		for s in 2:
+			var ang := rng.randf() * TAU
+			var dist := rx * rng.randf_range(0.35, 0.7)
+			var sx := cx + int(cos(ang) * dist)
+			var sy := cy + int(sin(ang) * dist * 0.7)
+			var srad := int(rx * rng.randf_range(0.3, 0.5))
+			for ox: int in [-size, 0, size]:
+				_splat(img, sx + ox, sy, srad, mult, strength * 0.8, size)
+	# Layer B: mid marbling across the whole field.
+	for i in 80:
+		var tone_b: Color = tones[rng.randi() % tones.size()]
+		var mult_b := _tone_mult(base, tone_b)
+		var cx_b := rng.randi_range(0, size - 1)
+		var cy_b := rng.randi_range(0, size - 1)
+		var rad_b := rng.randi_range(10, 26)
+		var strength_b := rng.randf_range(0.20, 0.38)
+		for ox: int in [-size, 0, size]:
+			_splat(img, cx_b + ox, cy_b, rad_b, mult_b, strength_b, size)
+	# Layer C: fine speckle grain, deliberately LOW contrast.
+	for i in 300:
+		var tone_c: Color = tones[rng.randi() % tones.size()]
+		var mult_c := _tone_mult(base, tone_c)
+		var cx_c := rng.randi_range(0, size - 1)
+		var cy_c := rng.randi_range(0, size - 1)
+		var rad_c := rng.randi_range(3, 8)
+		var strength_c := rng.randf_range(0.10, 0.20)
+		for ox: int in [-size, 0, size]:
+			_splat(img, cx_c + ox, cy_c, rad_c, mult_c, strength_c, size)
+	# Fur grain: a whisper of per-pixel noise under everything.
+	for i in 1600:
+		var x := rng.randi_range(0, size - 1)
+		var y := rng.randi_range(0, size - 1)
+		var n := rng.randf_range(0.96, 1.04)
 		var px: Color = img.get_pixel(x, y)
 		img.set_pixel(x, y, Color(px.r * n, px.g * n, px.b * n))
 	img.generate_mipmaps()
@@ -430,10 +554,14 @@ func _scatter(parent: Node3D, center: Vector3, radii: Vector3, count: int, rng: 
 		var pos := center + Vector3(dir.x * radii.x, dir.y * radii.y, dir.z * radii.z)
 		var s := rng.randf_range(smin, smax) * 0.9
 		var tone: Color = tones[rng.randi() % tones.size()]
-		# REALISM PASS 1 (tuning): each patch is muted 25-50% toward
-		# the dark base and pressed flatter — a tone IN the fur over
-		# the baked coat texture, not a disc stuck on top of it.
-		tone = tone.lerp(coat, rng.randf_range(0.25, 0.5))
+		# REALISM PASS 1 (tuning): each patch is muted toward the
+		# dark base and pressed flatter — a tone IN the fur over the
+		# baked coat texture, not a disc stuck on top of it.
+		# REALISM PASS 2: muted deeper again (40-60%) — the layered
+		# bake now carries the pattern, so the shells sit as quiet
+		# accents inside it instead of chips on top. Same number of
+		# RNG draws, so the pass-1 scatter layout is unchanged.
+		tone = tone.lerp(coat, rng.randf_range(0.4, 0.6))
 		var mi := _ell(parent, pos, Vector3(s, s * 0.30, s * rng.randf_range(0.7, 1.1)), tone, Vector3(rng.randf_range(-0.4, 0.4), rng.randf() * TAU, rng.randf_range(-0.4, 0.4)))
 		_mottles.append(mi)
 	mottle_count = _mottles.size()
