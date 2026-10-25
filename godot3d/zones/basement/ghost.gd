@@ -100,6 +100,12 @@ func _ell(parent: Node3D, pos: Vector3, dia: Vector3, c: Color, a := ALPHA) -> M
 	return mi
 
 
+func _arm(parent: Node3D, side: float, c: Color) -> MeshInstance3D:
+	var a := _ell(parent, Vector3(0.315 * side, 1.16, 0), Vector3(0.11, 0.54, 0.11), c)
+	a.rotation.z = -0.16 * side # hangs: shoulder out, hand drifting in
+	return a
+
+
 func _build_model() -> void:
 	var ink: Color = TINTS[tint_index % TINTS.size()]
 	_model = Node3D.new()
@@ -108,12 +114,20 @@ func _build_model() -> void:
 	if flipped:
 		_model.rotation.z = PI # one of them hangs upside down, like the source
 	add_child(_model)
-	# RedVisions ped, kit-smoothed: big head, torso a step lighter,
-	# ONE dark leg, one arm stuck up. No second leg. No feet.
-	_ell(_model, Vector3(0, 1.72, 0), Vector3(0.44, 0.44, 0.44), ink)
-	_ell(_model, Vector3(0, 1.12, 0), Vector3(0.52, 0.62, 0.30), ink.lightened(0.25))
-	_ell(_model, Vector3(0.12, 0.42, 0), Vector3(0.16, 0.72, 0.16), Color(0.10, 0.10, 0.12), 0.7)
-	_ell(_model, Vector3(-0.32, 1.52, 0), Vector3(0.12, 0.55, 0.12), ink)
+	# A floating PERSON, kit-smoothed (rebuilt 2026-10-25 per
+	# Daniel's standing spec: the previous stack - wide flat torso,
+	# one dark leg, one stuck-up arm - read as discs, not a person).
+	# Head clearly narrower than the shoulders, a torso deep enough
+	# that the slow source spin reads as a figure turning, two arms
+	# hanging at its sides, and below the waist the form tapers away
+	# in fading wisps. No legs - it floats.
+	_ell(_model, Vector3(0, 1.80, 0), Vector3(0.34, 0.40, 0.36), ink) # head
+	_ell(_model, Vector3(0, 1.54, 0), Vector3(0.48, 0.24, 0.32), ink.lightened(0.12)) # shoulders
+	_ell(_model, Vector3(0, 1.18, 0), Vector3(0.52, 0.62, 0.36), ink.lightened(0.25)) # torso
+	_arm(_model, -1.0, ink.lightened(0.12))
+	_arm(_model, 1.0, ink.lightened(0.12))
+	_ell(_model, Vector3(0, 0.56, 0), Vector3(0.40, 0.92, 0.28), ink, ALPHA * 0.90) # robe column: one smooth taper, no stacked segments
+	_ell(_model, Vector3(0.06, 0.12, 0), Vector3(0.15, 0.30, 0.11), ink, ALPHA * 0.60) # drifting wisp tip
 
 
 func choke_target() -> Vector3:
