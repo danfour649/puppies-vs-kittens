@@ -185,6 +185,34 @@ func _run() -> void:
 	check(game2.caught_count == 1, "provoked strike caught the out-of-arc mouse (caught=%d)" % game2.caught_count)
 	game2.queue_free()
 	await frames(3)
+
+	# ---------- PHASE C: walked lounge arrival (chair regression) ----------
+	# The garden chair's seat slab stops a walking cat at a flat
+	# ~0.50 m from centre; with the stock 0.45 arrival radius a
+	# walked arrival NEVER fired (she could only lounge there from
+	# her spawn point on it). Regression: start her on the ground,
+	# send her to the chair, require a real walked arrival.
+	print("DUO C: walked arrival at the garden chair")
+	DuoCharacters.last_choice = ""
+	var game3 = load("res://main.tscn").instantiate()
+	add_child(game3)
+	await frames(12)
+	var duo3 = game3.duo
+	var sib3 = duo3.sibling
+	var scat3: PvKCat = duo3.sibling_cat()
+	duo3.choose("willie")
+	sib3.autonomous = false
+	var chair_spot := Vector3(4.5, 0.46, 4.5) # main.CHAIR_SEAT
+	scat3.velocity = Vector3.ZERO
+	scat3.global_position = Vector3(4.5, 0.05, 7.3) # ground, 2.8 m south of the chair
+	await frames(3)
+	sib3.go_lounge(chair_spot)
+	var walked := await _wait_for(func() -> bool: return sib3.mode == "lounge" and scat3.is_lounging, 900)
+	check(walked, "sibling WALKED to the garden chair and lounged (mode=%s)" % sib3.mode)
+	var flat_d := Vector2(scat3.global_position.x - chair_spot.x, scat3.global_position.z - chair_spot.z).length()
+	check(flat_d < 0.05, "sibling settled on the chair seat (flat dist %.2f)" % flat_d)
+	game3.queue_free()
+	await frames(3)
 	print("DUO TESTS DONE: %d passed, %d failed" % [_pass, _fail])
 	get_tree().quit(1 if _fail > 0 else 0)
 
