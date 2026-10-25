@@ -390,7 +390,12 @@ func _bake_calico_texture(base: Color, tones: Array, seed_off: int, size: int) -
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(mottle_cfg.get("seed", 1)) + 2707 + seed_off
 	# Layer A: broad blotches, weighted to the true calico tones.
-	for i in 16:
+	# QA round 2026-10-25: count/radius/strength raised after in-game
+	# captures showed the pass-3 field landing invisibly on the torso
+	# flanks (Aggie read solid black at gameplay distance, coverage
+	# 260 permille). Same base, same tones, same seed — bolder lay-down
+	# so the photo-spec mottling actually reads on the whole coat.
+	for i in 26:
 		var pick := rng.randf()
 		var tone: Color = tones[3]
 		if pick < 0.42:
@@ -401,10 +406,10 @@ func _bake_calico_texture(base: Color, tones: Array, seed_off: int, size: int) -
 			tone = tones[2]
 		var cx := rng.randi_range(0, size - 1)
 		var cy := rng.randi_range(0, size - 1)
-		var rx := rng.randf_range(24.0, 48.0) * k
+		var rx := rng.randf_range(30.0, 56.0) * k
 		var ry := rx * rng.randf_range(0.6, 0.95)
 		var rot := rng.randf() * PI
-		var strength := rng.randf_range(0.65, 0.90)
+		var strength := rng.randf_range(0.72, 0.95)
 		for ox: int in [-size, 0, size]:
 			_splat_ellipse_tone(img, cx + ox, cy, rx, ry, rot, tone, strength, size)
 		# Satellites: two smaller splats hugging the blotch break its
