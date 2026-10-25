@@ -114,7 +114,7 @@ func _run() -> void:
 	spare.set_role("mother")
 	add_child(spare)
 	spare.set_target(_cat)
-	_place(spare, Vector3(4.35, 0.05, 3.35))
+	_place(spare, Vector3(4.35, 0.05, -3.35)) # beside the cat at the (flipped) hatch corner
 	await frames(3)
 	var hits0: int = _cat.hits_taken
 	spare._try_contact(1, 0.62)
