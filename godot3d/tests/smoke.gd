@@ -116,7 +116,42 @@ func _run() -> void:
 	check(aggie.eye_color.is_equal_approx(want_eye), "aggie eyes green-gold like his (got %s)" % aggie.eye_color)
 	check(aggie.mottle_count > 0, "aggie mottle patches built (%d)" % aggie.mottle_count)
 	check(aggie.torso_dia.x < cat.torso_dia.x * 0.8, "aggie build is wiry, not a scaled Willie (torso %.2f vs %.2f)" % [aggie.torso_dia.x, cat.torso_dia.x])
-	check(aggie.is_lounging, "aggie lounges on the chair")
+	# --- Aggie's lounge system, driven deterministically. ---
+	# RULING (coordinator, PR #13): this replaces the old one-shot
+	# sample of aggie.is_lounging. That sample passed pre-fix only
+	# because of the lounge-lock bug (playtest bug 4: Aggie stayed
+	# parked forever after her first lounge); post-fix she lounges
+	# ~55-60% of the time on SiblingAI's own 4-9 s timer, so a
+	# single sample is flaky by construction. Drive the system
+	# instead, duo-suite style: park her on the garden chair (the
+	# game's own spawn point for her — she cannot walk up to it,
+	# the chair's collision wedges her ~0.5 m out, short of the
+	# 0.45 m arrival radius), command the lounge, and assert she
+	# settles; then send her off and assert the flag clears and
+	# she moves again, which also regression-guards the bug-4
+	# un-lounge fix inside smoke.
+	var sib = _game.duo.sibling
+	sib.autonomous = false
+	aggie.velocity = Vector3.ZERO
+	aggie.global_position = Vector3(4.5, 0.52, 4.5) # her spawn: on the chair
+	sib.go_lounge(Vector3(4.5, 0.46, 4.5)) # the chair seat (CHAIR_SEAT)
+	var settled := false
+	for i in 120:
+		await get_tree().physics_frame
+		if sib.mode == "lounge" and aggie.is_lounging:
+			settled = true
+			break
+	check(settled and aggie.is_lounging, "aggie lounges on the chair")
+	var seat_d: float = aggie.global_position.distance_to(Vector3(4.5, 0.46, 4.5))
+	check(seat_d < 0.1, "aggie settled on the chair seat (dist %.2f m)" % seat_d)
+	# Exit lounge mode: the flag must clear and she must move.
+	var chair_pos: Vector3 = aggie.global_position
+	sib.go_lounge(Vector3(-10.5, 0.0, 7.5)) # fence corner, far away
+	await frames(5)
+	check(not aggie.is_lounging, "aggie un-lounges when sent off the chair (no lounge-lock)")
+	await frames(60)
+	var moved_again := Vector2(aggie.global_position.x - chair_pos.x, aggie.global_position.z - chair_pos.z).length()
+	check(moved_again > 0.3, "aggie moves again after un-lounging (moved %.2f m)" % moved_again)
 	var achar: Dictionary = ag.get("character", {})
 	check(String(achar.get("fight_style", "")) == "burst_and_flee", "character data: aggie fights burst-and-flee")
 	check(String(achar.get("provocation_trigger", "")) == "willie_meowing", "character data: willie meowing provokes aggie")
