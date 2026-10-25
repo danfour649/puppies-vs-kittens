@@ -37,6 +37,12 @@ const OFFER_MAX_DIST := 4.2
 const EAT_RADIUS := 1.15 ## around the chocolate itself
 const EAT_TIME := 1.0 ## seconds of deliberate holding to eat
 const LEAD_TIME := 0.55 ## prediction horizon for corner-cutting
+const SLIP_JUMP := 0.9 ## m in ONE frame: no cat moves this far in a
+# frame — a jump this big is a vanish (travel, respawn, a scripted
+# relocation) and she loses him: grabs end, pursuit breaks off.
+const SLIP_PAUSE := 2.2 ## seconds she stands blinking after a vanish
+const GRAB_REACH_Y := 0.45 ## she grabs cats at HER level — a cat up
+# on a ledge, counter or sofa back is out of reach (a refuge)
 const ENTRY_FOR_ZONE := {
 	HouseSpec.OUTSIDE: "EntryFrontDoor",
 	HouseSpec.GROUND_FLOOR: "EntryFrontDoor",
@@ -75,6 +81,8 @@ var _last_pos := Vector3.ZERO
 var _detour_t := 0.0
 var _detour_side := 1.0
 var _rng := RandomNumberGenerator.new()
+var _last_cat: PvKCat = null
+var _last_cat_pos := Vector3.ZERO
 
 var _bubble: Label3D
 var _bubble_t := 0.0
@@ -224,6 +232,16 @@ func steering_target() -> Vector3:
 
 # --- per-frame -------------------------------------------------------------------
 
+## Is the player cat being driven through main's input_override
+## seam right now? In real play nothing ever activates it — the
+## seam exists for the game's scripted test sequences, and she
+## stands politely aside for those (she is part of the game, not
+## an obstacle to its own regression contract).
+func _seam_active() -> bool:
+	var io: Variant = game.get("input_override")
+	return io is Dictionary and bool(io.get("active", false))
+
+
 func _physics_process(delta: float) -> void:
 	if game == null or actor == null:
 		return
@@ -238,6 +256,13 @@ func _physics_process(delta: float) -> void:
 	if _grab_cool > 0.0:
 		_grab_cool -= delta
 
+	# Vanish tracking: how far did the cat move since last frame?
+	var jumped := 0.0
+	if _last_cat == cat:
+		jumped = Vector2(cat.global_position.x - _last_cat_pos.x, cat.global_position.z - _last_cat_pos.z).length()
+	_last_cat = cat
+	_last_cat_pos = cat.global_position
+
 	if state == "dormant":
 		actor.set_move_dir(Vector3.ZERO)
 		actor.set_pose("idle")
@@ -246,30 +271,54 @@ func _physics_process(delta: float) -> void:
 		_update_hud()
 		return
 
-	# Zone following: she is where she is; the cat may not be.
-	if state != "grab":
-		var cat_zone := zones.current_zone
-		if cat_zone == her_zone:
-			if state == "follow_wait":
-				state = "pursue" # he came back — no trip needed
-				actor.set_pose("walk")
-		else:
-			if state != "follow_wait" or _follow_zone != cat_zone:
-				if state == "offer":
-					actor.set_chocolate_visible(false)
-					eat_progress = 0.0
-					_offer_t = _rng.randf_range(OFFER_EVERY[0], OFFER_EVERY[1])
-				state = "follow_wait"
-				_follow_zone = cat_zone
-				_follow_left = FOLLOW_DELAY
-				actor.set_pose("idle")
-				_say("Now where…?")
-			actor.set_move_dir(Vector3.ZERO)
-			_follow_left -= delta
-			if _follow_left <= 0.0:
-				_arrive(_follow_zone)
-			_update_hud()
-			return
+	# Zone following: she is where she is; the cat may not be. A
+	# grab does NOT survive the cat leaving — no pinning a cat
+	# across the world; he slipped away in the commotion.
+	var cat_zone := zones.current_zone
+	if cat_zone != her_zone:
+		if state == "grab":
+			_escape(false)
+		if state != "follow_wait" or _follow_zone != cat_zone:
+			if state == "offer":
+				actor.set_chocolate_visible(false)
+				eat_progress = 0.0
+				_offer_t = _rng.randf_range(OFFER_EVERY[0], OFFER_EVERY[1])
+			state = "follow_wait"
+			_follow_zone = cat_zone
+			_follow_left = FOLLOW_DELAY
+			actor.set_pose("idle")
+			_say("Now where…?")
+		actor.set_move_dir(Vector3.ZERO)
+		_follow_left -= delta
+		if _follow_left <= 0.0:
+			_arrive(_follow_zone)
+		_update_hud()
+		return
+	if state == "follow_wait":
+		state = "pursue" # he came back — no trip needed
+		actor.set_pose("walk")
+
+	# Scripted-sequence stand-down (see _seam_active).
+	if _seam_active():
+		actor.set_move_dir(Vector3.ZERO)
+		if state == "grab":
+			_escape(false)
+		_update_hud()
+		return
+
+	# The vanish: he was THERE and now he's THERE. She loses him —
+	# any hold ends, and she stands blinking instead of beelining
+	# to wherever he reappeared.
+	if jumped > SLIP_JUMP and (state == "pursue" or state == "grab" or state == "reset"):
+		if state == "grab":
+			_escape(false)
+		state = "forget"
+		_forget_left = SLIP_PAUSE
+		actor.set_move_dir(Vector3.ZERO)
+		actor.set_pose("forget")
+		_say("Where'd he go…?")
+		_update_hud()
+		return
 
 	match state:
 		"pursue":
@@ -349,6 +398,8 @@ func _step_pursue(delta: float, cat: PvKCat) -> void:
 func _can_grab(cat: PvKCat) -> bool:
 	if cat.is_fainted or cat.is_poisoned or cat.is_held:
 		return false
+	if absf(cat.global_position.y - actor.global_position.y) > GRAB_REACH_Y:
+		return false # up on something — out of her reach (a refuge)
 	if cat.has_meta("on_lap") and bool(cat.get_meta("on_lap")):
 		return false # CHOICE (spec-recommended): not even Glenys takes a cat off a lap
 	if bool(game.get("won")) or bool(game.get("run_over")):
@@ -385,6 +436,13 @@ func _begin_grab() -> void:
 
 func _step_grab(delta: float, cat: PvKCat) -> void:
 	_grab_t += delta
+	# If he is somehow no longer AT her chest — moved by travel, a
+	# respawn, anything — he is not held any more. The pin below
+	# must never drag a cat across the world.
+	var hp := actor.hold_point_global()
+	if Vector2(cat.global_position.x - hp.x, cat.global_position.z - hp.z).length() > 1.2:
+		_escape(false)
+		return
 	# She holds him up at her chest; his physics is pinned (the lap
 	# idiom: kinematic pin per step, velocity zeroed).
 	cat.velocity = Vector3.ZERO
@@ -563,6 +621,7 @@ func _arrive(zone_id: String) -> void:
 	actor.velocity = Vector3.ZERO
 	her_zone = zone_id
 	state = "pursue"
+	_grab_cool = maxf(_grab_cool, 2.0) # a beat to get her bearings
 	actor.set_pose("walk")
 	_say("There you are!")
 

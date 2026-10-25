@@ -161,6 +161,15 @@ func _run() -> void:
 	await frames(12)
 	check(sys.state == "pursue", "…and then she remembers the cat")
 
+	# The vanish: a cat who suddenly is NOT where he was (travel,
+	# respawn, a scripted relocation) has given her the slip — she
+	# breaks off, blinking, instead of beelining to the new spot.
+	cat.global_position = origin + Vector3(-5.5, 0.1, 2.5)
+	await frames(4)
+	check(sys.state == "forget", "a vanished cat breaks off the pursuit (state %s)" % sys.state)
+	sys.set("_forget_left", 0.05)
+	await frames(10)
+
 	# Zone following: the cat goes to the basement; she arrives
 	# through the same connector after her delay.
 	game.zones.travel(HouseSpec.BASEMENT, "EntryStairs", true)
