@@ -7,11 +7,15 @@ edits in `main.gd`.
 
 ## What's in the box
 
-- **Character select** (`character_select.gd`) — two cards over the
-  live yard at game start: play as the big plush boy or as his
-  small wiry sister. Touch, mouse, or keys **1 / 2**. Trait text
-  comes from the character data. The choice survives R-restarts
-  (a static in `characters.gd`), so restarting keeps your cat.
+- **Character select** (`character_select.gd` + `select_stage.gd`
+  + `select_minimap.gd`) — a Mortal Kombat-pattern select: the
+  highlighted cat stands rendered on a spotlight stage (the real
+  model, idle-animated), its name and one trait line beside it,
+  its start marked on a house-and-yard minimap. One decision:
+  arrows / hover move, Enter / click picks, **1 / 2** pick
+  directly. Name, line and start all come from the character
+  data. The choice survives R-restarts (a static in
+  `characters.gd`), so restarting keeps your cat.
   Whoever you don't pick becomes the sibling NPC.
 - **Character data** (`characters.gd`) — reads
   `cat_kit/cat_species.json` defensively: today's flat schema and

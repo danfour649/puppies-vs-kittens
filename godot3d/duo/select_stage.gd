@@ -16,6 +16,7 @@ var _camera: Camera3D
 var _holders: Dictionary = {} # id -> Node3D (cat parent, rides the pedestal)
 var _cats: Dictionary = {} # id -> PvKCat
 var _current := ""
+var _t := 0.0
 
 
 func setup(chars: Dictionary, order: Array) -> void:
@@ -42,8 +43,11 @@ func show_character(id: String) -> void:
 
 
 func _process(delta: float) -> void:
+	# A gentle sway, never a full turn: the cat stays front-facing in
+	# the light while the presentation breathes.
 	if _pedestal != null and _current != "":
-		_pedestal.rotation.y += 0.30 * delta
+		_t += delta
+		_pedestal.rotation.y = 0.55 * sin(_t * 0.35)
 
 
 func _build_room() -> void:

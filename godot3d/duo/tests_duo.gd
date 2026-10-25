@@ -61,6 +61,22 @@ func _run() -> void:
 	check(duo != null, "duo system present")
 	check(duo.select_ui.option_count() == 2, "character select builds two options (got %d)" % duo.select_ui.option_count())
 	check(duo.select_visible(), "character select shows at game start")
+	# MK-pattern select (2026-10-25): the highlight starts on the
+	# first cat, moves WITHOUT picking, and confirm() picks the
+	# highlighted cat through the real chosen signal.
+	check(duo.select_ui.highlighted_id() == "willie", "select highlight starts on Willie (got %s)" % duo.select_ui.highlighted_id())
+	duo.select_ui.highlight("aggie")
+	check(duo.select_ui.highlighted_id() == "aggie", "highlight moves to Aggie without picking")
+	check(duo.select_visible(), "moving the highlight does not pick")
+	for cid: String in ["willie", "aggie"]:
+		var chd: Dictionary = duo.chars[cid]
+		check(String(chd.get("line", "")) != "", "%s carries its one select line" % cid)
+		check(String(chd.get("start_name", "")) != "", "%s carries a start name for the minimap" % cid)
+	check(duo.select_ui._minimap.starts.size() == 2, "minimap marks both cats' real starts")
+	duo.select_ui.highlight("willie")
+	duo.select_ui.confirm()
+	await frames(5)
+	check(not duo.select_visible(), "confirm picks the highlighted cat and closes the select")
 	var willie = duo.willie_cat
 	var aggie = duo.aggie_cat
 	check(willie != null and aggie != null and willie != aggie, "two distinct cat instances")
