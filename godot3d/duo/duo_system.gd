@@ -22,7 +22,7 @@ const LOUNGE_SPOTS: Array = [
 	Vector3(8.5, 0.0, 3.5), # sunny patch
 	Vector3(-10.5, 0.0, 7.5), # fence corner
 ]
-const CATCH_RADIUS_BASE := 0.42
+const CATCH_RADIUS_BASE := 0.62
 const CATCH_RADIUS_PROVOKED := 0.80
 
 var game: Node = null

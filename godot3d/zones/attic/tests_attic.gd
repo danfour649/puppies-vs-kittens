@@ -46,7 +46,7 @@ func _run() -> void:
 	_cat = HarnessCatScene.new()
 	_cat.name = "HarnessCat"
 	add_child(_cat)
-	_place(_cat, Vector3(4.55, 0.05, 3.55))
+	_place(_cat, Vector3(4.55, 0.05, -3.55))
 	_attic.setup(_cat)
 	await frames(10)
 
@@ -106,7 +106,7 @@ func _run() -> void:
 	_place(rcheck, Vector3(-1.0, 0.05, 0.5))
 	check(absf(rcheck._speed_factor() - 1.0) < 0.001, "raccoon on open floor still reads 1.0 itself")
 	rcheck.queue_free()
-	_place(_cat, Vector3(4.55, 0.05, 3.55)) # back to the hatch corner for what follows
+	_place(_cat, Vector3(4.55, 0.05, -3.55)) # back to the hatch corner for what follows
 	await frames(6)
 
 	# --- contact damage cooldown (unit-level, spare raccoon) --------------
@@ -220,7 +220,7 @@ func _run() -> void:
 		k.set_physics_process(true)
 
 	# --- stagger at thresholds, and stagger scatters the kits ---------------------------
-	_place(_cat, Vector3(4.55, 0.05, 3.55)) # far away; direct calls only
+	_place(_cat, Vector3(4.55, 0.05, -3.55)) # far away; direct calls only
 	for k in kits:
 		_place(k, mother.global_position + Vector3(0.8, 0, 0.4))
 		if k.state != "hover":

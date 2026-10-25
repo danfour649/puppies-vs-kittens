@@ -1091,7 +1091,15 @@ func _step_sibling_fence() -> void:
 	# The sibling is a backyard cat: it never enters the front
 	# zone (and so never meets traffic or dogs). SiblingAI's spots
 	# are all in the yard, so this is a belt-and-braces nudge.
+	# PLAYTEST FIX (bug 2): the fence is a YARD rule and must only
+	# run while the cats are actually outside. The interior stack
+	# lives at world z ~ -200, so clamping z >= -9.4 in every zone
+	# yanked the sibling out of the house the frame after any
+	# indoor travel and pinned her against the house wall.
 	if game == null or game.get("duo") == null:
+		return
+	var zones: Variant = game.get("zones")
+	if zones == null or String(zones.get("current_zone")) != HouseSpec.OUTSIDE:
 		return
 	var sib: Variant = game.duo.sibling_cat()
 	if sib != null and is_instance_valid(sib):

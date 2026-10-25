@@ -13,8 +13,8 @@ signal was_caught(m: PvKMouse)
 const COAT := Color(0.45, 0.36, 0.28)
 const MODEL_SCALE := 0.10
 const WANDER_SPEED := 1.2
-const FLEE_SPEED := 3.4
-const FLEE_TIRED_SPEED := 2.2
+const FLEE_SPEED := 3.05
+const FLEE_TIRED_SPEED := 1.95
 const FLEE_RADIUS := 2.4
 
 var state := "idle"

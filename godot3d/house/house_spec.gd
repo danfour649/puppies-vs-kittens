@@ -110,11 +110,11 @@ static func entries(id: String) -> Dictionary:
 			# open floor around it (things hunt you down here).
 			return {"EntryStairs": Transform3D(Basis(), Vector3(2.85, 0.0, 4.5))}
 		ATTIC:
-			# INTEGRATION: the built attic's hatch is its SE floor
-			# corner (HATCH_POS (5.05, 3.55)); the landing stands on
+			# INTEGRATION: the built attic's hatch is its +x/-z floor
+			# corner (HATCH_POS (5.05, -3.55)); the landing stands on
 			# clear floor just west of it, clear of the crate stairs
 			# and of the return volume below, facing into the room.
-			return {"EntryHatch": Transform3D(Basis(Vector3.UP, PI / 4.0), Vector3(3.9, 0.0, 3.9))}
+			return {"EntryHatch": Transform3D(Basis(Vector3.UP, PI), Vector3(3.9, 0.0, -3.9))}
 	return {}
 
 
@@ -143,7 +143,7 @@ static func connectors(id: String) -> Array:
 			}]
 		ATTIC:
 			return [{
-				"at": Vector3(5.05, 0.7, 3.55), "size": Vector3(1.7, 1.4, 1.7),
+				"at": Vector3(5.05, 0.7, -3.55), "size": Vector3(1.7, 1.4, 1.7),
 				"target_zone": GROUND_FLOOR, "target_entry": "EntryHatchBottom",
 			}]
 	return []
@@ -264,7 +264,7 @@ const ANCHORS := {
 	"sofa": {"u": 0.782, "v": 0.099, "floor": GROUND_FLOOR}, # the lap seat
 	"scratch_post": {"u": 0.965, "v": 0.594, "floor": GROUND_FLOOR},
 	"basement_entry": {"u": 0.668, "v": 0.969, "floor": BASEMENT}, # built entry (2.85, 4.5)
-	"attic_entry": {"u": 0.729, "v": 0.906, "floor": ATTIC}, # built entry (3.9, 3.9)
+	"attic_entry": {"u": 0.729, "v": 0.094, "floor": ATTIC}, # built entry (3.9, -3.9)
 	"attic_perch": {"u": 0.812, "v": 0.500, "floor": ATTIC}, # built perch (5.30, 0.0)
 }
 

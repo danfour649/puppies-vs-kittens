@@ -104,6 +104,12 @@ func begin_flee() -> void:
 func _physics_process(delta: float) -> void:
 	if cat == null or not is_instance_valid(cat):
 		return
+	# PLAYTEST FIX (bug 4): leaving lounge mode must un-lounge the
+	# cat. PvKCat refuses to move or strike while is_lounging, and
+	# nothing else ever cleared it (the duo suite masked the lock
+	# by un-lounging her by hand). Any non-lounge mode means GO.
+	if mode != "lounge" and cat.is_lounging:
+		cat.set_lounge(false)
 	_timer -= delta
 	match mode:
 		"lounge":

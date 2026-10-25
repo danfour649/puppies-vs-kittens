@@ -58,7 +58,7 @@ is vertically honest — stairs and hatch line up in world space.
 | outside | `EntryFrontDoor` (2.5, 0.30, −8.45), faces the yard |
 | ground_floor | `EntryFrontDoor` (2.5, 0, 3.55) · `EntryStairsTop` (−6.5, 0, −1.55) · `EntryHatchBottom` (6.5, 0, −1.7) |
 | basement | `EntryStairs` (2.85, 0, 4.5) — landing by the built south-wall stair (foot (4.35, 5.35)) |
-| attic | `EntryHatch` (3.9, 0, 3.9) — foot of the built crate stair up to the hatch (5.05, 3.55) |
+| attic | `EntryHatch` (3.9, 0, −3.9) — foot of the built crate stair up to the hatch (5.05, −3.55) |
 
 ### Connector volumes (walk-in triggers, local to each zone)
 
@@ -341,8 +341,8 @@ above-cell LINKED pattern, basement 260 = below-grade LINKED,
 | sofa / lap seat | (4.8, −3.85) | (0.782, 0.099) | (3.05, −5.85) |
 | scratch post | (7.9, 0.9) | (0.965, 0.594) | (5.02, 1.37) |
 | attic perch | (5.30, 0.0) | (0.812, 0.500) | (3.37, 0.00) |
-| attic hatch | (5.05, 3.55) | (0.797, 0.870) | (3.21, 5.40) |
-| attic entry landing | (3.9, 3.9) | (0.729, 0.906) | (2.48, 5.93) |
+| attic hatch | (5.05, −3.55) | (0.797, 0.130) | (3.21, −5.40) |
+| attic entry landing | (3.9, −3.9) | (0.729, 0.094) | (2.48, −5.93) |
 | basement entry landing | (2.85, 4.5) | (0.668, 0.969) | (1.81, 6.85) |
 | basement stair foot | (4.35, 5.35) | (0.756, 1.057) | (2.77, 8.13) |
 | basement heart (Alpha den) | (1.0, −2.0) | (0.559, 0.292) | (0.64, −3.04) |
