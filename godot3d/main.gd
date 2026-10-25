@@ -186,17 +186,12 @@ func _build_environment() -> void:
 	var spots := [Vector2(-8, -3), Vector2(6, 1), Vector2(-2, 6), Vector2(9, -6), Vector2(-10, 5), Vector2(1, -1)]
 	for i in spots.size():
 		_box(env, Vector3(4.5, 0.012, 3.6), Vector3(spots[i].x, 0.006 + i * 0.0012, spots[i].y), patches[i])
-	# Fence: posts + two rails on the south, east and west edges.
-	for side: int in [-1, 1]:
-		var x := 13.0 * side
-		for zi in range(-10, 11, 2):
-			_box(env, Vector3(0.14, 1.15, 0.14), Vector3(x, 0.57, float(zi)), wood_dark)
-		_box(env, Vector3(0.06, 0.12, 20.4), Vector3(x, 0.85, 0), wood)
-		_box(env, Vector3(0.06, 0.12, 20.4), Vector3(x, 0.4, 0), wood)
-	for zi in range(-12, 13, 2):
-		_box(env, Vector3(0.14, 1.15, 0.14), Vector3(float(zi), 0.57, 10.0), wood_dark)
-	_box(env, Vector3(26.4, 0.12, 0.06), Vector3(0, 0.85, 10.0), wood)
-	_box(env, Vector3(26.4, 0.12, 0.06), Vector3(0, 0.4, 10.0), wood)
+	# Boundary: NO fence at 255 Massey (Daniel, 2026-10-25) — the
+	# yard is ringed by an impassable thorn hedge of wild roses.
+	# The invisible boundary statics further down are UNCHANGED,
+	# so the hedge stops cats, mice and dogs exactly where the
+	# fence did; only the visuals changed.
+	_build_rose_hedge(env)
 	# House along the north edge: wall, roof lip, door, windows, porch.
 	var siding := Color(0.74, 0.71, 0.65)
 	var trim := Color(0.92, 0.9, 0.85)
@@ -238,6 +233,7 @@ func _build_environment() -> void:
 	_static_box(statics, Vector3(0.5, 2.6, 0.5), Vector3(-8.5, 1.3, -5.0))
 	_static_box(statics, Vector3(2.4, 1.5, 1.2), Vector3(9.9, 0.75, -6.05))
 	_static_box(statics, Vector3(0.7, 0.46, 0.7), CHAIR_SEAT + Vector3(0, -0.23, 0))
+	_build_front_roses(env)
 	_dress_yard(env)
 
 
@@ -248,7 +244,6 @@ func _build_environment() -> void:
 func _dress_yard(env: Node3D) -> void:
 	var trim := Color(0.92, 0.9, 0.85)
 	var wood_dark := Color(0.42, 0.31, 0.21)
-	var hedge := Color(0.16, 0.32, 0.12)
 	var blade_mesh := CylinderMesh.new()
 	blade_mesh.top_radius = 0.0
 	blade_mesh.bottom_radius = 0.018
@@ -291,9 +286,8 @@ func _dress_yard(env: Node3D) -> void:
 			dot.material_override = _mat(Color(0.95, 0.88, 0.55) if placed % 4 == 0 else Color(0.9, 0.9, 0.92))
 			dot.position = Vector3(cx + 0.14, 0.1, cz + 0.1)
 			env.add_child(dot)
-	# South-fence hedge line (inside the fence, slight height jitter).
-	for i in 9:
-		_box(env, Vector3(2.55, 0.5 + 0.08 * sin(i * 2.3), 0.5), Vector3(-11.0 + i * 2.75, 0.27, 9.55), hedge.darkened(0.05 * (i % 3)))
+	# (The plain south hedge line that used to sit here was
+	# replaced by the wild-rose thorn hedge, _build_rose_hedge.)
 	# House trim.
 	_box(env, Vector3(0.12, 2.2, 0.14), Vector3(1.92, 1.32, -9.94), trim) # door jambs
 	_box(env, Vector3(0.12, 2.2, 0.14), Vector3(3.08, 1.32, -9.94), trim)
@@ -308,6 +302,105 @@ func _dress_yard(env: Node3D) -> void:
 	_box(env, Vector3(0.12, 1.5, 0.12), Vector3(0.0, 0.99, -7.55), wood_dark) # porch posts
 	_box(env, Vector3(0.12, 1.5, 0.12), Vector3(5.0, 0.99, -7.55), wood_dark)
 	_box(env, Vector3(1.4, 0.12, 0.5), Vector3(2.5, 0.06, -7.12), Color(0.55, 0.42, 0.3)) # step
+
+
+
+## A smooth ball in the kit idiom (one shared unit sphere, scaled).
+var _ball_mesh: SphereMesh = null
+var _thorn_mesh: CylinderMesh = null
+
+
+func _ball(parent: Node3D, pos: Vector3, dia: Vector3, c: Color) -> MeshInstance3D:
+	if _ball_mesh == null:
+		_ball_mesh = SphereMesh.new()
+		_ball_mesh.radius = 0.5
+		_ball_mesh.height = 1.0
+		_ball_mesh.radial_segments = 14
+		_ball_mesh.rings = 7
+	var mi := MeshInstance3D.new()
+	mi.mesh = _ball_mesh
+	mi.material_override = _mat(c)
+	mi.position = pos
+	mi.scale = dia
+	parent.add_child(mi)
+	return mi
+
+
+## One wild-rose bush (Daniel, 2026-10-25): a tangled dark-green
+## mass, pale thorn spikes poking out of it, and rose-pink / red
+## blooms that read at gameplay distance. Built from the yard's
+## existing plant idiom (ellipsoid masses + sphere dots).
+func _rose_bush(parent: Node3D, pos: Vector3, s: float, rng: RandomNumberGenerator) -> void:
+	if _thorn_mesh == null:
+		_thorn_mesh = CylinderMesh.new()
+		_thorn_mesh.top_radius = 0.0
+		_thorn_mesh.bottom_radius = 0.03
+		_thorn_mesh.height = 0.18
+		_thorn_mesh.radial_segments = 5
+	var g := Node3D.new()
+	g.position = pos
+	g.rotation.y = rng.randf() * TAU
+	parent.add_child(g)
+	var mass := Color(0.13, 0.27, 0.10)
+	var mass2 := Color(0.18, 0.33, 0.13)
+	_ball(g, Vector3(0, 0.52 * s, 0), Vector3(1.75, 1.1, 1.2) * s, mass)
+	_ball(g, Vector3(0.38 * s, 0.78 * s, 0.14 * s), Vector3(1.2, 0.82, 0.9) * s, mass2)
+	_ball(g, Vector3(-0.42 * s, 0.72 * s, -0.12 * s), Vector3(1.05, 0.75, 0.85) * s, mass)
+	# Thorns: pale little spikes poking out of the mass.
+	var thorn := Color(0.78, 0.74, 0.62)
+	for i in 5:
+		var a := rng.randf() * TAU
+		var spike := MeshInstance3D.new()
+		spike.mesh = _thorn_mesh
+		spike.material_override = _mat(thorn)
+		spike.position = Vector3(cos(a) * 0.8 * s, rng.randf_range(0.5, 1.05) * s, sin(a) * 0.55 * s)
+		spike.rotation = Vector3(rng.randf_range(-0.7, 0.7), 0, rng.randf_range(-0.7, 0.7))
+		g.add_child(spike)
+	# Blooms: wild-rose pinks and reds, one pale-yellow accent.
+	var pinks: Array[Color] = [Color(0.93, 0.36, 0.51), Color(0.84, 0.20, 0.28), Color(0.96, 0.58, 0.64), Color(0.98, 0.85, 0.55)]
+	for i in 9:
+		var a2 := rng.randf() * TAU
+		var r := rng.randf_range(0.5, 0.88) * s
+		var bp := Vector3(cos(a2) * r, rng.randf_range(0.6, 1.2) * s, sin(a2) * r * 0.68)
+		_ball(g, bp, Vector3.ONE * rng.randf_range(0.11, 0.17), pinks[rng.randi() % pinks.size()])
+
+
+## The Massey boundary hedge (Daniel, 2026-10-25): a dense thorn
+## hedge of wild roses on the south, east and west edges, exactly
+## where the fence stood. VISUAL ONLY — the boundary statics in
+## _build_environment are unchanged, so the hedge is exactly as
+## impassable as the fence was.
+func _build_rose_hedge(env: Node3D) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 90210
+	# South edge: two staggered rows (the boundary row, plus a
+	# lower front row where the plain hedge used to sit).
+	var x := -12.6
+	while x <= 12.7:
+		_rose_bush(env, Vector3(x, 0, 9.92), rng.randf_range(1.0, 1.18), rng)
+		x += 1.68
+	x = -11.8
+	while x <= 12.0:
+		_rose_bush(env, Vector3(x, 0, 9.42), rng.randf_range(0.78, 0.9), rng)
+		x += 1.68
+	# East and west edges: one dense row each.
+	for side: float in [-1.0, 1.0]:
+		var z := -9.4
+		while z <= 9.5:
+			_rose_bush(env, Vector3(12.95 * side, 0, z), rng.randf_range(1.02, 1.2), rng)
+			z += 1.68
+
+
+## Front-garden wild roses (Daniel, 2026-10-25): an ornamental bed
+## of the same roses along the house's street face. No collision —
+## the front-lawn statics are untouched and the crossing routes
+## (door axis, driveway mouth, Corolla) stay clear.
+func _build_front_roses(env: Node3D) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 511
+	_box(env, Vector3(14.2, 0.05, 1.15), Vector3(-1.9, 0.026, -11.32), Color(0.24, 0.19, 0.12))
+	for bx: float in [-7.6, -5.4, -3.2, -1.0, 1.2, 4.4]:
+		_rose_bush(env, Vector3(bx, 0.05, -11.32), rng.randf_range(0.8, 0.95), rng)
 
 
 func _build_lights() -> void:

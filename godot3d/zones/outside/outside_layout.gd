@@ -140,3 +140,24 @@ const DOG_GIVE_UP_DIST := 16.0
 const DOG_GIVE_UP_TIME := 14.0
 const DOG_TREE_CIRCLE_TIME := 3.5
 const DOG_BUSH_CONFUSE_TIME := 2.0
+
+## --- back-yard forest (TODO #121, Daniel 2026-10-25) ----------------
+## The real 255 Massey back yard is a literal forest. Decorative
+## grove positions (YardForest), planted along the boundary lines
+## and in two interior clusters so the canopy closes the yard in.
+## Every position keeps >= ~2 m from a gameplay point: the three
+## climbable trees keep clear bases (squirrel / climb / dog-circle
+## room), and the feeder, ambush bushes, chair, crates, porch and
+## door axis stay open. The lawn's middle band stays a glade, and
+## the south row leaves a clearing around TREE_SOUTH.
+const FOREST_SEED := 25512
+const FOREST_POSITIONS: Array[Vector3] = [
+	Vector3(-11.5, 0, 8.55), Vector3(-9.3, 0, 8.55), Vector3(-7.1, 0, 8.55),
+	Vector3(-5.6, 0, 8.6), Vector3(0.5, 0, 8.55), Vector3(3.3, 0, 8.55),
+	Vector3(6.1, 0, 8.55), Vector3(8.7, 0, 8.55), Vector3(11.3, 0, 8.55),
+	Vector3(-11.7, 0, -7.6), Vector3(-11.7, 0, -5.0), Vector3(-11.7, 0, -2.4),
+	Vector3(-12.1, 0, 0.4), Vector3(-11.7, 0, 5.4),
+	Vector3(11.75, 0, -7.4), Vector3(11.75, 0, -4.2), Vector3(11.75, 0, 0.8),
+	Vector3(11.75, 0, 5.2),
+	Vector3(-7.9, 0, 5.7), Vector3(-5.7, 0, 6.5), Vector3(9.9, 0, 6.7),
+]

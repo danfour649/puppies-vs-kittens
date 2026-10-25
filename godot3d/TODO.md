@@ -70,3 +70,22 @@ in behaviour, never anatomy.
 - [x] Player-Aggie urge meter + Find Willie objective + interrupts
 - [x] No-kittens punchline popup (first mount attempt)
 - [x] tests_heat suite; full battery green
+
+## Massey yard — forest, rose hedge, front roses (Daniel, 2026-10-25 09:21 + 09:23)
+
+- [ ] **Back yard = forest (TODO #121, both games; this is the PvK
+  half).** The real 255 Massey back yard is a literal forest:
+  dense trees + canopy, enclosed feel. PvK: decorative forest
+  trees (YardForest) along the edges + interior clusters, clear
+  of the feeder / ambush bushes / chair / crates / porch and of
+  the three climbable trees' bases — the climbable trees keep
+  their gameplay roles (perches, climb harness, dog escape).
+- [ ] **No fence — the boundary is a thorn hedge of wild roses.**
+  Remove the post-and-rail fence; plant a dense wild-rose thorn
+  hedge on the same three edges. It must stay EXACTLY as
+  impassable as the fence was: the boundary statics and the
+  yard-clamp rules are unchanged, so cats, mice and Glenys
+  pathing treat the hedge as the boundary.
+- [ ] **Wild roses in the front garden too.** The same roses in a
+  bed along the house's street face — ornamental, no collision,
+  crossing routes (door axis, driveway, Corolla) stay clear.
