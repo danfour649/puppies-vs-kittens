@@ -23,6 +23,9 @@ extends Node3D
 ## house contract (massey-zones.md) was not yet published when this
 ## was built, so footprint / floor Y / stair position above are this
 ## zone's own documented values for the coordinator to reconcile.
+## Stair position: RECONCILED 2026-10-25 — the fade pairing with the
+## ground-floor shaft is ruled INTENTIONAL (see STAIR PAIRING in
+## house/house_spec.gd); the stairs stay on the south wall as built.
 
 # --- room ---------------------------------------------------------------------
 const ROOM_MIN := Vector2(-8, -6)

@@ -64,7 +64,8 @@ const DIVIDER_GAP := Rect2(-1.95, -0.6, 0.3, 1.2) # doorway in it
 const FRONT_DOOR_X := 2.5 # matches the yard: porch + door sit here
 const FRONT_DOOR_W := 1.1
 const FRONT_DOOR_H := 2.15
-const STAIRWELL := Rect2(-7.7, -4.3, 2.4, 2.6) # centre (-6.5, -3.0)
+const STAIRWELL := Rect2(-7.7, -4.3, 2.4, 2.6) # centre (-6.5, -3.0); the basement
+# stair pairing is fade-based and INTENTIONAL — see STAIR PAIRING at entries(BASEMENT)
 const HATCH := Rect2(5.9, -3.6, 1.2, 1.2) # centre (6.5, -3.0)
 
 ## Signature props (ground floor) — the zone lanes leave these be.
@@ -103,11 +104,27 @@ static func entries(id: String) -> Dictionary:
 				"EntryHatchBottom": Transform3D(Basis(Vector3.UP, PI), Vector3(6.5, 0.0, -1.7)),
 			}
 		BASEMENT:
-			# INTEGRATION: the built labyrinth's stairs are on the
-			# SOUTH wall (its ENTRY_POS stair foot at (4.35, 5.35));
-			# the landing stands on the fully open south row west
-			# of the stair foot — clear of the return volume, with
+			# STAIR PAIRING — INTENTIONAL (coordinator ruling
+			# 2026-10-25 under Daniel's burn-down order; the
+			# PR #13 escalation is CLOSED): the two stair
+			# DRESSINGS do not share world geometry, by design.
+			# The ground-floor shaft is the STAIRWELL (NW,
+			# centre (-6.5, -3.0), EntryStairsTop above); the
+			# built labyrinth's flight climbs its SOUTH wall
+			# (stair foot ENTRY_POS (4.35, 5.35)); this landing
+			# stands on the fully open south row west of the
+			# stair foot — clear of the return volume, with
 			# open floor around it (things hunt you down here).
+			# Floor travel is a FADE through the connectors,
+			# so the two dressings are never on screen together:
+			# the pairing is by connector/entry, not by aligned
+			# geometry. Aligning them was ruled out — the
+			# basement stair foot (z 5.35) lies OUTSIDE the
+			# ground-floor footprint (z ±4.8), an east-side
+			# shaft would collide with the attic hatch and the
+			# sofa, and moving the basement entry would mean
+			# redesigning the maze and Daniel's litter corner.
+			# Both staircases stay exactly as played.
 			return {"EntryStairs": Transform3D(Basis(), Vector3(2.85, 0.0, 4.5))}
 		ATTIC:
 			# INTEGRATION: the built attic's hatch is its +x/-z floor
