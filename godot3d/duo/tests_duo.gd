@@ -127,8 +127,22 @@ func _run() -> void:
 		if is_instance_valid(m):
 			m.cat = null
 	await frames(10)
-	for m: Variant in _alive_mice(game):
-		await _catch_one(game, willie, m)
+	# HARDENED (win-loop race): do NOT iterate a snapshot of the
+	# alive list. One swipe catches every mouse inside the catch
+	# radius, so an earlier strike can catch a later snapshot entry
+	# too — and a caught mouse frees itself ~0.23 s later, so the
+	# snapshot entry could be caught or outright freed by the time
+	# its turn came (the old loop then struck at a freed instance).
+	# Re-fetch the alive list before every catch instead; the win
+	# is still earned mouse by mouse through the same mechanics,
+	# and the guard only bounds a loop that is no longer catching.
+	var win_guard := 0
+	while not game.won and win_guard < 40:
+		win_guard += 1
+		var alive_now := _alive_mice(game)
+		if alive_now.is_empty():
+			break
+		await _catch_one(game, willie, alive_now[0])
 	check(game.won, "win state reached with the sibling in the yard")
 	check((game.get("_banner") as Label).visible, "win banner visible")
 	game.queue_free()
@@ -234,15 +248,39 @@ func _run() -> void:
 
 
 func _catch_one(game: Node, cat: PvKCat, mouse: PvKMouse) -> void:
-	# Stand the cat half a metre behind the mouse, facing it (-Z fwd),
-	# then pin the mouse on the paw point: a wandering mouse can drift
-	# out of the arc during the strike windup otherwise.
+	# HARDENED (win-loop race): never strike on a fixed frame
+	# cadence. A strike cycle is 0.34 s of strike plus the species'
+	# strike_cooldown of recovery (~0.72 s total for Willie); the
+	# old fixed 45-frame settle after each strike left only ~5
+	# frames of slack over that cycle, which vanished under box
+	# load and strike() started failing its check in streaks.
+	# Poll the cat's real strike state instead (the suite already
+	# reaches into internals elsewhere, e.g. select_ui._minimap).
+	# The target is also re-validated before anything touches it:
+	# a previous swipe may have caught it already, and a caught
+	# mouse frees itself moments later.
+	if not is_instance_valid(mouse) or mouse.state == "caught":
+		return
+	# Stand the cat half a metre behind the mouse, facing it (-Z fwd).
 	cat.velocity = Vector3.ZERO
 	cat.global_position = Vector3(mouse.global_position.x, 0.05, mouse.global_position.z + 0.5)
 	cat.rotation.y = 0.0
 	await frames(3)
+	# Wait for the previous strike cycle to fully recover. The
+	# bound is generous; on timeout we still attempt the strike
+	# below and its check reports the failure, exactly as before.
+	await _wait_for(func() -> bool: return cat._strike_t < 0.0 and cat._strike_cd <= 0.0, 900)
+	if not is_instance_valid(mouse) or mouse.state == "caught":
+		return
+	# Pin the mouse on the paw point at the last moment: a
+	# wandering mouse can drift out of the arc during the strike
+	# windup otherwise.
 	var pp: Vector3 = cat.paw_point()
 	mouse.global_position = Vector3(pp.x, 0.0, pp.z)
 	var ok: bool = cat.strike()
 	check(ok, "strike started")
-	await frames(45)
+	# Wait for THIS strike to run its course (the swipe resolves
+	# at 0.10 s, the strike ends at 0.34 s) rather than counting
+	# a fixed 45 frames that raced the cooldown under load.
+	await _wait_for(func() -> bool: return cat._strike_t < 0.0, 300)
+	await frames(3)
