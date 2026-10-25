@@ -247,6 +247,32 @@ func _run() -> void:
 	get_tree().quit(1 if _fail > 0 else 0)
 
 
+func _wait_strike(game: Node, cat: PvKCat, cond: Callable, max_frames: int) -> bool:
+	# _wait_for plus the tree-climb release. A swipe beside a trunk
+	# whose squirrel is taunting makes the outside system auto-start
+	# a climb (its paw_swiped handler, "nothing struck at a trunk"
+	# step), and the climb turns the cat's PHYSICS PROCESS OFF until
+	# the player climbs down — so a staged strike can freeze
+	# mid-swing (_strike_t parked just past the 0.10 s swipe) and
+	# strike() then refuses forever: the long "strike started"
+	# failure streaks. That is intended game behaviour (the outside
+	# suite tests the auto-climb); the harness simply has to climb
+	# back down, through the game's own test seam (climb_axis_debug
+	# is the S key), before the strike state can advance again.
+	var sys = game.outside
+	for i in max_frames:
+		if bool(cond.call()):
+			if sys != null:
+				sys.climb_axis_debug = 0.0
+			return true
+		if sys != null and sys.climbing() and sys.player_cat() == cat:
+			sys.climb_axis_debug = -1.0
+		await get_tree().physics_frame
+	if sys != null:
+		sys.climb_axis_debug = 0.0
+	return bool(cond.call())
+
+
 func _catch_one(game: Node, cat: PvKCat, mouse: PvKMouse) -> void:
 	# HARDENED (win-loop race): never strike on a fixed frame
 	# cadence. A strike cycle is 0.34 s of strike plus the species'
@@ -255,10 +281,11 @@ func _catch_one(game: Node, cat: PvKCat, mouse: PvKMouse) -> void:
 	# frames of slack over that cycle, which vanished under box
 	# load and strike() started failing its check in streaks.
 	# Poll the cat's real strike state instead (the suite already
-	# reaches into internals elsewhere, e.g. select_ui._minimap).
-	# The target is also re-validated before anything touches it:
-	# a previous swipe may have caught it already, and a caught
-	# mouse frees itself moments later.
+	# reaches into internals elsewhere, e.g. select_ui._minimap),
+	# via _wait_strike so a swipe-triggered tree climb cannot
+	# freeze the swing mid-cycle. The target is also re-validated
+	# before anything touches it: a previous swipe may have caught
+	# it already, and a caught mouse frees itself moments later.
 	if not is_instance_valid(mouse) or mouse.state == "caught":
 		return
 	# Stand the cat half a metre behind the mouse, facing it (-Z fwd).
@@ -269,7 +296,7 @@ func _catch_one(game: Node, cat: PvKCat, mouse: PvKMouse) -> void:
 	# Wait for the previous strike cycle to fully recover. The
 	# bound is generous; on timeout we still attempt the strike
 	# below and its check reports the failure, exactly as before.
-	await _wait_for(func() -> bool: return cat._strike_t < 0.0 and cat._strike_cd <= 0.0, 900)
+	await _wait_strike(game, cat, func() -> bool: return cat._strike_t < 0.0 and cat._strike_cd <= 0.0, 900)
 	if not is_instance_valid(mouse) or mouse.state == "caught":
 		return
 	# Pin the mouse on the paw point at the last moment: a
@@ -282,5 +309,5 @@ func _catch_one(game: Node, cat: PvKCat, mouse: PvKMouse) -> void:
 	# Wait for THIS strike to run its course (the swipe resolves
 	# at 0.10 s, the strike ends at 0.34 s) rather than counting
 	# a fixed 45 frames that raced the cooldown under load.
-	await _wait_for(func() -> bool: return cat._strike_t < 0.0, 300)
+	await _wait_strike(game, cat, func() -> bool: return cat._strike_t < 0.0, 300)
 	await frames(3)
