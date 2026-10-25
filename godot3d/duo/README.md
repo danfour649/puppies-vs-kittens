@@ -41,9 +41,43 @@ edits in `main.gd`.
     wider one-hit catch arc, and a visible aura.
   The meter + a "PROVOKED!" flash live in the HUD (`duo_system.gd`).
 
+## The heat system (`heat_system.gd`)
+
+Aggie goes into **heat**, frequently (Daniel's spec, 2026-10-24):
+the cycle runs off 16–30 s → heat 30–60 s → a short settle. In heat
+she hunts Willie down wherever he is and **solicits** — the cat
+kit's courtship pose (a rocking roll, front dipped in a present,
+tail swung aside) plus the **yowl**, a 1.15 s synth variant in
+`meow_audio.gd` (`aggie_yowl`: louder and longer than her chirp,
+unmistakable across the yard).
+
+Willie is **neutered**. When he is the NPC and she comes near, he
+performs from the comedy response table (SiblingAI heat modes):
+the **blank stare**, **pointed self-grooming** (the kit's groom
+pose), wandering off to **knock his water bowl over** (the bowl by
+the porch tips, splash and all, and is set upright after the heat),
+and the occasional **half-hearted mount attempt** — hop on, hold a
+beat, lose interest. The first attempt fires the popup: *"He's
+neutered. There will be NO kittens."* There are never kittens;
+the tests assert the cat count stays two.
+
+- **Player is Willie:** Aggie NPC runs `heat_seek` / `heat_solicit`
+  at him — a moving hazard to dodge while hunting.
+- **Player is Aggie:** an **urge meter** and a *Find Willie*
+  objective show during heat, and every 8–14 s an **involuntary
+  roll-and-yowl interrupt** wobbles her controls for 0.9 s via
+  main's `input_override` seam (brief, never a lockout).
+
+Dignity rules: heat never starts, and its behaviours suspend,
+while the provocation system is mid-flurry/buff, while a cat is
+fainted, while the player cat is on a lap (or held — the `caught`
+meta seam), or while character select is up. Provocation wins any
+overlap and heat resumes after it.
+
 ## Verification
 
     godot --headless --path godot3d res://duo/tests_duo.tscn
+    godot --headless --path godot3d res://duo/tests_heat.tscn
 
 Headless state tests (select builds both options, role swap,
 sizes, sibling pathing, the full provocation simulation both

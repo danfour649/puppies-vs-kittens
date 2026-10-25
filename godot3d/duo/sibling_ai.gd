@@ -20,6 +20,9 @@ var cat: PvKCat = null
 var player_cat: PvKCat = null
 var lounge_spots: Array = []
 ## mode: idle | to_lounge | lounge | wander | dash | flurry | flee
+##   | heat_seek | heat_solicit              (Aggie in heat, NPC)
+##   | heat_stare | heat_groom | heat_knock | heat_knock_done
+##   | heat_mount | heat_mount_hold          (Willie in heat, NPC)
 var mode := "idle"
 ## When false, the cat holds its current mode (tests + cut moments);
 ## provocation commands work regardless.
@@ -28,6 +31,13 @@ var autonomous := true
 var _target := Vector3.ZERO
 var _timer := 0.0
 var _rng := RandomNumberGenerator.new()
+
+## HEAT: one-shot event flag for the HeatSystem to poll ("knock"
+## when Willie reaches the drink and swipes it). Cleared by the
+## reader. Plus the knock target and the mount hop latch.
+var heat_event := ""
+var _heat_target := Vector3.ZERO
+var _heat_hopped := false
 
 
 func _ready() -> void:
@@ -99,6 +109,80 @@ func begin_flee() -> void:
 	mode = "flee"
 
 
+# --- heat commands (the HeatSystem conducts; these just perform) -----------
+
+## Aggie: hunt the player cat down, wherever he is.
+func begin_heat_seek() -> void:
+	if cat != null:
+		cat.set_lounge(false)
+		cat.set_courtship(false)
+	mode = "heat_seek"
+
+
+## Aggie: she caught up with him — roll, present, tail aside.
+func begin_heat_solicit() -> void:
+	mode = "heat_solicit"
+	_timer = _rng.randf_range(2.6, 4.2)
+	if cat != null:
+		cat.set_move_input(Vector3.ZERO, false, false)
+		cat.set_courtship(true)
+
+
+## Willie: the blank stare. Stop dead, look at her, say nothing.
+func begin_heat_stare() -> void:
+	mode = "heat_stare"
+	_timer = 2.2
+	if cat != null:
+		cat.set_move_input(Vector3.ZERO, false, false)
+		cat.set_lounge(false)
+
+
+## Willie: pointed self-grooming, pointedly not looking at her.
+func begin_heat_groom() -> void:
+	mode = "heat_groom"
+	_timer = 2.8
+	if cat != null:
+		cat.set_move_input(Vector3.ZERO, false, false)
+		cat.set_lounge(false)
+		cat.set_act_pose("groom")
+
+
+## Willie: wander off and knock the drink over (target = stand point).
+func begin_heat_knock(target: Vector3) -> void:
+	mode = "heat_knock"
+	_heat_target = target
+	_timer = 9.0
+
+
+## Willie: the half-hearted mount attempt — hop on, hold a beat,
+## remember he has somewhere else to be. Goes nowhere, by design.
+func begin_heat_mount() -> void:
+	mode = "heat_mount"
+	_timer = 9.0
+	_heat_hopped = false
+
+
+## Heat over (or pre-empted): poses off, back to chilling.
+func end_heat() -> void:
+	if cat != null:
+		cat.set_courtship(false)
+		cat.set_act_pose("")
+		cat.set_move_input(Vector3.ZERO, false, false)
+	if mode.begins_with("heat"):
+		mode = "idle"
+		if autonomous:
+			go_lounge_nearest()
+
+
+## The HeatSystem's watchdog: a heat mode that outstayed its welcome.
+func cancel_heat_mode() -> void:
+	if cat != null:
+		cat.set_courtship(false)
+		cat.set_act_pose("")
+	if mode.begins_with("heat"):
+		mode = "idle"
+
+
 # --- brain -------------------------------------------------------------------
 
 func _physics_process(delta: float) -> void:
@@ -128,6 +212,65 @@ func _physics_process(delta: float) -> void:
 		"dash":
 			if player_cat != null and is_instance_valid(player_cat):
 				_drive(player_cat.global_position, 1.0, true, true)
+		"heat_seek":
+			if player_cat != null and is_instance_valid(player_cat):
+				if _flat(cat.global_position, player_cat.global_position) < 0.95:
+					begin_heat_solicit()
+				else:
+					_drive(player_cat.global_position, 0.9, false, true)
+		"heat_solicit":
+			cat.set_move_input(Vector3.ZERO, false, false)
+			if player_cat != null and is_instance_valid(player_cat):
+				_face(player_cat.global_position)
+				if _flat(cat.global_position, player_cat.global_position) > 1.35:
+					cat.set_courtship(false)
+					begin_heat_seek()
+			if _timer <= 0.0:
+				if player_cat != null and is_instance_valid(player_cat) \
+						and _flat(cat.global_position, player_cat.global_position) < 1.1:
+					_timer = _rng.randf_range(2.6, 4.2) # he's still here. Again.
+				else:
+					cat.set_courtship(false)
+					begin_heat_seek()
+		"heat_stare":
+			cat.set_move_input(Vector3.ZERO, false, false)
+			if player_cat != null and is_instance_valid(player_cat):
+				_face(player_cat.global_position)
+			if _timer <= 0.0:
+				mode = "idle"
+		"heat_groom":
+			cat.set_move_input(Vector3.ZERO, false, false)
+			if _timer <= 0.0:
+				cat.set_act_pose("")
+				mode = "idle"
+		"heat_knock":
+			if _drive(_heat_target, 0.8, false):
+				cat.strike()
+				heat_event = "knock"
+				mode = "heat_knock_done"
+				_timer = 1.2
+			elif _timer <= 0.0:
+				mode = "idle"
+		"heat_knock_done":
+			cat.set_move_input(Vector3.ZERO, false, false)
+			if _timer <= 0.0:
+				mode = "idle"
+		"heat_mount":
+			if player_cat != null and is_instance_valid(player_cat):
+				var behind: Vector3 = player_cat.global_position - player_cat.forward_dir() * 0.55
+				if _drive(behind, 0.95, true, true):
+					cat.jump()
+					_heat_hopped = true
+					mode = "heat_mount_hold"
+					_timer = 1.2
+			if _timer <= 0.0 and mode == "heat_mount":
+				mode = "idle" # couldn't get there — disinterest wins early
+		"heat_mount_hold":
+			cat.set_move_input(Vector3.ZERO, false, false)
+			if player_cat != null and is_instance_valid(player_cat):
+				_face(player_cat.global_position)
+			if _timer <= 0.0:
+				mode = "idle"
 		"flurry":
 			if player_cat != null and is_instance_valid(player_cat):
 				if _flat(cat.global_position, player_cat.global_position) > 0.7:

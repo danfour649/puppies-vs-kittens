@@ -50,3 +50,23 @@ on eating/getting into them. Everything else about Glenys is
 inconvenience and comedy.
 
 Status: DONE on branch `glenys` (PR #14, lane closed 2026-10-25). Glenys suite 44/44; full battery green with her live (smoke 52, duo 51, massey 61, basement 53, attic 49, outside 67, occupants 51).
+
+## Heat system (Daniel, 2026-10-24 22:43 — locked spec)
+
+Aggie goes into heat, frequently: ~30–60 s stretches in which she hunts
+Willie down wherever he is and solicits — rolling, presenting, tail
+aside, and a loud synth YOWL. Willie is NEUTERED; his responses are
+comedy (blank stare, pointed self-grooming, wandering off to knock a
+drink over, the occasional half-hearted mount attempt that goes
+nowhere). NO KITTENS, EVER — the game says so in a popup at least
+once. Player-as-Willie: the pursuit is a hazard to dodge. Player-as-
+Aggie: an urge meter, a "Find Willie" objective, and occasional
+involuntary roll-and-yowl interrupts. Cartoonish throughout — comedy
+in behaviour, never anatomy.
+
+- [x] Heat cycle FSM + SiblingAI heat modes (seek / solicit)
+- [x] Yowl synth (MeowAudio variant: louder, longer)
+- [x] Willie NPC response table (stare / groom / knock drink / mount attempt)
+- [x] Player-Aggie urge meter + Find Willie objective + interrupts
+- [x] No-kittens punchline popup (first mount attempt)
+- [x] tests_heat suite; full battery green
