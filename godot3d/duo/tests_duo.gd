@@ -84,7 +84,7 @@ func _run() -> void:
 	check(String(aggie.species_name) == String(duo.chars["aggie"]["name"]), "sibling name comes from character data (got %s)" % aggie.species_name)
 	check(duo.sibling_cat() == aggie, "sibling is the other cat")
 	check(String(aggie.pattern) == "tortoiseshell", "sibling Aggie uses the real tortie pattern (got %s)" % aggie.pattern)
-	check(aggie.mottle_count > 0, "sibling Aggie model has tortie mottle patches (count=%d)" % aggie.mottle_count)
+	check(aggie.mottle_count > 0, "sibling Aggie model has tortie mottle in her coat texture (coverage=%d permille)" % aggie.mottle_count)
 	check(absf(aggie.model_scale - 0.25) < 0.011, "sibling Aggie scale is 0.25 from the characters schema (got %.2f)" % aggie.model_scale)
 	check(String(willie.pattern) == "bicolor" and willie.stripe_count > 0, "Willie is the striped bicolor build (stripes=%d)" % willie.stripe_count)
 	check(absf(willie.model_scale - 0.35) < 0.011, "Willie scale is 0.35 from the characters schema (got %.2f)" % willie.model_scale)
@@ -162,7 +162,7 @@ func _run() -> void:
 	check(game2.cat.model_scale < duo2.willie_cat.model_scale,
 		"player Aggie is smaller than sibling Willie (%.2f < %.2f)" % [game2.cat.model_scale, duo2.willie_cat.model_scale])
 	check(duo2.sibling_cat() == duo2.willie_cat, "sibling is Willie")
-	check(String(game2.cat.pattern) == "tortoiseshell" and game2.cat.mottle_count > 0, "player Aggie is the real tortie model (pattern=%s, mottles=%d)" % [game2.cat.pattern, game2.cat.mottle_count])
+	check(String(game2.cat.pattern) == "tortoiseshell" and game2.cat.mottle_count > 0, "player Aggie is the real tortie model (pattern=%s, mottle coverage=%d)" % [game2.cat.pattern, game2.cat.mottle_count])
 	# Willie NPC paths AROUND the player, not through her.
 	var sib2 = duo2.sibling
 	sib2.autonomous = false

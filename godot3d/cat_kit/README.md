@@ -118,15 +118,19 @@ stay green-gold — the dark-eye ruling is Willie's).
 
 - Palette: base `#241C17` (photo median); mottle orange `#B06E2C`;
   mottle cream `#BFA87A`; eyes `#8A9A3B`; nose near-black brown.
-- Calico technique: a **seeded scatter** of small flattened
-  ellipsoid shells in the two tones, hugging the torso (denser),
-  head, legs and tail over the dark base — irregular sizes,
-  rotations and placement driven by `palette.mottle.seed`
-  (20261024), so she builds identically every run; the smoke test
-  asserts patch count and scatter signature across two builds.
-  Primitives have no fur texture, so the mottle reads as patchy
-  colour rather than individual hairs — the honest limit of the
-  technique.
+- Calico technique (pass 3): the mottling is **baked into her
+  coat texture** — broad blotches, marbling and speckle composed
+  in the texture over the dark base, worn by the torso, head,
+  legs and tail (each part its own seed offset from
+  `palette.mottle.seed`, 20261024), so she builds identically
+  every run; the smoke test asserts the texture's pattern
+  coverage and that it truly reaches both locked tones. Passes 1–2
+  scattered flattened shells over an 8-bit bake; the bake's
+  multipliers clamped at 1.0 against the dark base, so the shells
+  carried all the colour and read as stuck-on patches — pass 3
+  composes in colour space and ships a float multiplier field.
+  The mottle reads as patchy colour rather than individual
+  hairs — the honest limit of smooth primitives.
 - Build: **wiry** — a lean, slim torso (0.30 unit wide vs Willie's
   0.44), narrow chest and haunches, slim legs, thin tail. Not a
   scaled-down Willie: the silhouette differs in the data

@@ -12,9 +12,9 @@ extends CharacterBody3D
 ## Colouring is each cat's own, per Daniel's ruled spec (2026-10-25;
 ## see cat_kit/README.md): Willie is white with #E8AF54 ginger tabby
 ## patches (cap, big saddle, white tail with a ginger underside,
-## faint darker striping) and dark eyes; Aggie is a dark calico — a
-## seeded scatter of orange/cream mottle shells over a warm
-## black-brown base.
+## faint darker striping) and dark eyes; Aggie is a dark calico —
+## orange/cream mottling baked into her coat texture over a warm
+## black-brown base (pass 3: pure texture, no scatter shells).
 ##
 ## Animation is entirely code-driven pose math (idle breathing, gait,
 ## crouch, lounge flop, strike), in the spirit of wildlife.gd's
@@ -91,6 +91,8 @@ var is_poisoned := false ## GLENYS/POISON: the run-ending state (eat_poison)
 var is_held := false ## GLENYS: caught — no movement, no strikes, no harm
 
 # --- structure verification handles (smoke test) ------------------------------
+## PASS 3: Aggie's mottle lives in her baked coat texture; this is the
+## texture's pattern coverage in permille (see _bake_calico_texture).
 var mottle_count := 0
 var stripe_count := 0
 
@@ -99,7 +101,6 @@ var _saddle_patch: MeshInstance3D
 var _eyes: Array = []
 var _ears: Array = [] # [MeshInstance3D, side, base_rotation] — realism pass
 var _tail_base: Array = [] # rest position per tail segment — realism pass
-var _mottles: Array = []
 var _stripes: Array = []
 
 # --- rig ----------------------------------------------------------------------
@@ -243,19 +244,44 @@ func _mat(c: Color, rough := 0.95) -> StandardMaterial3D:
 # contract the smoke test asserts is untouched.
 
 var _coat_mat: Material = null
+var _coat_part_mats: Dictionary = {}
 var _saddle_mat: Material = null
 
+## Baked calico fields, shared by every cat of the same seed in this
+## process: "seed:part offset:size" -> [ImageTexture, coverage in
+## permille]. Same seed, same coat — sharing the field IS the
+## determinism contract, and it keeps a second Aggie from rebaking.
+static var _coat_bake_cache: Dictionary = {}
 
-func _coat_material() -> Material:
+
+## The tortie's coat material for one body part ("body" is the big
+## torso/chest/haunch shells and the default; head/legs/tail get
+## their own seed offsets so the pattern never repeats part-to-part).
+func _coat_material(part := "body") -> Material:
 	if pattern != "tortoiseshell":
 		return null
-	if _coat_mat == null:
-		var m := StandardMaterial3D.new()
-		m.albedo_color = coat
-		m.roughness = 0.95
-		m.albedo_texture = _bake_calico_texture(coat, [mottle_orange, mottle_cream, coat.lightened(0.16), coat.darkened(0.25)])
-		_coat_mat = m
-	return _coat_mat
+	if part == "body":
+		if _coat_mat == null:
+			_coat_mat = _make_coat_material(0, 384)
+		return _coat_mat
+	if not _coat_part_mats.has(part):
+		var off := int({"head": 104729, "legs": 209759, "tail": 314573}.get(part, 17))
+		_coat_part_mats[part] = _make_coat_material(off, 256)
+	return _coat_part_mats[part]
+
+
+func _make_coat_material(seed_off: int, size: int) -> StandardMaterial3D:
+	var key := "%d:%d:%d" % [int(mottle_cfg.get("seed", 1)), seed_off, size]
+	if not _coat_bake_cache.has(key):
+		_coat_bake_cache[key] = _bake_calico_texture(coat, [mottle_orange, mottle_cream, coat.lightened(0.16), coat.darkened(0.25)], seed_off, size)
+	var baked: Array = _coat_bake_cache[key]
+	var m := StandardMaterial3D.new()
+	m.albedo_color = coat
+	m.roughness = 0.95
+	m.albedo_texture = baked[0]
+	if seed_off == 0:
+		mottle_count = int(baked[1])
+	return m
 
 
 func _saddle_material() -> Material:
@@ -300,43 +326,32 @@ func _bake_coat_texture(base: Color, tones: Array, seed_off: int, blobs := 90) -
 	return ImageTexture.create_from_image(img)
 
 
-# --- baked calico texture (REALISM PASS 2) -----------------------------------
-# Pass 1's single layer of mid-size blobs still read as speckle at
-# close range: every patch the same scale, every edge the same
-# hardness. A real calico is marbled at SEVERAL scales at once, so
-# pass 2 bakes three layers over a 256px field:
-#   A) broad elongated blotches (smootherstep shoulders, the softest
-#      falloff), each with satellite splats so no patch stays a
-#      clean ellipse;
-#   B) mid marbling that breaks the blotches up;
-#   C) fine, low-contrast speckle grain over everything.
-# Tone multipliers preserve HUE (channels scaled together under one
-# cap) instead of pass 1's per-channel clamp, which flattened orange
-# and cream into the same bright wash so the two calico colours
-# could not separate in the fur. albedo_color stays the exact
-# palette colour; the field is still a multiplier field around 1.0.
-# A pure function of the mottle seed, like everything else here.
+# --- baked calico texture (REALISM PASS 3) ----------------------------------
+# Pass 2 baked three layers into a multiplier field stored in an
+# 8-bit image — and 8 bits CLAMP at 1.0, so against Aggie's dark
+# base (#241C17) every multiplier above 1.0 was thrown away: the
+# bake could only suppress blue a little, and the most-orange texel
+# it could render was (0.141, 0.110, 0.047) — dark brown. Every
+# scrap of visible orange/cream came from the 95 scatter shells,
+# which is exactly why they still read as stuck-on patches (lane-5
+# pixel probe, 2026-10-25 — pass 2's own ceiling, root-caused).
+# Pass 3 retires the shells and makes the texture the whole coat:
+#   1) compose the pattern in ABSOLUTE colour space over the base
+#      (pass 2's three layers — broad blotches with satellites, mid
+#      marbling, fine speckle — blended TOWARD the true palette
+#      tones, so patch centres genuinely reach #B06E2C / #BFA87A);
+#   2) ship it as a multiplier field in a FLOAT image, where the
+#      ratios a dark base needs (up to ~6x) survive storage.
+# albedo_color stays the exact palette base, so the data-level
+# palette contract (smoke, test_anim) is untouched — and the field
+# preserves hue by construction: multiplier = tone / base renders
+# the tone exactly. A pure function of the mottle seed.
 
 
-## The multiplier that turns `base` toward `tone` with the tone's
-## hue intact: per-channel ratios scaled down TOGETHER when the
-## brightest exceeds `cap`, then held to pass 1's [0.55, 1.5] bounds.
-func _tone_mult(base: Color, tone: Color, cap := 1.5) -> Color:
-	var m := Color(
-		tone.r / maxf(base.r, 0.02),
-		tone.g / maxf(base.g, 0.02),
-		tone.b / maxf(base.b, 0.02))
-	var peak := maxf(m.r, maxf(m.g, m.b))
-	if peak > cap:
-		var k := cap / peak
-		m = Color(m.r * k, m.g * k, m.b * k)
-	return Color(clampf(m.r, 0.55, 1.5), clampf(m.g, 0.55, 1.5), clampf(m.b, 0.55, 1.5))
-
-
-## Elliptical splat with a smootherstep shoulder: a broad, soft
-## blotch rather than a disc. Drawn at wrapped x like _splat so the
+## Blotch in colour space: blend the field TOWARD `tone` with a
+## smootherstep shoulder. Drawn at wrapped x like _splat so the
 ## sphere seam never shows a cut.
-func _splat_ellipse(img: Image, cx: int, cy: int, rx: float, ry: float, rot: float, mult: Color, strength: float, size: int) -> void:
+func _splat_ellipse_tone(img: Image, cx: int, cy: int, rx: float, ry: float, rot: float, tone: Color, strength: float, size: int) -> void:
 	var ext := int(maxf(rx, ry)) + 1
 	var cs := cos(rot)
 	var sn := sin(rot)
@@ -351,21 +366,31 @@ func _splat_ellipse(img: Image, cx: int, cy: int, rx: float, ry: float, rot: flo
 				continue
 			var t := 1.0 - sqrt(q)
 			var fall := t * t * t * (t * (t * 6.0 - 15.0) + 10.0) * strength
-			var px: Color = img.get_pixel(xx, yy)
-			img.set_pixel(xx, yy, Color(
-				lerpf(px.r, px.r * mult.r, fall),
-				lerpf(px.g, px.g * mult.g, fall),
-				lerpf(px.b, px.b * mult.b, fall)))
+			img.set_pixel(xx, yy, img.get_pixel(xx, yy).lerp(tone, fall))
 
 
-func _bake_calico_texture(base: Color, tones: Array) -> ImageTexture:
-	var size := 256
+## Round colour-space splat (satellites + marbling layers).
+func _splat_tone(img: Image, cx: int, cy: int, rad: int, tone: Color, strength: float, size: int) -> void:
+	for yy in range(maxi(0, cy - rad), mini(size, cy + rad + 1)):
+		for xx in range(maxi(0, cx - rad), mini(size, cx + rad + 1)):
+			var d := Vector2(xx - cx, yy - cy).length() / float(rad)
+			if d >= 1.0:
+				continue
+			var fall := (1.0 - d) * (1.0 - d) * strength
+			img.set_pixel(xx, yy, img.get_pixel(xx, yy).lerp(tone, fall))
+
+
+## Compose Aggie's calico; returns [multiplier texture, coverage].
+## Coverage is the permille of the field that ends up mottle rather
+## than base — the pass-3 mottle_count contract (see smoke).
+func _bake_calico_texture(base: Color, tones: Array, seed_off: int, size: int) -> Array:
+	var k := float(size) / 256.0
 	var img := Image.create(size, size, false, Image.FORMAT_RGBA8)
-	img.fill(Color(1, 1, 1))
+	img.fill(base)
 	var rng := RandomNumberGenerator.new()
-	rng.seed = int(mottle_cfg.get("seed", 1)) + 2707
+	rng.seed = int(mottle_cfg.get("seed", 1)) + 2707 + seed_off
 	# Layer A: broad blotches, weighted to the true calico tones.
-	for i in 26:
+	for i in 16:
 		var pick := rng.randf()
 		var tone: Color = tones[3]
 		if pick < 0.42:
@@ -374,15 +399,14 @@ func _bake_calico_texture(base: Color, tones: Array) -> ImageTexture:
 			tone = tones[1]
 		elif pick < 0.90:
 			tone = tones[2]
-		var mult := _tone_mult(base, tone)
 		var cx := rng.randi_range(0, size - 1)
 		var cy := rng.randi_range(0, size - 1)
-		var rx := rng.randf_range(30.0, 62.0)
-		var ry := rx * rng.randf_range(0.45, 0.8)
+		var rx := rng.randf_range(24.0, 48.0) * k
+		var ry := rx * rng.randf_range(0.6, 0.95)
 		var rot := rng.randf() * PI
-		var strength := rng.randf_range(0.30, 0.48)
+		var strength := rng.randf_range(0.65, 0.90)
 		for ox: int in [-size, 0, size]:
-			_splat_ellipse(img, cx + ox, cy, rx, ry, rot, mult, strength, size)
+			_splat_ellipse_tone(img, cx + ox, cy, rx, ry, rot, tone, strength, size)
 		# Satellites: two smaller splats hugging the blotch break its
 		# clean elliptical outline (calico patches cluster).
 		for s in 2:
@@ -390,39 +414,45 @@ func _bake_calico_texture(base: Color, tones: Array) -> ImageTexture:
 			var dist := rx * rng.randf_range(0.35, 0.7)
 			var sx := cx + int(cos(ang) * dist)
 			var sy := cy + int(sin(ang) * dist * 0.7)
-			var srad := int(rx * rng.randf_range(0.3, 0.5))
+			var srad := maxi(2, int(rx * rng.randf_range(0.3, 0.5)))
 			for ox: int in [-size, 0, size]:
-				_splat(img, sx + ox, sy, srad, mult, strength * 0.8, size)
+				_splat_tone(img, sx + ox, sy, srad, tone, strength * 0.8, size)
 	# Layer B: mid marbling across the whole field.
-	for i in 80:
+	for i in 55:
 		var tone_b: Color = tones[rng.randi() % tones.size()]
-		var mult_b := _tone_mult(base, tone_b)
 		var cx_b := rng.randi_range(0, size - 1)
 		var cy_b := rng.randi_range(0, size - 1)
-		var rad_b := rng.randi_range(10, 26)
-		var strength_b := rng.randf_range(0.20, 0.38)
+		var rad_b := maxi(2, int(rng.randf_range(10.0, 26.0) * k))
+		var strength_b := rng.randf_range(0.22, 0.38)
 		for ox: int in [-size, 0, size]:
-			_splat(img, cx_b + ox, cy_b, rad_b, mult_b, strength_b, size)
+			_splat_tone(img, cx_b + ox, cy_b, rad_b, tone_b, strength_b, size)
 	# Layer C: fine speckle grain, deliberately LOW contrast.
 	for i in 300:
 		var tone_c: Color = tones[rng.randi() % tones.size()]
-		var mult_c := _tone_mult(base, tone_c)
 		var cx_c := rng.randi_range(0, size - 1)
 		var cy_c := rng.randi_range(0, size - 1)
-		var rad_c := rng.randi_range(3, 8)
-		var strength_c := rng.randf_range(0.10, 0.20)
+		var rad_c := maxi(1, int(rng.randf_range(3.0, 8.0) * k))
+		var strength_c := rng.randf_range(0.10, 0.22)
 		for ox: int in [-size, 0, size]:
-			_splat(img, cx_c + ox, cy_c, rad_c, mult_c, strength_c, size)
-	# Fur grain: a whisper of per-pixel noise under everything.
-	for i in 1600:
-		var x := rng.randi_range(0, size - 1)
-		var y := rng.randi_range(0, size - 1)
-		var n := rng.randf_range(0.96, 1.04)
-		var px: Color = img.get_pixel(x, y)
-		img.set_pixel(x, y, Color(px.r * n, px.g * n, px.b * n))
-	img.generate_mipmaps()
-	return ImageTexture.create_from_image(img)
-
+			_splat_tone(img, cx_c + ox, cy_c, rad_c, tone_c, strength_c, size)
+	# Convert to the multiplier field (float image: ratios survive),
+	# with a whisper of fur grain, measuring coverage on the way.
+	var fimg := Image.create(size, size, false, Image.FORMAT_RGBAF)
+	var covered := 0
+	for y in size:
+		for x in size:
+			var px: Color = img.get_pixel(x, y)
+			var dd := Vector3(px.r - base.r, px.g - base.g, px.b - base.b).length()
+			if dd > 0.14:
+				covered += 1
+			var n := rng.randf_range(0.97, 1.03)
+			fimg.set_pixel(x, y, Color(
+				clampf(px.r * n / maxf(base.r, 0.02), 0.25, 8.0),
+				clampf(px.g * n / maxf(base.g, 0.02), 0.25, 8.0),
+				clampf(px.b * n / maxf(base.b, 0.02), 0.25, 8.0)))
+	fimg.generate_mipmaps()
+	var coverage := int(round(1000.0 * float(covered) / float(size * size)))
+	return [ImageTexture.create_from_image(fimg), coverage]
 
 func _splat(img: Image, cx: int, cy: int, rad: int, mult: Color, strength: float, size: int) -> void:
 	for yy in range(maxi(0, cy - rad), mini(size, cy + rad + 1)):
@@ -462,6 +492,10 @@ func _ell_m(parent: Node3D, pos: Vector3, dia: Vector3, mat: Material, rot := Ve
 
 
 func _taper(parent: Node3D, pos: Vector3, top_r: float, bot_r: float, h: float, c: Color) -> MeshInstance3D:
+	return _taper_m(parent, pos, top_r, bot_r, h, _mat(c))
+
+
+func _taper_m(parent: Node3D, pos: Vector3, top_r: float, bot_r: float, h: float, mat: Material) -> MeshInstance3D:
 	var key := "%s|%s|%s" % [top_r, bot_r, h]
 	if not _cyls.has(key):
 		var cm := CylinderMesh.new()
@@ -472,7 +506,7 @@ func _taper(parent: Node3D, pos: Vector3, top_r: float, bot_r: float, h: float, 
 		_cyls[key] = cm
 	var mi := MeshInstance3D.new()
 	mi.mesh = _cyls[key]
-	mi.material_override = _mat(c)
+	mi.material_override = mat
 	mi.position = pos
 	parent.add_child(mi)
 	return mi
@@ -488,8 +522,8 @@ func _build_model() -> void:
 	_model.add_child(_body) # Body stays child 0 (GTA contract)
 
 	# Torso mass: main ellipsoid + blended chest + haunches (coat/base).
-	# REALISM PASS 1: a tortie wears her baked coat texture on the big
-	# shells, so the mottle lives IN the fur instead of speckling on.
+	# PASS 3: a tortie wears her baked coat texture on the big shells —
+	# the whole mottle lives IN the fur; there are no scatter shells.
 	var cm := _coat_material()
 	if cm != null:
 		_torso = _ell_m(_body, Vector3(0, 0.55, 0.02), torso_dia, cm)
@@ -541,47 +575,12 @@ func _stripe(parent: Node3D, pos: Vector3, dia: Vector3, rot: Vector3) -> void:
 	stripe_count = _stripes.size()
 
 
-## Aggie's coat: the dark base shows through a seeded scatter of
-## orange/cream mottle shells, denser on the torso, plus her cream
-## throat/chest. Deterministic — same seed, same cat, every build.
+## Aggie's torso extras: her cream throat/chest and an orange accent
+## (designed markings, like Willie's bib — the mottling itself is in
+## the coat texture now). Deterministic: same seed, same cat.
 func _build_tortie_body() -> void:
 	_ell(_body, Vector3(0, 0.585, -0.42), Vector3(0.13, 0.17, 0.09), mottle_cream, Vector3(-0.35, 0, 0))
 	_ell(_body, Vector3(0.05, 0.63, -0.40), Vector3(0.09, 0.11, 0.07), mottle_orange, Vector3(-0.3, 0, 0))
-	var rng := _mottle_rng()
-	_scatter(_body, Vector3(0, 0.55, 0.02), torso_dia * 0.5, int(mottle_cfg.get("torso", 64)), rng, 0.04, 0.11)
-
-
-func _mottle_rng() -> RandomNumberGenerator:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = int(mottle_cfg.get("seed", 1))
-	return rng
-
-
-## Scatter `count` small flattened two-tone shells over an ellipsoid
-## surface (center + radii in the parent's space). Every random draw
-## comes from the caller's seeded RNG, so the whole cat is a pure
-## function of the seed.
-func _scatter(parent: Node3D, center: Vector3, radii: Vector3, count: int, rng: RandomNumberGenerator, smin: float, smax: float) -> void:
-	var tones: Array = [mottle_orange, mottle_cream]
-	for i in count:
-		var theta := rng.randf() * TAU
-		var y := lerpf(-0.7, 1.0, rng.randf()) # bias up: more mottle on top/sides
-		var r := sqrt(maxf(0.0, 1.0 - y * y))
-		var dir := Vector3(cos(theta) * r, y, sin(theta) * r)
-		var pos := center + Vector3(dir.x * radii.x, dir.y * radii.y, dir.z * radii.z)
-		var s := rng.randf_range(smin, smax) * 0.9
-		var tone: Color = tones[rng.randi() % tones.size()]
-		# REALISM PASS 1 (tuning): each patch is muted toward the
-		# dark base and pressed flatter — a tone IN the fur over the
-		# baked coat texture, not a disc stuck on top of it.
-		# REALISM PASS 2: muted deeper again (40-60%) — the layered
-		# bake now carries the pattern, so the shells sit as quiet
-		# accents inside it instead of chips on top. Same number of
-		# RNG draws, so the pass-1 scatter layout is unchanged.
-		tone = tone.lerp(coat, rng.randf_range(0.4, 0.6))
-		var mi := _ell(parent, pos, Vector3(s, s * 0.30, s * rng.randf_range(0.7, 1.1)), tone, Vector3(rng.randf_range(-0.4, 0.4), rng.randf() * TAU, rng.randf_range(-0.4, 0.4)))
-		_mottles.append(mi)
-	mottle_count = _mottles.size()
 
 
 func _build_head() -> void:
@@ -589,19 +588,16 @@ func _build_head() -> void:
 	_head.name = "Head"
 	_head.position = Vector3(0, LEG_H + 0.38, -0.5)
 	_body.add_child(_head)
-	var hcm := _coat_material()
+	var hcm := _coat_material("head")
 	if hcm != null:
 		_ell_m(_head, Vector3(0, 0.03, -0.05), Vector3(0.30, 0.28, 0.29), hcm) # skull
 	else:
 		_ell(_head, Vector3(0, 0.03, -0.05), Vector3(0.30, 0.28, 0.29), coat) # skull
 	_ell(_head, Vector3(0, -0.035, -0.155), Vector3(0.185, 0.135, 0.155), coat) # muzzle
 	if pattern == "tortoiseshell":
-		# Mostly dark face, orange mottling. Each scattered part
-		# re-seeds (seed + part offset) so counts can change
-		# independently without reshuffling the other parts.
-		var rng := RandomNumberGenerator.new()
-		rng.seed = int(mottle_cfg.get("seed", 1)) + 101
-		_scatter(_head, Vector3(0, 0.03, -0.05), Vector3(0.145, 0.135, 0.14), int(mottle_cfg.get("head", 12)), rng, 0.035, 0.08)
+		# Mostly dark face; the orange mottling lives in the skull's
+		# baked coat texture (pass 3) — no scatter shells any more.
+		pass
 	else:
 		# The cap: wraps the top of the head, around the ears, and
 		# down the sides of the cheeks; the face blaze stays white.
@@ -629,24 +625,23 @@ func _leg_key(sx: float, sz: float) -> String:
 
 
 func _build_legs() -> void:
-	var rng: RandomNumberGenerator = null
-	if pattern == "tortoiseshell":
-		rng = _mottle_rng()
-		rng.seed = int(mottle_cfg.get("seed", 1)) + 202
-	var per_leg := 0
-	if pattern == "tortoiseshell":
-		per_leg = int(mottle_cfg.get("legs", 8)) / 4
+	# PASS 3: a tortie's legs wear her baked coat texture too — the
+	# pattern runs down the legs IN the texture, no scatter shells.
+	var leg_mat: Material = _coat_material("legs")
 	for sx: float in [-1.0, 1.0]:
 		for sz: float in [-1.0, 1.0]:
 			var hip := Node3D.new()
 			hip.position = Vector3(sx * 0.12, LEG_H, sz * 0.32)
 			_model.add_child(hip)
 			_hips[_leg_key(sx, sz)] = hip
-			_ell(hip, Vector3.ZERO, Vector3(leg_r_top * 2.3, 0.13, leg_r_top * 2.3), coat)
-			_taper(hip, Vector3(0, -(leg_len * 0.5 + 0.005), 0), leg_r_top, leg_r_bot, leg_len, coat)
-			_ell(hip, Vector3(0, -(leg_len - 0.018), -0.016), Vector3(leg_r_top * 1.6, 0.06, leg_r_top * 2.0), coat)
-			if rng != null and per_leg > 0:
-				_scatter(hip, Vector3(0, -leg_len * 0.48, 0), Vector3(leg_r_top * 1.02, leg_len * 0.40, leg_r_top * 1.02), per_leg, rng, 0.03, 0.055)
+			if leg_mat != null:
+				_ell_m(hip, Vector3.ZERO, Vector3(leg_r_top * 2.3, 0.13, leg_r_top * 2.3), leg_mat)
+				_taper_m(hip, Vector3(0, -(leg_len * 0.5 + 0.005), 0), leg_r_top, leg_r_bot, leg_len, leg_mat)
+				_ell_m(hip, Vector3(0, -(leg_len - 0.018), -0.016), Vector3(leg_r_top * 1.6, 0.06, leg_r_top * 2.0), leg_mat)
+			else:
+				_ell(hip, Vector3.ZERO, Vector3(leg_r_top * 2.3, 0.13, leg_r_top * 2.3), coat)
+				_taper(hip, Vector3(0, -(leg_len * 0.5 + 0.005), 0), leg_r_top, leg_r_bot, leg_len, coat)
+				_ell(hip, Vector3(0, -(leg_len - 0.018), -0.016), Vector3(leg_r_top * 1.6, 0.06, leg_r_top * 2.0), coat)
 
 
 func _build_tail() -> void:
@@ -660,38 +655,26 @@ func _build_tail() -> void:
 		[0.17, 0.016, 0.096], [0.22, 0.027, 0.090], [0.265, 0.041, 0.082],
 		[0.31, 0.057, 0.074], [0.355, 0.079, 0.066], [0.400, 0.114, 0.058],
 	]
-	# Tail segments are the coat colour for both cats (white for
-	# Willie, her dark base for Aggie). Willie's tail (Daniel's ruled
-	# spec, 2026-10-25): WHITE with a ginger underside — a flattened
-	# ginger shell hugging the lower half of each segment. No rings.
-	var seg_pos: Array = []
+	# Tail segments: plain coat for Willie; Aggie's wear her tail
+	# coat texture (dark base with orange running through it).
+	# Willie's tail (Daniel's ruled spec, 2026-10-25): WHITE with a
+	# ginger underside — a flattened ginger shell hugging the lower
+	# half of each segment. No rings.
+	var tail_mat: Material = _coat_material("tail")
 	for i in segs.size():
 		var s: Array = segs[i]
 		var pos := Vector3(0, float(s[1]), float(s[0]))
-		seg_pos.append([pos, float(s[2]) * tail_k])
-		var seg_mi := _ell(_tail, pos, Vector3.ONE * float(s[2]) * tail_k, coat)
+		var seg_mi: MeshInstance3D
+		if tail_mat != null:
+			seg_mi = _ell_m(_tail, pos, Vector3.ONE * float(s[2]) * tail_k, tail_mat)
+		else:
+			seg_mi = _ell(_tail, pos, Vector3.ONE * float(s[2]) * tail_k, coat)
 		_tail_segs.append([seg_mi, float(s[2]) * tail_k])
 		_tail_base.append(pos)
 		if pattern != "tortoiseshell":
 			var dia := float(s[2]) * tail_k
 			var under := _ell(_tail, pos + Vector3(0, -dia * 0.32, 0), Vector3(dia * 0.94, dia * 0.48, dia * 0.94), ginger)
 			_tail_underside.append(under)
-	if pattern == "tortoiseshell":
-		# Orange running through the dark tail (photo truth).
-		var rng := _mottle_rng()
-		rng.seed = int(mottle_cfg.get("seed", 1)) + 303
-		var tones: Array = [mottle_orange, mottle_cream]
-		for i in int(mottle_cfg.get("tail", 9)):
-			var sp: Array = seg_pos[rng.randi() % seg_pos.size()]
-			var c: Vector3 = sp[0]
-			var rad: float = float(sp[1]) * 0.5
-			var ang := rng.randf() * TAU
-			var pos := c + Vector3(cos(ang) * rad, sin(ang) * rad, rng.randf_range(-0.02, 0.02))
-			var s := rng.randf_range(0.035, 0.07)
-			var tone: Color = tones[rng.randi() % tones.size()]
-			_mottles.append(_ell(_tail, pos, Vector3(s, s * 0.45, s * 0.9), tone, Vector3(0, 0, rng.randf_range(-0.4, 0.4))))
-		mottle_count = _mottles.size()
-
 
 
 # --- controller -----------------------------------------------------------------

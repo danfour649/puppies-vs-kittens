@@ -140,10 +140,33 @@ func _run() -> void:
 	var want_base := Color(float(j_base[0]), float(j_base[1]), float(j_base[2]))
 	var a_torso := (aggie._torso.material_override as StandardMaterial3D).albedo_color
 	check(a_torso.is_equal_approx(want_base), "aggie torso is the calico base (got %s)" % a_torso)
+	var j_orange: Array = apal.get("mottle_orange", [])
+	var want_orange := Color(float(j_orange[0]), float(j_orange[1]), float(j_orange[2]))
+	var j_cream: Array = apal.get("mottle_cream", [])
+	var want_cream := Color(float(j_cream[0]), float(j_cream[1]), float(j_cream[2]))
 	var j_aeye: Array = apal.get("eye", [])
 	var want_aeye := Color(float(j_aeye[0]), float(j_aeye[1]), float(j_aeye[2]))
 	check(aggie.eye_color.is_equal_approx(want_aeye), "aggie eyes green-gold from her own palette (got %s)" % aggie.eye_color)
-	check(aggie.mottle_count > 0, "aggie mottle patches built (%d)" % aggie.mottle_count)
+	# PASS 3 contract: the mottle lives in the baked coat texture and
+	# mottle_count is its pattern coverage in permille — substantial
+	# mottling, but the dark base must still show through.
+	check(aggie.mottle_count >= 200 and aggie.mottle_count <= 800, "aggie coat texture carries the mottle (coverage %d permille)" % aggie.mottle_count)
+	# The texture must actually REACH the locked tones. Pass 2's 8-bit
+	# bake clamped its multipliers at 1.0 and could render nothing
+	# brighter than the base — dark brown pretending to be orange
+	# (the scatter shells carried the colour). Reconstruct texel
+	# albedos and demand a near-match to each locked tone.
+	var atex := ((aggie._torso.material_override as StandardMaterial3D).albedo_texture as ImageTexture).get_image()
+	var best_o := 10.0
+	var best_c := 10.0
+	for gx in range(0, atex.get_width(), 3):
+		for gy in range(0, atex.get_height(), 3):
+			var tx := atex.get_pixel(gx, gy)
+			var alb := Color(want_base.r * tx.r, want_base.g * tx.g, want_base.b * tx.b)
+			best_o = minf(best_o, Vector3(alb.r - want_orange.r, alb.g - want_orange.g, alb.b - want_orange.b).length())
+			best_c = minf(best_c, Vector3(alb.r - want_cream.r, alb.g - want_cream.g, alb.b - want_cream.b).length())
+	check(best_o < 0.12, "aggie coat texture reaches her locked orange (closest %.3f)" % best_o)
+	check(best_c < 0.15, "aggie coat texture reaches her locked cream (closest %.3f)" % best_c)
 	check(aggie.torso_dia.x < cat.torso_dia.x * 0.8, "aggie build is wiry, not a scaled Willie (torso %.2f vs %.2f)" % [aggie.torso_dia.x, cat.torso_dia.x])
 	# --- Aggie's lounge system, driven deterministically. ---
 	# RULING (coordinator, PR #13): this replaces the old one-shot
@@ -186,19 +209,24 @@ func _run() -> void:
 	check(String(achar.get("provocation_trigger", "")) == "willie_meowing", "character data: willie meowing provokes aggie")
 	check(bool(achar.get("wins_vs_willie", false)), "character data: aggie always beats willie")
 	check(absf(float(achar.get("weight_vs_willie", 0.0)) - 0.5) < 0.001, "character data: aggie weighs half of willie")
-	# Determinism: a fresh Aggie build scatters identically.
+	# Determinism: a fresh Aggie build bakes identically (same seed,
+	# same coat field — the pass-3 successor of the scatter signature).
 	var ag2 = CatScript.new()
 	ag2.set_character("aggie")
 	add_child(ag2)
 	await frames(3)
-	check(ag2.mottle_count == aggie.mottle_count, "aggie mottle count deterministic (%d vs %d)" % [ag2.mottle_count, aggie.mottle_count])
+	check(ag2.mottle_count == aggie.mottle_count, "aggie mottle coverage deterministic (%d vs %d)" % [ag2.mottle_count, aggie.mottle_count])
+	var img1 := ((aggie._torso.material_override as StandardMaterial3D).albedo_texture as ImageTexture).get_image()
+	var img2 := ((ag2._torso.material_override as StandardMaterial3D).albedo_texture as ImageTexture).get_image()
 	var sig1 := 0.0
-	for mi in aggie._mottles:
-		sig1 += mi.position.x * 3.0 + mi.position.y * 5.0 + mi.position.z * 7.0
 	var sig2 := 0.0
-	for mi in ag2._mottles:
-		sig2 += mi.position.x * 3.0 + mi.position.y * 5.0 + mi.position.z * 7.0
-	check(absf(sig1 - sig2) < 0.001, "aggie mottle scatter identical across builds")
+	for gx in range(0, img1.get_width(), 7):
+		for gy in range(0, img1.get_height(), 7):
+			var p1 := img1.get_pixel(gx, gy)
+			var p2 := img2.get_pixel(gx, gy)
+			sig1 += p1.r * 3.0 + p1.g * 5.0 + p1.b * 7.0
+			sig2 += p2.r * 3.0 + p2.g * 5.0 + p2.b * 7.0
+	check(absf(sig1 - sig2) < 0.001, "aggie coat texture identical across builds")
 	ag2.queue_free()
 	print("SMOKE DONE: %d passed, %d failed" % [_pass, _fail])
 	get_tree().quit(1 if _fail > 0 else 0)
