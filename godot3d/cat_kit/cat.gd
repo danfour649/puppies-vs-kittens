@@ -523,9 +523,12 @@ func _build_bicolor_body() -> void:
 
 
 func _stripe(parent: Node3D, pos: Vector3, dia: Vector3, rot: Vector3) -> void:
-	# REALISM PASS 1: stripes sit 30% toward the ginger — a tone in the
-	# fur, not ribs laid over it (the baked saddle shading does the rest).
-	_stripes.append(_ell(parent, pos, dia, ginger_dark.lerp(ginger, 0.30), rot))
+	# Stripes wear the derived ginger_dark exactly. (Realism pass 1 sat
+	# them 30% toward the ginger, but that softening belonged to the
+	# photo-tuned palette; under Daniel's 2026-10-25 ruling the spec-lock
+	# wins — tests/smoke.gd locks the stripe albedo to ginger_dark. The
+	# baked saddle shading still does the tonal blending.)
+	_stripes.append(_ell(parent, pos, dia, ginger_dark, rot))
 	stripe_count = _stripes.size()
 
 
