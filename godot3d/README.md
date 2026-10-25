@@ -93,6 +93,31 @@ is `docs/massey-zones.md` — read it before touching a zone.
 - **Mouse drag** — orbit camera, **wheel** — zoom
 - **Touch** — virtual joystick (bottom-left) + PAW and POUNCE buttons (bottom-right) + MEOW button + OBJECTIVES button
 
+## One night in the basement
+
+A complete night, separate from the yard: `zones/basement/night_hunt.tscn`.
+The HTML5 build opens here. Desktop play of the full house is unchanged.
+
+Willie, one seed-built basement (the years Glenys kept — notes, the
+teapot, a folded jumper — stacked into narrow paths, tall piles and
+a couple of mouse pockets). Catch three mice. Bring one to Glenys
+at the stairs. She is glad of it.
+
+- **Enter** or **Begin the night** — start
+- **WASD / arrows** — move (camera-relative). **Shift** sprint. **Ctrl / C** stalk
+- **F** — paw. **Space** — jump, or pounce in the air
+- **M** — meow (the mice hear it)
+- **Right-drag** — look. **Wheel** — zoom. **R** — the night over again
+- Touch: joystick, **PAW**, **POUNCE**
+
+Mice, the window flock and Aggie (the other cat, at dusk on the
+high boxes) all think with `ai/` — sight, hearing, a cat-scent
+map, one state machine. The basement generator is
+`zones/basement/hoarder_generator.gd`; it writes the same 14×10
+legend the hand-authored maze uses, so a level is playable in
+exactly that sense: entrance reaches the heart, the alcove only
+through the gap, every nest pocket reachable.
+
 ## Run / export
 
 Open `godot3d/` in Godot 4.7, or headless:

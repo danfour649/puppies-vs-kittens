@@ -87,6 +87,12 @@ var _meshes := {}
 
 
 func _ready() -> void:
+	# The HTML5 build is the one-night basement. Desktop, the editor
+	# and the suites keep the full house — web is the only feature
+	# that takes this branch, and headless tests do not set it.
+	if OS.has_feature("web"):
+		call_deferred("_boot_web_slice")
+		return
 	_rng.randomize()
 	_build_environment()
 	_build_lights()
@@ -170,6 +176,10 @@ func _static_box(parent: StaticBody3D, size: Vector3, pos: Vector3) -> void:
 
 
 # --- world -------------------------------------------------------------------
+
+func _boot_web_slice() -> void:
+	get_tree().change_scene_to_file("res://zones/basement/night_hunt.tscn")
+
 
 func _build_environment() -> void:
 	var env := Node3D.new()

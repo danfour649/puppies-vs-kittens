@@ -21,4 +21,7 @@ run basement zones/basement/tests_basement.tscn
 run attic zones/attic/tests_attic.tscn
 run outside zones/outside/tests_outside.tscn
 run occupants occupants/tests_occupants.tscn
+run ai ai/tests_ai.tscn
+run hoarder zones/basement/tests_hoarder.tscn
+run night zones/basement/tests_night.tscn
 echo "ALL DONE" >> "$OUT/summary.txt"
