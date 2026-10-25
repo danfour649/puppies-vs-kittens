@@ -66,6 +66,13 @@ const ENTRY_POS := Vector3(4.35, 0.05, 5.35) ## stair foot, facing north
 const HEART_POS := Vector3(1.0, 0, -2.0) ## maze centre: the rat den
 const LITTER_POS := Vector3(-7.35, 0, -3.9) ## NW corner
 const GIFT_POS := Vector3(-6.76, 0, -3.76) ## beside the litter box. Not in it.
+## RAT POISON (Glenys spec extension, Daniel 2026-10-24 23:32): old
+## bait in the SW perimeter corner — OUTSIDE the maze grid, off the
+## entry->heart path and every other route. Visible and labelled;
+## lethal ONLY on contact with the bait itself (the cat must get
+## INTO it): eat_poison, the run-ender. Walking past is safe.
+const POISON_POS := Vector3(-7.45, 0, 5.45) ## SW corner, perimeter strip
+const POISON_RADIUS := 0.32 ## the bait tray's own footprint, nothing more
 const SHELF_UNITS: Array = [ ## [position, rot_y] — boards face local +z
 	[Vector3(-5.0, 0, -5.45), 0.0],
 	[Vector3(0.5, 0, -5.45), 0.0],
@@ -116,6 +123,8 @@ signal cat_respawned
 @export var track_cat_hp := true ## the hub can switch this off and own HP itself
 
 var player_cat: PvKCat = null
+var dressing_count := 0 ## GLENYS dressing pass: clutter props built (tests read this)
+var _poison_fired := false
 var rats: Array = []
 var spiders: Array = []
 var ghosts: Array = []
@@ -494,6 +503,8 @@ func _build_props() -> void:
 	_vis_cyl(self, Vector3(0, 2.12, -5.36), 0.04, 15.6, metal.darkened(0.1), Vector3(0, 0, PI * 0.5), 0.7)
 	_vis_cyl(self, Vector3(7.72, 2.05, 0), 0.06, 11.0, metal, Vector3(PI * 0.5, 0, 0), 0.7)
 	_build_litter_corner()
+	_build_poison()
+	_build_dressing()
 
 
 func _build_litter_corner() -> void:
@@ -512,6 +523,119 @@ func _build_litter_corner() -> void:
 	add_child(gift)
 	_vis_sphere(gift, Vector3.ZERO, Vector3(0.11, 0.05, 0.09), Color(0.30, 0.19, 0.09), 1.0)
 	_vis_sphere(gift, Vector3(0.07, -0.005, 0.03), Vector3(0.06, 0.032, 0.05), Color(0.26, 0.16, 0.08), 1.0)
+
+
+## The rat poison bait (Glenys extension): a tipped old bait box,
+## its tray, and spilled pellets in the SW perimeter corner. It is
+## LABELLED in-world — a cat player can read exactly what it is —
+## and it is the only lethal thing down here.
+func _build_poison() -> void:
+	var g := Node3D.new()
+	g.name = "RatPoison"
+	g.position = POISON_POS
+	add_child(g)
+	# The bait tray — the contact footprint (POISON_RADIUS) is this.
+	_vis_box(g, Vector3(0.52, 0.03, 0.40), Vector3(0, 0.015, 0), Color(0.16, 0.15, 0.13))
+	# Poison pellets, an unwholesome green, heaped in the tray.
+	var pellet := Color(0.36, 0.58, 0.24)
+	for p: Vector3 in [Vector3(-0.12, 0.045, -0.06), Vector3(0.02, 0.05, 0.05), Vector3(0.13, 0.045, -0.09), Vector3(-0.04, 0.055, -0.12), Vector3(0.09, 0.04, 0.11)]:
+		_vis_sphere(g, p, Vector3(0.075, 0.05, 0.075), pellet, 1.0)
+	# A few spilled on the concrete beside the tray (visual only —
+	# the lethal footprint stays the tray itself).
+	for p: Vector3 in [Vector3(0.38, 0.02, 0.18), Vector3(0.44, 0.02, -0.05)]:
+		_vis_sphere(g, p, Vector3(0.05, 0.035, 0.05), pellet, 1.0)
+	# The old box it came in, tipped against the wall, warning stripe.
+	_vis_box(g, Vector3(0.36, 0.26, 0.10), Vector3(-0.18, 0.13, -0.33), Color(0.55, 0.48, 0.20), 0.35)
+	_vis_box(g, Vector3(0.37, 0.07, 0.105), Vector3(-0.18, 0.20, -0.33), Color(0.75, 0.28, 0.14), 0.35)
+	# The label: readable from across the corner, because fair's fair.
+	var label := Label3D.new()
+	label.text = "RAT POISON"
+	label.font_size = 64
+	label.pixel_size = 0.0035
+	label.modulate = Color(0.95, 0.35, 0.18)
+	label.outline_size = 8
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.position = Vector3(0, 0.55, -0.1)
+	g.add_child(label)
+
+
+## DRESSING (Glenys extension, Daniel 2026-10-24): more old tools
+## and stored junk — a full workbench, paint cans, shelf jars, wall
+## tools, a ladder, a hose. HARD CONSTRAINT: none of it touches the
+## maze. Every piece sits in the perimeter strip, on a shelf board,
+## or on the workbench (the one new solid, also perimeter) — the
+## MAP grid, the entrance->heart walk and the Aggie gap are exactly
+## as they were. dressing_count lets the tests prove it landed.
+func _build_dressing() -> void:
+	var wood := Color(0.40, 0.29, 0.16)
+	var metal := Color(0.45, 0.47, 0.50)
+	# The workbench: west wall, between the litter corner and the
+	# west shelves. Top + the lane's one dressing solid.
+	_vis_box(self, Vector3(0.55, 0.07, 1.9), Vector3(-7.68, 0.80, 1.2), wood.darkened(0.1))
+	_solid(Vector3(0.55, 0.07, 1.9), Vector3(-7.68, 0.80, 1.2))
+	for dz: float in [-0.85, 0.85]:
+		_vis_box(self, Vector3(0.5, 0.78, 0.08), Vector3(-7.68, 0.39, 1.2 + dz), wood.darkened(0.25))
+	dressing_count += 1
+	# Tools ON the bench: hammer, saw, wrench, oil can, a jar of nails.
+	_vis_cyl(self, Vector3(-7.70, 0.86, 0.75), 0.02, 0.30, wood.lightened(0.25), Vector3(PI * 0.5, 0, 0.3))
+	_vis_box(self, Vector3(0.16, 0.07, 0.06), Vector3(-7.70, 0.875, 0.62), metal.darkened(0.2))
+	dressing_count += 1 # hammer
+	_vis_box(self, Vector3(0.03, 0.02, 0.55), Vector3(-7.66, 0.845, 1.35), metal.lightened(0.15))
+	_vis_box(self, Vector3(0.07, 0.09, 0.16), Vector3(-7.66, 0.87, 1.62), Color(0.62, 0.16, 0.12))
+	dressing_count += 1 # saw + grip
+	_vis_box(self, Vector3(0.05, 0.03, 0.24), Vector3(-7.60, 0.85, 1.95), metal.darkened(0.05), 0.5)
+	dressing_count += 1 # wrench
+	_vis_cyl(self, Vector3(-7.78, 0.93, 2.15), 0.055, 0.19, Color(0.55, 0.20, 0.14), Vector3.ZERO, 0.4)
+	_vis_cyl(self, Vector3(-7.78, 1.02, 2.15), 0.012, 0.09, metal, Vector3(0, 0, 0.5), 0.5)
+	dressing_count += 1 # oil can
+	_vis_cyl(self, Vector3(-7.55, 0.90, 0.35), 0.05, 0.13, Color(0.75, 0.78, 0.72), Vector3.ZERO, 0.15)
+	dressing_count += 1 # jar
+	# Paint cans, NE perimeter corner: two up, one tipped.
+	_vis_cyl(self, Vector3(7.55, 0.16, -5.60), 0.13, 0.32, Color(0.62, 0.58, 0.50), Vector3.ZERO, 0.35)
+	_vis_cyl(self, Vector3(7.25, 0.13, -5.72), 0.11, 0.26, Color(0.30, 0.42, 0.55), Vector3.ZERO, 0.35)
+	_vis_cyl(self, Vector3(7.62, 0.11, -5.18), 0.12, 0.30, Color(0.55, 0.30, 0.16), Vector3(PI * 0.5, 0, 0.2), 0.35)
+	dressing_count += 3
+	# Jars + a spray bottle on the north shelf boards.
+	for jx: float in [-5.25, -4.95, -4.68]:
+		_vis_cyl(self, Vector3(jx, 1.03, -5.45), 0.045, 0.13, Color(0.78, 0.80, 0.74), Vector3.ZERO, 0.15)
+		dressing_count += 1
+	_vis_cyl(self, Vector3(0.32, 1.02, -5.45), 0.04, 0.17, Color(0.25, 0.45, 0.65), Vector3.ZERO, 0.3)
+	_vis_box(self, Vector3(0.05, 0.06, 0.05), Vector3(0.32, 1.13, -5.45), Color(0.85, 0.80, 0.70))
+	dressing_count += 1 # spray bottle
+	# Wall tools on the east wall: shovel + rake, hung high.
+	_vis_cyl(self, Vector3(7.86, 1.25, -2.9), 0.022, 1.15, wood.lightened(0.2), Vector3(0, 0, 0.06))
+	_vis_box(self, Vector3(0.04, 0.34, 0.20), Vector3(7.86, 0.60, -2.88), metal.darkened(0.15))
+	dressing_count += 1 # shovel
+	_vis_cyl(self, Vector3(7.86, 1.30, -3.35), 0.02, 1.05, wood.lightened(0.2), Vector3(0, 0, -0.05))
+	_vis_box(self, Vector3(0.04, 0.05, 0.34), Vector3(7.86, 0.80, -3.37), metal.darkened(0.1))
+	dressing_count += 1 # rake
+	# A ladder leaning on the north wall, west of the heart.
+	for dx: float in [-0.22, 0.22]:
+		_vis_box(self, Vector3(0.05, 2.0, 0.05), Vector3(-2.5 + dx, 1.02, -5.80), wood.darkened(0.05), 0.0)
+	for i in 4:
+		_vis_box(self, Vector3(0.44, 0.045, 0.045), Vector3(-2.5, 0.35 + i * 0.42, -5.79), wood)
+	dressing_count += 1
+	# A coiled hose on the west wall.
+	var hose := MeshInstance3D.new()
+	var tm := TorusMesh.new()
+	tm.inner_radius = 0.16
+	tm.outer_radius = 0.26
+	hose.mesh = tm
+	hose.material_override = _mat(Color(0.20, 0.32, 0.20), 1.0)
+	hose.position = Vector3(-7.88, 1.05, -0.9)
+	hose.rotation = Vector3(0, PI * 0.5, 0)
+	add_child(hose)
+	dressing_count += 1
+	# Cardboard pile on the south strip, west of the entry stairs.
+	_vis_box(self, Vector3(0.8, 0.4, 0.7), Vector3(0.4, 0.2, 5.6), _cardboard(31))
+	_vis_box(self, Vector3(0.65, 0.35, 0.6), Vector3(0.45, 0.57, 5.58), _cardboard(32), 0.3)
+	_vis_box(self, Vector3(0.5, 0.3, 0.5), Vector3(-0.35, 0.15, 5.62), _cardboard(33), -0.2)
+	dressing_count += 3
+
+
+## The bait's local position (tests + the Glenys README read this).
+func poison_pos() -> Vector3:
+	return POISON_POS
 
 
 func _build_lights() -> void:
@@ -817,6 +941,15 @@ func _process(delta: float) -> void:
 				toy_collected.emit(toy.toy_id, toys_collected, toys.size())
 				if objective_done("lost_toys"):
 					_complete_objective("lost_toys")
+	# RAT POISON: contact with the bait itself — and nothing else
+	# down here — is lethal. The check runs in LOCAL space, so it
+	# can only fire for a cat physically in this room, and the
+	# radius is the tray's own footprint: beside it is safe.
+	if not _poison_fired and player_cat != null and is_instance_valid(player_cat) and player_cat.has_method("eat_poison"):
+		var lp := to_local(player_cat.global_position)
+		if absf(lp.y) < 0.9 and Vector2(lp.x - POISON_POS.x, lp.z - POISON_POS.z).length() <= POISON_RADIUS:
+			_poison_fired = true
+			player_cat.eat_poison("rat_poison")
 	# Standalone follow camera.
 	if _cam != null and player_cat != null:
 		var want := player_cat.global_position + Vector3(0, 1.6, 2.4)

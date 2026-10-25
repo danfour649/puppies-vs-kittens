@@ -23,6 +23,7 @@ signal paw_swiped
 signal health_changed(hp: float, max_hp: float)
 signal fainted(cat: PvKCat)
 signal hissed(cat: PvKCat)
+signal poisoned(cat: PvKCat, source: String)
 
 const DATA_PATH := "res://cat_kit/cat_species.json"
 const LEG_H := 0.35 # unit-space leg anchor height (GTA stray_cat leg_h)
@@ -76,6 +77,8 @@ var stamina := 100.0
 var is_lounging := false
 var hp := 120.0
 var is_fainted := false
+var is_poisoned := false ## GLENYS/POISON: the run-ending state (eat_poison)
+var is_held := false ## GLENYS: caught — no movement, no strikes, no harm
 
 # --- structure verification handles (smoke test) ------------------------------
 var mottle_count := 0
@@ -683,7 +686,7 @@ func set_move_input(dir: Vector3, sprint: bool, stalk: bool) -> void:
 
 
 func strike() -> bool:
-	if _strike_t >= 0.0 or _strike_cd > 0.0 or is_lounging or is_fainted or _hiss_t >= 0.0:
+	if _strike_t >= 0.0 or _strike_cd > 0.0 or is_lounging or is_fainted or _hiss_t >= 0.0 or is_held or is_poisoned:
 		return false
 	_strike_t = 0.0
 	_swipe_fired = false
@@ -719,7 +722,7 @@ func paw_point() -> Vector3:
 ## A real jump, for shelves and platforms. Standard platforming
 ## ledge in the Massey house is 0.5 m; this apex clears ~0.8 m.
 func jump() -> bool:
-	if not is_on_floor() or is_lounging or is_fainted or _hiss_t >= 0.0:
+	if not is_on_floor() or is_lounging or is_fainted or _hiss_t >= 0.0 or is_held or is_poisoned:
 		return false
 	velocity.y = jump_velocity
 	return true
@@ -789,9 +792,37 @@ func heal(amount: float) -> float:
 func heal_full() -> void:
 	hp = max_hp
 	is_fainted = false
+	is_poisoned = false
+	is_held = false
 	_invuln_t = 0.0
 	set_lounge(false)
 	health_changed.emit(hp, max_hp)
+
+
+## GLENYS has him: held up in her arms. No movement, no strikes —
+## and no harm, ever: a grab costs control and time, not HP. The
+## Glenys system owns the hold/release; this is just the cat side.
+func set_held(on: bool) -> void:
+	is_held = on
+	if on:
+		velocity = Vector3.ZERO
+
+
+## POISON — the game's ONLY lethal act, and it is always the cat's
+## own doing: eating the chocolate Glenys offers, or getting into
+## the basement rat poison. This is NOT a faint — no hub respawn,
+## no life spent; the game ends the run (main listens for the
+## `poisoned` signal). Damage never routes here: take_damage can
+## only faint. Nothing else may call this.
+func eat_poison(source: String) -> bool:
+	if is_poisoned or is_fainted:
+		return false
+	is_poisoned = true
+	is_held = false
+	velocity = Vector3.ZERO
+	set_lounge(true) # the flop; main decides what it means
+	poisoned.emit(self, source)
+	return true
 
 
 func _faint() -> void:
@@ -805,7 +836,7 @@ func _faint() -> void:
 ## low), HISS_TIME of control lock, NO damage. Emits hissed (the
 ## audio hook). Returns false if it couldn't start.
 func hiss() -> bool:
-	if _hiss_t >= 0.0 or is_lounging or is_fainted:
+	if _hiss_t >= 0.0 or is_lounging or is_fainted or is_held or is_poisoned:
 		return false
 	_hiss_t = 0.0
 	hissed.emit(self)
@@ -840,7 +871,7 @@ func _physics_process(delta: float) -> void:
 	var want := Vector3.ZERO
 	var speed := 0.0
 	var moving := false
-	if _input_dir.length() > 0.05 and not is_lounging and not is_fainted and _hiss_t < 0.0 and _strike_t < 0.0:
+	if _input_dir.length() > 0.05 and not is_lounging and not is_fainted and not is_held and not is_poisoned and _hiss_t < 0.0 and _strike_t < 0.0:
 		moving = true
 		var sprinting := _input_sprint and stamina > 1.0
 		speed = (stalk_speed if _input_stalk else (sprint_speed if sprinting else walk_speed)) * speed_multiplier

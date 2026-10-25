@@ -22,6 +22,7 @@ const SCORE_EVENTS := {
 	"lap_purr": 5,
 	"ankle_shoo": 10,
 	"lap_full_heal": 0,
+	"glenys_escape": 25, ## GLENYS lane: wriggling free of her grab
 }
 
 var items: Array = [] # {id, zone, title, target, count, done, kill_species}
