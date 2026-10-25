@@ -109,6 +109,11 @@ func _coat() -> Color:
 	return COAT_ALPHA if is_alpha else COAT
 
 
+var _legs: Array = [] # REALISM PASS 1: [pivot, lx, lz] per leg
+var _scurry_ph := 0.0 # REALISM PASS 1
+var _tail_pivot: Node3D = null # REALISM PASS 1
+
+
 func _build_model() -> void:
 	var coat := _coat()
 	var dark := coat.darkened(0.35)
@@ -126,12 +131,22 @@ func _build_model() -> void:
 	for ex: float in [-0.09, 0.09]:
 		_box(_body, Vector3(0.06, 0.10, 0.03), Vector3(ex, leg_h + 0.60, -0.52), dark) # ears
 		_box(_body, Vector3(0.045, 0.045, 0.02), Vector3(ex * 0.72, leg_h + 0.44, -0.72), EYE) # eyes
-	_box(_body, Vector3(0.035, 0.035, 0.70), Vector3(0, leg_h + 0.12, 0.78), Color(0.62, 0.45, 0.42)) # tail
+	# REALISM PASS 1: the tail hangs from a base pivot so it can drag
+	# and sway behind the scurry instead of riding as a fixed plank.
+	_tail_pivot = Node3D.new()
+	_tail_pivot.position = Vector3(0, leg_h + 0.12, 0.43)
+	_body.add_child(_tail_pivot)
+	_box(_tail_pivot, Vector3(0.035, 0.035, 0.70), Vector3(0, 0, 0.35), Color(0.62, 0.45, 0.42)) # tail
 	if is_alpha:
 		_box(_body, Vector3(0.40, 0.10, 0.70), Vector3(0, leg_h + 0.40, 0.05), coat.lightened(0.25)) # mane ridge
 	for lx: float in [-0.13, 0.13]:
 		for lz: float in [-0.34, 0.34]:
-			_box(_model, Vector3(0.09, leg_h, 0.09), Vector3(lx, leg_h * 0.5, lz), dark)
+			# REALISM PASS 1: hip pivots for the scurry stride.
+			var pivot := Node3D.new()
+			pivot.position = Vector3(lx, leg_h, lz)
+			_model.add_child(pivot)
+			_box(pivot, Vector3(0.09, leg_h, 0.09), Vector3(0, -leg_h * 0.5, 0), dark)
+			_legs.append([pivot, lx, lz])
 
 
 func _build_hp_bar() -> void:
@@ -351,3 +366,13 @@ func _process(delta: float) -> void:
 		_body.position.y = absf(sin(_phase)) * 0.10
 	else:
 		_body.position.y = 0.0
+	# REALISM PASS 1: scurry — fast small diagonal strides, and the
+	# tail dragging a lazy half-frequency S behind them.
+	if spd > 0.1:
+		_scurry_ph += delta * (16.0 + spd * 6.0)
+	var samp := clampf(spd * 0.22, 0.0, 0.5)
+	for lg: Array in _legs:
+		var off := 0.0 if (float(lg[1]) < 0.0) == (float(lg[2]) < 0.0) else PI
+		(lg[0] as Node3D).rotation.x = sin(_scurry_ph + off) * samp
+	if _tail_pivot != null:
+		_tail_pivot.rotation.y = sin(_scurry_ph * 0.5 - 0.8) * 0.22 * (1.0 if spd > 0.1 else 0.3)

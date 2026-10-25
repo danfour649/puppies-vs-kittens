@@ -84,6 +84,8 @@ var stripe_count := 0
 var _torso: MeshInstance3D
 var _saddle_patch: MeshInstance3D
 var _eyes: Array = []
+var _ears: Array = [] # [MeshInstance3D, side, base_rotation] — realism pass
+var _tail_base: Array = [] # rest position per tail segment — realism pass
 var _mottles: Array = []
 var _stripes: Array = []
 
@@ -217,9 +219,94 @@ func _mat(c: Color, rough := 0.95) -> StandardMaterial3D:
 	return _mats[key]
 
 
+# --- baked coat textures (REALISM PASS 1) ------------------------------------
+# Flat colour + hard-edged shells read as "speckles on a cat". Baking
+# the pattern into the big shells' albedo puts soft colour IN the fur;
+# the shells stay on top as deeper accents. Everything is a pure
+# function of the character's mottle seed — same seed, same coat.
+# albedo_color stays the exact palette colour (the texture carries
+# only near-1.0 variation around it), so the data-level palette
+# contract the smoke test asserts is untouched.
+
+var _coat_mat: Material = null
+var _saddle_mat: Material = null
+
+
+func _coat_material() -> Material:
+	if pattern != "tortoiseshell":
+		return null
+	if _coat_mat == null:
+		var m := StandardMaterial3D.new()
+		m.albedo_color = coat
+		m.roughness = 0.95
+		m.albedo_texture = _bake_coat_texture(coat, [mottle_orange, mottle_cream, coat.lightened(0.16), coat.darkened(0.25)], 707, 150)
+		_coat_mat = m
+	return _coat_mat
+
+
+func _saddle_material() -> Material:
+	if _saddle_mat == null:
+		var m := StandardMaterial3D.new()
+		m.albedo_color = ginger
+		m.roughness = 0.95
+		m.albedo_texture = _bake_coat_texture(ginger, [ginger_dark, ginger_dark.lightened(0.12), ginger.lightened(0.10)], 909)
+		_saddle_mat = m
+	return _saddle_mat
+
+
+## A soft-blob colour field over `base`: seeded splats with quadratic
+## falloff, drawn at wrapped x so the sphere seam never shows a cut,
+## plus per-pixel fur noise. Tones are applied as MULTIPLIERS around
+## 1.0 (tone/base per channel), keeping albedo_color the palette truth.
+func _bake_coat_texture(base: Color, tones: Array, seed_off: int, blobs := 90) -> ImageTexture:
+	var size := 192
+	var img := Image.create(size, size, false, Image.FORMAT_RGBA8)
+	img.fill(Color(1, 1, 1))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(mottle_cfg.get("seed", 1)) + seed_off
+	for i in blobs:
+		var tone: Color = tones[rng.randi() % tones.size()]
+		var mult := Color(
+			clampf(tone.r / maxf(base.r, 0.02), 0.55, 1.5),
+			clampf(tone.g / maxf(base.g, 0.02), 0.55, 1.5),
+			clampf(tone.b / maxf(base.b, 0.02), 0.55, 1.5))
+		var cx := rng.randi_range(0, size - 1)
+		var cy := rng.randi_range(0, size - 1)
+		var rad := rng.randi_range(7, 30)
+		var strength := rng.randf_range(0.35, 0.8)
+		for ox: int in [-size, 0, size]:
+			_splat(img, cx + ox, cy, rad, mult, strength, size)
+	for i in 2400:
+		var x := rng.randi_range(0, size - 1)
+		var y := rng.randi_range(0, size - 1)
+		var n := rng.randf_range(0.94, 1.06)
+		var px: Color = img.get_pixel(x, y)
+		img.set_pixel(x, y, Color(px.r * n, px.g * n, px.b * n))
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
+
+
+func _splat(img: Image, cx: int, cy: int, rad: int, mult: Color, strength: float, size: int) -> void:
+	for yy in range(maxi(0, cy - rad), mini(size, cy + rad + 1)):
+		for xx in range(maxi(0, cx - rad), mini(size, cx + rad + 1)):
+			var d := Vector2(xx - cx, yy - cy).length() / float(rad)
+			if d >= 1.0:
+				continue
+			var fall := (1.0 - d) * (1.0 - d) * strength
+			var px: Color = img.get_pixel(xx, yy)
+			img.set_pixel(xx, yy, Color(
+				lerpf(px.r, px.r * mult.r, fall),
+				lerpf(px.g, px.g * mult.g, fall),
+				lerpf(px.b, px.b * mult.b, fall)))
+
+
 ## One shared unit sphere (radius 0.5), scaled per part into smooth
 ## ellipsoids — the remodel's answer to the GTA box frame.
 func _ell(parent: Node3D, pos: Vector3, dia: Vector3, c: Color, rot := Vector3.ZERO, rough := 0.95) -> MeshInstance3D:
+	return _ell_m(parent, pos, dia, _mat(c, rough), rot)
+
+
+func _ell_m(parent: Node3D, pos: Vector3, dia: Vector3, mat: Material, rot := Vector3.ZERO) -> MeshInstance3D:
 	if _sphere == null:
 		_sphere = SphereMesh.new()
 		_sphere.radius = 0.5
@@ -228,7 +315,7 @@ func _ell(parent: Node3D, pos: Vector3, dia: Vector3, c: Color, rot := Vector3.Z
 		_sphere.rings = 16
 	var mi := MeshInstance3D.new()
 	mi.mesh = _sphere
-	mi.material_override = _mat(c, rough)
+	mi.material_override = mat
 	mi.position = pos
 	mi.scale = dia
 	mi.rotation = rot
@@ -263,11 +350,21 @@ func _build_model() -> void:
 	_model.add_child(_body) # Body stays child 0 (GTA contract)
 
 	# Torso mass: main ellipsoid + blended chest + haunches (coat/base).
-	_torso = _ell(_body, Vector3(0, 0.55, 0.02), torso_dia, coat)
-	_ell(_body, Vector3(0, 0.545, -0.30), chest_dia, coat)
+	# REALISM PASS 1: a tortie wears her baked coat texture on the big
+	# shells, so the mottle lives IN the fur instead of speckling on.
+	var cm := _coat_material()
+	if cm != null:
+		_torso = _ell_m(_body, Vector3(0, 0.55, 0.02), torso_dia, cm)
+		_ell_m(_body, Vector3(0, 0.545, -0.30), chest_dia, cm)
+	else:
+		_torso = _ell(_body, Vector3(0, 0.55, 0.02), torso_dia, coat)
+		_ell(_body, Vector3(0, 0.545, -0.30), chest_dia, coat)
 	var hx := torso_dia.x * 0.22
 	for sx: float in [-1.0, 1.0]:
-		_ell(_body, Vector3(sx * hx, 0.565, 0.29), haunch_dia, coat)
+		if cm != null:
+			_ell_m(_body, Vector3(sx * hx, 0.565, 0.29), haunch_dia, cm)
+		else:
+			_ell(_body, Vector3(sx * hx, 0.565, 0.29), haunch_dia, coat)
 
 	if pattern == "tortoiseshell":
 		_build_tortie_body()
@@ -282,7 +379,7 @@ func _build_model() -> void:
 ## upper sides (photo truth), a small chest bib, and faint darker
 ## tabby striping inside the saddle.
 func _build_bicolor_body() -> void:
-	_saddle_patch = _ell(_body, Vector3(0, 0.612, 0.04), Vector3(0.468, 0.335, 0.82), ginger)
+	_saddle_patch = _ell_m(_body, Vector3(0, 0.612, 0.04), Vector3(0.468, 0.335, 0.82), _saddle_material())
 	_ell(_body, Vector3(0, 0.605, 0.335), Vector3(0.46, 0.31, 0.38), ginger)
 	_ell(_body, Vector3(0, 0.60, -0.44), Vector3(0.15, 0.19, 0.10), ginger, Vector3(-0.35, 0, 0))
 	# Back stripes: flattened darker shells lying across the saddle.
@@ -297,7 +394,9 @@ func _build_bicolor_body() -> void:
 
 
 func _stripe(parent: Node3D, pos: Vector3, dia: Vector3, rot: Vector3) -> void:
-	_stripes.append(_ell(parent, pos, dia, ginger_dark, rot))
+	# REALISM PASS 1: stripes sit 30% toward the ginger — a tone in the
+	# fur, not ribs laid over it (the baked saddle shading does the rest).
+	_stripes.append(_ell(parent, pos, dia, ginger_dark.lerp(ginger, 0.30), rot))
 	stripe_count = _stripes.size()
 
 
@@ -329,9 +428,13 @@ func _scatter(parent: Node3D, center: Vector3, radii: Vector3, count: int, rng: 
 		var r := sqrt(maxf(0.0, 1.0 - y * y))
 		var dir := Vector3(cos(theta) * r, y, sin(theta) * r)
 		var pos := center + Vector3(dir.x * radii.x, dir.y * radii.y, dir.z * radii.z)
-		var s := rng.randf_range(smin, smax)
+		var s := rng.randf_range(smin, smax) * 0.9
 		var tone: Color = tones[rng.randi() % tones.size()]
-		var mi := _ell(parent, pos, Vector3(s, s * 0.38, s * rng.randf_range(0.7, 1.1)), tone, Vector3(rng.randf_range(-0.4, 0.4), rng.randf() * TAU, rng.randf_range(-0.4, 0.4)))
+		# REALISM PASS 1 (tuning): each patch is muted 25-50% toward
+		# the dark base and pressed flatter — a tone IN the fur over
+		# the baked coat texture, not a disc stuck on top of it.
+		tone = tone.lerp(coat, rng.randf_range(0.25, 0.5))
+		var mi := _ell(parent, pos, Vector3(s, s * 0.30, s * rng.randf_range(0.7, 1.1)), tone, Vector3(rng.randf_range(-0.4, 0.4), rng.randf() * TAU, rng.randf_range(-0.4, 0.4)))
 		_mottles.append(mi)
 	mottle_count = _mottles.size()
 
@@ -341,7 +444,11 @@ func _build_head() -> void:
 	_head.name = "Head"
 	_head.position = Vector3(0, LEG_H + 0.38, -0.5)
 	_body.add_child(_head)
-	_ell(_head, Vector3(0, 0.03, -0.05), Vector3(0.30, 0.28, 0.29), coat) # skull
+	var hcm := _coat_material()
+	if hcm != null:
+		_ell_m(_head, Vector3(0, 0.03, -0.05), Vector3(0.30, 0.28, 0.29), hcm) # skull
+	else:
+		_ell(_head, Vector3(0, 0.03, -0.05), Vector3(0.30, 0.28, 0.29), coat) # skull
 	_ell(_head, Vector3(0, -0.035, -0.155), Vector3(0.185, 0.135, 0.155), coat) # muzzle
 	if pattern == "tortoiseshell":
 		# Mostly dark face, orange mottling. Each scattered part
@@ -364,6 +471,7 @@ func _build_head() -> void:
 	for sx: float in [-1.0, 1.0]:
 		var ear := _ell(_head, Vector3(sx * 0.088, 0.155, -0.01), Vector3(0.085, 0.15, 0.05), ear_col, Vector3(0.06, 0, -sx * 0.14))
 		ear.scale.z = 0.05
+		_ears.append([ear, sx, ear.rotation])
 		_ell(_head, Vector3(sx * 0.088, 0.15, -0.032), Vector3(0.05, 0.09, 0.02), inner_ear_color)
 	# Eyes: green-gold/hazel for both cats (photo truth).
 	for sx: float in [-1.0, 1.0]:
@@ -419,6 +527,7 @@ func _build_tail() -> void:
 		seg_pos.append([pos, float(s[2]) * tail_k])
 		var seg_mi := _ell(_tail, pos, Vector3.ONE * float(s[2]) * tail_k, tail_cols[i])
 		_tail_segs.append([seg_mi, float(s[2]) * tail_k])
+		_tail_base.append(pos)
 	if pattern == "tortoiseshell":
 		# Orange running through the dark tail (photo truth).
 		var rng := _mottle_rng()
@@ -640,27 +749,120 @@ func _physics_process(delta: float) -> void:
 
 
 # --- animation (poses are pure functions of state + time) ------------------------
+# REALISM PASS 1: the pose layer is a small locomotion system that
+# OBSERVES the cat (velocity, anim_state, yaw) and never drives it:
+# speed-blended gaits (walk / trot / bound with per-leg cycle offsets),
+# stride bob + roll, turn lean, a lagged follow-through tail curve,
+# acceleration stretch, a landing settle, ear micro-motion, and an
+# idle repertoire (stand -> sit -> groom). _update_pose() is separate
+# from _process() so headless tests can step it with fixed deltas on a
+# process-disabled cat and assert on the pose state.
+
+## Per-leg gait cycle offsets (fractions of a stride cycle).
+const GAIT_OFFS := {
+	"walk": {"FL": 0.0, "BR": 0.25, "FR": 0.5, "BL": 0.75},
+	"trot": {"FL": 0.0, "BR": 0.0, "FR": 0.5, "BL": 0.5},
+	"bound": {"FL": 0.0, "FR": 0.06, "BL": 0.5, "BR": 0.56},
+}
+
+var _anim_t := 0.0
+var _spd_s := 0.0 # smoothed horizontal speed
+var _accel_s := 0.0 # smoothed acceleration
+var _prev_yaw := 0.0
+var _yaw_rate := 0.0 # smoothed turn rate (rad/s)
+var _tail_bend := 0.0 # lagged lateral tail bend from turning
+var _fall_v := 0.0
+var _was_air := false
+var _land_t := -1.0
+var idle_time := 0.0 # read-only: seconds in the current idle bout
+var idle_pose := "stand" # read-only: stand | sit | groom
+var _sit_k := 0.0
+var _groom_k := 0.0
+var _ear_flick_t := 2.0
+var _ear_flick := 0.0
+var _ear_flick_side := 1.0
+
 
 func _process(delta: float) -> void:
+	_update_pose(delta)
+
+
+func _update_pose(delta: float) -> void:
+	_anim_t += delta
 	_hiss_k = move_toward(_hiss_k, 1.0 if _hiss_t >= 0.0 else 0.0, delta * (5.0 if _hiss_t >= 0.0 else 2.5))
 	_faint_k = move_toward(_faint_k, 1.0 if is_fainted else 0.0, delta * 3.0)
-	var spd := Vector2(velocity.x, velocity.z).length()
-	if anim_state in ["walk", "stalk", "sprint"]:
-		_phase += delta * (4.2 + spd * 1.9)
 	_lounge_k = move_toward(_lounge_k, 1.0 if is_lounging else 0.0, delta * 2.2)
 
-	# Body: gait bob / stalk crouch / lounge flop.
+	# --- observed motion (read-only: the physics layer owns these) ---
+	var spd := Vector2(velocity.x, velocity.z).length()
+	_accel_s = lerpf(_accel_s, clampf((spd - _spd_s) / maxf(delta, 0.001), -14.0, 14.0), 1.0 - exp(-8.0 * delta))
+	_spd_s = lerpf(_spd_s, spd, 1.0 - exp(-10.0 * delta))
+	_yaw_rate = lerpf(_yaw_rate, clampf(angle_difference(_prev_yaw, rotation.y) / maxf(delta, 0.001), -9.0, 9.0), 1.0 - exp(-7.0 * delta))
+	_prev_yaw = rotation.y
+	var sf := clampf(_spd_s / maxf(sprint_speed, 0.01), 0.0, 1.15) # gait driver
+	var moving := anim_state in ["walk", "stalk", "sprint"]
+
+	# --- gait clock + blend weights (walk -> trot -> bound by speed) --
+	var w_walk := 1.0 - smoothstep(0.34, 0.55, sf)
+	var w_bound := smoothstep(0.70, 0.95, sf)
+	var w_trot := clampf(1.0 - w_walk - w_bound, 0.0, 1.0)
+	if anim_state == "stalk":
+		w_walk = 1.0
+		w_trot = 0.0
+		w_bound = 0.0
+	if moving:
+		var freq := lerpf(1.7, 3.9, clampf(sf, 0.0, 1.0))
+		if anim_state == "stalk":
+			freq = 1.5 + spd * 0.45
+		_phase += delta * TAU * freq
+
+	# --- landing settle: a brief crouch-dip after a real fall ---------
+	if not is_on_floor():
+		_fall_v = velocity.y
+		_was_air = true
+	elif _was_air:
+		_was_air = false
+		if _fall_v < -1.6:
+			_land_t = 0.0
+	if _land_t >= 0.0:
+		_land_t += delta
+		if _land_t > 0.24:
+			_land_t = -1.0
+	var land_dip := 0.0
+	if _land_t >= 0.0:
+		land_dip = sin(PI * clampf(_land_t / 0.24, 0.0, 1.0))
+
+	# --- idle repertoire: stand, then sit, with groom pulses ----------
+	var idling := anim_state == "idle" and not is_lounging and not is_fainted and _hiss_t < 0.0 and _strike_t < 0.0
+	if idling:
+		idle_time += delta
+	else:
+		idle_time = 0.0
+	var cyc := fmod(idle_time, 17.0)
+	var sit_want := 1.0 if (idling and cyc > 4.0 and cyc < 11.0) else 0.0
+	_sit_k = move_toward(_sit_k, sit_want, delta * (2.6 if sit_want > 0.0 else 4.5))
+	var groom_want := 0.0
+	if idling and _sit_k > 0.6:
+		for w: Array in [[6.1, 7.3], [8.7, 9.9]]:
+			if cyc > float(w[0]) and cyc < float(w[1]):
+				groom_want = sin(PI * (cyc - float(w[0])) / (float(w[1]) - float(w[0])))
+	_groom_k = move_toward(_groom_k, groom_want, delta * 5.0)
+	idle_pose = "groom" if _groom_k > 0.4 else ("sit" if _sit_k > 0.5 else "stand")
+
+	# --- body pose ------------------------------------------------------
 	var body_scale := Vector3.ONE
 	var body_y := 0.0
+	var body_pitch := 0.0
+	var body_roll := 0.85 * _faint_k # the faint flop still owns the roll base
 	var tail_rot := Vector3(0, sin(_time * 1.7) * 0.08, 0)
 	var head_rot := Vector3.ZERO
 	match anim_state:
 		"idle":
 			body_scale.y = 1.0 + sin(_time * 2.1) * 0.025 # breathing
-			head_rot.y = sin(_time * 0.43) * 0.38 # look-around
+			head_rot.y = sin(_time * 0.43) * 0.38 * (1.0 - _sit_k) # look-around (less in a sit)
 			head_rot.x = sin(_time * 0.31) * 0.06
 		"walk", "sprint":
-			body_y = absf(sin(_phase)) * (0.05 if anim_state == "walk" else 0.065)
+			pass # bob / roll / pitch come from the gait terms below
 		"stalk":
 			body_scale.y = 0.84
 			body_y = -0.04
@@ -681,6 +883,39 @@ func _process(delta: float) -> void:
 				head_rot.x = lerpf(0.16, 0.0, k)
 		"lounge":
 			pass
+	if moving:
+		# Two-beat bob for walk/trot, one suspension beat for the bound.
+		body_y += sin(_phase * 2.0) * 0.016 * (w_walk * 0.6 + w_trot) + sin(_phase + 0.6) * 0.045 * w_bound
+		body_roll += sin(_phase) * (0.020 * w_walk + 0.034 * w_trot)
+		body_pitch += sin(_phase - 0.5) * 0.075 * w_bound
+	# Turn lean: roll into the turn, scaled by speed.
+	body_roll += clampf(_yaw_rate * 0.045, -0.17, 0.17) * clampf(_spd_s / 2.0, 0.0, 1.0)
+	# Acceleration easing: stretch on launch, compress on the stop.
+	body_pitch += clampf(-_accel_s * 0.006, -0.05, 0.07)
+	var stretch := clampf(_accel_s * 0.008, -0.035, 0.055) * (1.0 if moving else 0.3)
+	body_scale.z *= 1.0 + stretch
+	body_scale.y *= 1.0 - stretch * 0.45
+	# Airborne shape: reach on the pounce, tuck on the rise.
+	if not is_on_floor():
+		if is_pouncing():
+			body_pitch += -0.13
+		elif velocity.y > 1.0:
+			body_pitch += 0.05
+		else:
+			body_pitch += -0.03
+	body_y -= 0.055 * land_dip
+	body_scale.y *= 1.0 - 0.07 * land_dip
+	# The sit: haunches down (+x pitch drops the rear), chest proud,
+	# tail wrapping around the side like the lounge's.
+	if _sit_k > 0.0:
+		body_pitch += 0.40 * _sit_k
+		body_y -= 0.055 * _sit_k
+		head_rot.x -= 0.10 * _sit_k
+		tail_rot.y += 0.75 * _sit_k
+	# The groom: head down to the raised front-right paw, lick bob.
+	if _groom_k > 0.0:
+		head_rot.x += (0.52 + sin(_anim_t * 9.0) * 0.06) * _groom_k
+		head_rot.y += 0.34 * _groom_k
 	if _lounge_k > 0.0:
 		# Willow's flop numbers (wildlife.gd _spawn_river_cat): low and
 		# long, tail wrapped — eased in by _lounge_k.
@@ -693,9 +928,14 @@ func _process(delta: float) -> void:
 		body_y += 0.05 * _hiss_k
 		head_rot.x = lerpf(head_rot.x, 0.34, _hiss_k)
 		tail_rot.x = lerpf(tail_rot.x, -0.85, _hiss_k)
+	# Head stabilisation: the head counters ~2/3 of the body's pitch and
+	# ~half its roll, so the gaze stays level while the body works.
+	head_rot.x -= body_pitch * 0.65
+	head_rot.y -= body_roll * 0.4
 	_body.scale = body_scale
 	_body.position.y = body_y * (1.0 - _lounge_k)
-	_body.rotation.z = 0.85 * _faint_k # the faint flop rolls him over
+	_body.rotation.z = body_roll
+	_body.rotation.x = body_pitch * (1.0 - _lounge_k)
 	_head.rotation = head_rot
 	_tail.rotation = tail_rot
 	# Tail puff for the hiss (segments recorded at build time).
@@ -704,24 +944,85 @@ func _process(delta: float) -> void:
 	# Invulnerability blink — never while fainted (he's a drama cat).
 	if _model != null:
 		_model.visible = (int(_time * 18.0) % 2 == 0) if (_invuln_t > 0.0 and not is_fainted) else true
+	_update_tail(delta, sf, moving)
+	_update_ears(delta, sf)
+	_update_legs(land_dip, w_walk, w_trot, w_bound, moving)
 
-	# Legs: diagonal pairs; tucked away in the lounge.
-	var amp := 0.0
-	if anim_state == "walk":
-		amp = 0.55
-	elif anim_state == "sprint":
-		amp = 0.8
-	elif anim_state == "stalk":
-		amp = 0.3
+
+## The tail as a lagged follow-through chain: each segment's rest
+## position is re-curved by a sway wave that travels base -> tip
+## (amplitude growing toward the tip) plus a smoothed bend from
+## turning. Segments are spheres, so the curve lives in positions.
+func _update_tail(delta: float, sf: float, moving: bool) -> void:
+	_tail_bend = lerpf(_tail_bend, clampf(-_yaw_rate * 0.11, -0.55, 0.55), 1.0 - exp(-4.5 * delta))
+	var amp := 0.016 + 0.05 * clampf(sf, 0.0, 1.0)
+	var freq := 2.2 + 5.0 * clampf(sf, 0.0, 1.0)
+	if anim_state == "stalk":
+		amp *= 0.35 # a stalking tail is low and still
+	if _lounge_k > 0.3:
+		amp *= 0.4
+	var n := _tail_segs.size()
+	for i in n:
+		var seg := _tail_segs[i][0] as MeshInstance3D
+		var base: Vector3 = _tail_base[i]
+		var t := float(i) / float(maxi(1, n - 1))
+		var wave := sin(_anim_t * freq - t * 2.6) * amp * (0.2 + 0.8 * t)
+		var stream := 1.0 - 0.4 * smoothstep(0.7, 0.95, sf) # flattens at the bound
+		seg.position = Vector3(
+			base.x + (wave + _tail_bend * 0.16) * t,
+			base.y * stream + sin(_anim_t * freq - t * 2.6 - 0.9) * amp * 0.4 * t,
+			base.z)
+
+
+## Ear micro-motion: a slow splay drift, an occasional single-ear
+## flick, pinned back by speed and flattened by the hiss.
+func _update_ears(delta: float, sf: float) -> void:
+	_ear_flick_t -= delta
+	if _ear_flick_t <= 0.0:
+		_ear_flick_t = randf_range(2.2, 5.5)
+		_ear_flick = 1.0
+		_ear_flick_side = 1.0 if randf() > 0.5 else -1.0
+	_ear_flick = move_toward(_ear_flick, 0.0, delta * 6.0)
+	for e: Array in _ears:
+		var mi := e[0] as MeshInstance3D
+		var sx := float(e[1])
+		var r: Vector3 = e[2]
+		r.z += sin(_anim_t * 1.3 + sx * 1.7) * 0.035
+		r.x -= clampf(sf, 0.0, 1.0) * 0.30 + _hiss_k * 0.45
+		if sx == _ear_flick_side:
+			r.x += sin(_ear_flick * PI) * 0.5
+		mi.rotation = r
+
+
+## Legs: the three gaits blended by their weights, with the special
+## poses (lounge splay, sit fold, groom paw, airborne shapes, landing
+## compression, the strike slash) layered over the cycle.
+func _update_legs(land_dip: float, w_walk: float, w_trot: float, w_bound: float, moving: bool) -> void:
 	for key in _hips:
 		var hip := _hips[key] as Node3D
-		var splay := 0.0
 		if _lounge_k > 0.0:
-			splay = (0.5 if key.begins_with("F") else -0.35) * _lounge_k
+			var splay := (0.5 if key.begins_with("F") else -0.35) * _lounge_k
 			hip.rotation.x = lerpf(hip.rotation.x, splay, 0.5)
 			continue
-		var ph := _phase + (0.0 if key in ["FL", "BR"] else PI)
-		hip.rotation.x = sin(ph) * amp if amp > 0.0 else lerpf(hip.rotation.x, 0.0, 0.3)
+		var rot := 0.0
+		if moving:
+			var amp := 0.30 if anim_state == "stalk" else 0.52
+			rot = (w_walk * sin(_phase + TAU * float(GAIT_OFFS["walk"][key]))
+				+ w_trot * sin(_phase + TAU * float(GAIT_OFFS["trot"][key]))
+				+ w_bound * sin(_phase + TAU * float(GAIT_OFFS["bound"][key]))) * amp * (1.0 + 0.35 * w_bound)
+		elif _sit_k > 0.0:
+			rot = (1.15 if key.begins_with("B") else 0.03) * _sit_k # hind fold, front pillars
+		if _groom_k > 0.0 and key == "FR":
+			rot = lerpf(rot, -0.85, _groom_k) # paw raised to the face
+		if not is_on_floor():
+			if is_pouncing():
+				rot = -0.8 if key.begins_with("F") else 0.65
+			elif velocity.y > 1.0:
+				rot = lerpf(rot, 0.3, 0.6) # tucked on the rise
+			else:
+				rot = lerpf(rot, -0.25, 0.6) # reaching for the ground
+		rot += land_dip * (0.35 if key.begins_with("F") else 0.3)
+		hip.rotation.x = rot if (moving or not is_on_floor()) else lerpf(hip.rotation.x, rot, 0.35)
 	# The strike slash: front-right leg whips through its arc.
 	if anim_state == "strike" and _hips.has("FR"):
 		var fr := _hips["FR"] as Node3D

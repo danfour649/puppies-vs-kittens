@@ -124,6 +124,12 @@ func _bark() -> void:
 		_voice.play()
 
 
+var _legs: Array = [] # REALISM PASS 1: [pivot, lx, lz] per leg
+var _trot_ph := 0.0 # REALISM PASS 1
+var _last_pos := Vector3.ZERO # REALISM PASS 1
+var _spd_s := 0.0 # REALISM PASS 1: smoothed ground speed
+
+
 func _physics_process(delta: float) -> void:
 	_time += delta
 	_state_t += delta
@@ -175,6 +181,19 @@ func _physics_process(delta: float) -> void:
 			_tail.rotation.y = 0.0
 		else:
 			_tail.rotation.y = sin(_time * 3.0) * 0.15
+	# REALISM PASS 1: the trot — diagonal leg pairs driven by the
+	# measured ground speed, with a whisper of body roll. (The chase
+	# bob and heel sway already live in the step functions.)
+	var moved := (global_position - _last_pos).length() / maxf(delta, 0.001)
+	_last_pos = global_position
+	_spd_s = lerpf(_spd_s, moved, 1.0 - exp(-8.0 * delta))
+	if _spd_s > 0.15:
+		_trot_ph += delta * TAU * (1.6 + _spd_s * 0.85)
+	var tamp := clampf(_spd_s * 0.14, 0.0, 0.55) * (1.2 if state == "chase" else 1.0)
+	for lg: Array in _legs:
+		var off := 0.0 if (float(lg[1]) < 0.0) == (float(lg[2]) < 0.0) else PI
+		(lg[0] as Node3D).rotation.x = sin(_trot_ph + off) * tamp
+	_body.rotation.z = sin(_trot_ph) * 0.022 * (1.0 if _spd_s > 0.15 else 0.0)
 
 
 func _cat_spotted() -> bool:
@@ -400,4 +419,9 @@ func _build() -> void:
 	_box(_tail, Vector3(0.09, 0.09, 0.42), Vector3(0, 0.05, 0.2), coat, Vector3(-0.5, 0, 0))
 	for lx: float in [-0.12, 0.12]:
 		for lz: float in [-0.32, 0.32]:
-			_box(_model, Vector3(0.1, leg_h, 0.1), Vector3(lx, leg_h * 0.5, lz), dark)
+			# REALISM PASS 1: legs hang from hip pivots so they can trot.
+			var pivot := Node3D.new()
+			pivot.position = Vector3(lx, leg_h, lz)
+			_model.add_child(pivot)
+			_box(pivot, Vector3(0.1, leg_h, 0.1), Vector3(0, -leg_h * 0.5, 0), dark)
+			_legs.append([pivot, lx, lz])
