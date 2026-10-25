@@ -171,8 +171,11 @@ func _shadow_cat(delta: float) -> void:
 	# rest. The ghost guards the passage; it does not chase.
 	var step := maxf(0.0, minf(to_cat.length() - 0.45, shadow_speed * delta))
 	var want := global_position + to_cat.normalized() * step
-	global_position.x = want.x
-	global_position.z = want.z
+	# Assign the whole vector at once: component-wise global_position
+	# writes (.x = / .z =) never reach an AnimatableBody3D physics
+	# transform - the server keeps its own copy and the shadow step
+	# silently went nowhere (probe-proven, 2026-10-25).
+	global_position = want
 
 
 func _update_contact(delta: float) -> void:
