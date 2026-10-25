@@ -7,8 +7,10 @@ GTA's box idiom, the cat modelled smooth from ellipsoids and tapered
 cylinders (see `cat_kit/`). The Java v0.2
 original and the 2D Godot port (branch `godot-revamp`) are untouched.
 
-**Scope of this edition: play as the cat.** No bird mode, no birds of
-any kind. Puppies are Phase 2.
+**Scope of this edition: play as the cat.** No bird mode — you only
+ever play as the cats — but birds exist in the world: the outside
+feeder draws a constant stream of them, and they are prey.
+Puppies are Phase 2.
 
 You are **Willie** — a big white-and-ginger boy cat (scale 0.35),
 built by `cat_kit/` to GTA Fredericton's `stray_cat` construction
