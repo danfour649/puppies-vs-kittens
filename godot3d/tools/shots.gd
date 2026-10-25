@@ -2,8 +2,8 @@ extends Node
 ## Standing-shot pass for Willie and Aggie. Run under Xvfb (real
 ## rendering, unlike the headless smoke test):
 ##   xvfb-run godot --path godot3d res://tools/shots.tscn
-## Saves four PNGs into res://screenshots/: willie_closeup,
-## aggie_closeup, both_cats, lounge.
+## Saves five PNGs into res://screenshots/: willie_closeup,
+## willie_rear, aggie_closeup, both_cats, lounge.
 
 var _game = null
 
@@ -54,6 +54,14 @@ func _run() -> void:
 	await _shot("willie_closeup")
 	if sun != null:
 		sun.light_energy = 1.05
+	# (a2) Willie rear: identical staging to the close-up, camera
+	# swung behind him and a touch low — the standing tail shot
+	# (Daniel's ruled spec: white tail, ginger underside).
+	_game.cam_dist = 0.9
+	_game.cam_pitch = 0.12
+	_game.cam_yaw = -0.6 + PI
+	await _wait(0.7)
+	await _shot("willie_rear")
 	# (b) Aggie close-up: she lounges on the garden chair; anchor the
 	# camera on her and come in close from her front-left.
 	_anchor_at(_game.aggie.global_position + Vector3(0, 0.13, 0))

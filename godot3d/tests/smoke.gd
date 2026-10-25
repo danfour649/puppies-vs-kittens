@@ -41,8 +41,11 @@ func _run() -> void:
 	check(cat.is_on_floor(), "cat stands on the ground")
 	check(cat.global_position.y > -0.1 and cat.global_position.y < 0.2, "cat at ground height (y=%.2f)" % cat.global_position.y)
 	check(cat.species_name == "Willie", "cat is Willie (got %s)" % cat.species_name)
-	# Willie's photo palette, asserted on the values fed into the
-	# materials (data level only — rendered readbacks lie headless).
+	# Willie's ruled palette (Daniel, 2026-10-25), asserted on the
+	# values fed into the materials (data level only — rendered
+	# readbacks lie headless). The SPEC LOCK checks below pin the
+	# JSON itself to Daniel's constants, so the palette cannot
+	# silently drift back to the photo-tuned defect values.
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://cat_kit/cat_species.json"))
 	var chars: Dictionary = data.get("characters", {})
 	var willie: Dictionary = chars.get("willie", {})
@@ -50,20 +53,44 @@ func _run() -> void:
 	var j_coat: Array = pal.get("coat", [])
 	var j_ginger: Array = pal.get("ginger", [])
 	var j_eye: Array = pal.get("eye", [])
+	var j_dark: Array = pal.get("ginger_dark", [])
+	var want_dark := Color(float(j_dark[0]), float(j_dark[1]), float(j_dark[2]))
 	var want_coat := Color(float(j_coat[0]), float(j_coat[1]), float(j_coat[2]))
 	var want_ginger := Color(float(j_ginger[0]), float(j_ginger[1]), float(j_ginger[2]))
 	var want_eye := Color(float(j_eye[0]), float(j_eye[1]), float(j_eye[2]))
-	check(cat.coat.is_equal_approx(want_coat), "coat colour comes from Willie's photo palette (got %s)" % cat.coat)
+	check(cat.coat.is_equal_approx(want_coat), "coat colour comes from Willie's ruled palette (got %s)" % cat.coat)
 	var torso_mat := (cat._torso.material_override as StandardMaterial3D).albedo_color
 	check(torso_mat.is_equal_approx(want_coat), "torso material albedo is the palette white (got %s)" % torso_mat)
 	var saddle_mat := (cat._saddle_patch.material_override as StandardMaterial3D).albedo_color
-	check(saddle_mat.is_equal_approx(want_ginger), "saddle patch albedo is the photo ginger (got %s)" % saddle_mat)
-	check(not want_ginger.is_equal_approx(Color(0.9098, 0.6863, 0.3294)), "ginger deepened from the v0.1 art #E8AF54")
-	check(cat.eye_color.is_equal_approx(want_eye), "eyes are the palette green-gold (got %s)" % cat.eye_color)
+	check(saddle_mat.is_equal_approx(want_ginger), "saddle patch albedo is the ruled ginger (got %s)" % saddle_mat)
+	# SPEC LOCK — Daniel's ruling, 2026-10-25: his recorded values
+	# are canonical; the photo-tuned values were a spec defect.
+	check(want_ginger.is_equal_approx(Color(0.9098, 0.6863, 0.3294)), "SPEC LOCK: ginger is #E8AF54 (got %s)" % want_ginger)
+	check(want_dark.is_equal_approx(Color(0.682, 0.515, 0.237)), "SPEC LOCK: ginger_dark is #AE833C, derived from #E8AF54 (got %s)" % want_dark)
+	check(want_eye.is_equal_approx(Color(0.10, 0.08, 0.07)), "SPEC LOCK: Willie's eyes are dark (got %s)" % want_eye)
+	check(cat.eye_color.is_equal_approx(want_eye), "eyes are the palette dark (got %s)" % cat.eye_color)
 	var eye_mat := (cat._eyes[0].material_override as StandardMaterial3D).albedo_color
-	check(eye_mat.is_equal_approx(want_eye), "eye material albedo is green-gold (got %s)" % eye_mat)
+	check(eye_mat.is_equal_approx(want_eye), "eye material albedo is dark (got %s)" % eye_mat)
+	var stripe_mat := (cat._stripes[0].material_override as StandardMaterial3D).albedo_color
+	check(stripe_mat.is_equal_approx(want_dark), "stripe albedo is the derived ginger_dark (got %s)" % stripe_mat)
 	check(absf(cat.model_scale - 0.35) < 0.001, "Willie scale is 0.35 (got %.3f)" % cat.model_scale)
 	check(cat.stripe_count >= 6, "tabby striping present (%d stripes)" % cat.stripe_count)
+	# Tail, spec-locked (ruling 2026-10-25): white segments with a
+	# ginger underside — no rings, no ginger segment bodies.
+	check(cat._tail_segs.size() == 9, "tail has 9 segments (got %d)" % cat._tail_segs.size())
+	var tail_all_white := true
+	for seg in cat._tail_segs:
+		var seg_mat := (seg[0].material_override as StandardMaterial3D).albedo_color
+		if not seg_mat.is_equal_approx(want_coat):
+			tail_all_white = false
+	check(tail_all_white, "SPEC LOCK: every tail segment is white — no ginger rings")
+	check(cat._tail_underside.size() == cat._tail_segs.size(), "ginger tail-underside shells built (%d)" % cat._tail_underside.size())
+	var under_all_ginger := true
+	for shell in cat._tail_underside:
+		var sh_mat := (shell.material_override as StandardMaterial3D).albedo_color
+		if not sh_mat.is_equal_approx(want_ginger):
+			under_all_ginger = false
+	check(under_all_ginger, "SPEC LOCK: tail underside is the ruled ginger")
 	var wchar: Dictionary = willie.get("character", {})
 	check(String(wchar.get("meowing", "")) == "constant", "character data: Willie meows constantly")
 	# Scripted walk.
@@ -102,7 +129,7 @@ func _run() -> void:
 		await _catch_one(cat, _game.mice[i])
 	check(_game.won, "win state reached after all mice caught")
 	check((_game.get("_banner") as Label).visible, "win banner visible")
-	# --- Aggie: the tortie sister, lounging on the garden chair. ---
+	# --- Aggie: the calico sister, lounging on the garden chair. ---
 	var aggie = _game.aggie
 	check(aggie != null, "aggie exists")
 	check(aggie.species_name == "Aggie", "second cat is Aggie (got %s)" % aggie.species_name)
@@ -112,8 +139,10 @@ func _run() -> void:
 	var j_base: Array = apal.get("base", [])
 	var want_base := Color(float(j_base[0]), float(j_base[1]), float(j_base[2]))
 	var a_torso := (aggie._torso.material_override as StandardMaterial3D).albedo_color
-	check(a_torso.is_equal_approx(want_base), "aggie torso is the tortie base (got %s)" % a_torso)
-	check(aggie.eye_color.is_equal_approx(want_eye), "aggie eyes green-gold like his (got %s)" % aggie.eye_color)
+	check(a_torso.is_equal_approx(want_base), "aggie torso is the calico base (got %s)" % a_torso)
+	var j_aeye: Array = apal.get("eye", [])
+	var want_aeye := Color(float(j_aeye[0]), float(j_aeye[1]), float(j_aeye[2]))
+	check(aggie.eye_color.is_equal_approx(want_aeye), "aggie eyes green-gold from her own palette (got %s)" % aggie.eye_color)
 	check(aggie.mottle_count > 0, "aggie mottle patches built (%d)" % aggie.mottle_count)
 	check(aggie.torso_dia.x < cat.torso_dia.x * 0.8, "aggie build is wiry, not a scaled Willie (torso %.2f vs %.2f)" % [aggie.torso_dia.x, cat.torso_dia.x])
 	# --- Aggie's lounge system, driven deterministically. ---

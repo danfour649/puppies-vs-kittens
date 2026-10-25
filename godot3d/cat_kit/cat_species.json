@@ -83,7 +83,7 @@
           0.06
         ],
         "pattern": "tortoiseshell",
-        "provenance": "From Daniel's photos of the real Aggie (cat_kit/reference/reference-aggie-drawer.jpg and reference-aggie-plant.jpg): a dark tortoiseshell (Daniel says calico; the photos show tortie) \u2014 warm black-brown base #241C17 (photo median) with irregular orange #B06E2C and cream #BFA87A mottling over the whole coat, a mostly dark face with orange mottling and a cream/orange throat and chest, a dark tail with orange running through it, and green-gold eyes like her brother's. The mottle is a seeded scatter of small flattened ellipsoid shells in the two tones over the dark base, denser on the torso; mottle.seed makes her build identically every run."
+        "provenance": "From Daniel's photos of the real Aggie (cat_kit/reference/reference-aggie-drawer.jpg and reference-aggie-plant.jpg): a dark calico (Daniel's recorded word for her coat) \u2014 warm black-brown base #241C17 (photo median) with irregular orange #B06E2C and cream #BFA87A mottling over the whole coat, a mostly dark face with orange mottling and a cream/orange throat and chest, a dark tail with orange running through it, and green-gold eyes. The mottle is a seeded scatter of small flattened ellipsoid shells in the two tones over the dark base, denser on the torso; mottle.seed makes her build identically every run."
       },
       "scale": 0.25,
       "sex": "female"
@@ -143,19 +143,19 @@
           1.0
         ],
         "eye": [
-          0.541,
-          0.604,
-          0.231
+          0.1,
+          0.08,
+          0.07
         ],
         "ginger": [
-          0.78,
-          0.439,
-          0.125
+          0.9098,
+          0.6863,
+          0.3294
         ],
         "ginger_dark": [
-          0.592,
-          0.329,
-          0.09
+          0.682,
+          0.515,
+          0.237
         ],
         "inner_ear": [
           0.89,
@@ -168,7 +168,7 @@
           0.478
         ],
         "pattern": "bicolor",
-        "provenance": "From Daniel's photos of the real Willie (cat_kit/reference/reference-willie-basket.jpg and reference-willie-table.jpg), which override the v0.1 hand-drawn art where they differ: pure white face blaze, muzzle, chest, belly, legs and paws; rich orange tabby as a cap wrapping the top of the head around the ears and down the sides of the cheeks, a LARGE saddle over the whole back and upper sides, and a substantially ginger, ringed tail; green-gold (hazel) eyes; small pink nose. Ginger albedo is #C97020, inside the #C26D1E-#CD7A2A band Daniel specified ('definitely darker orange' than the v0.1 art's #E8AF54): raw photo medians sample muted (#A68041-ish) because of indoor light and shadow, and the game's ACES tonemapping + midday sun desaturate further, so the albedo is set rich and tuned BY EYE against the photos in the standing willie_closeup shot. Tabby striping (ginger_dark #975417) is a fainter, darker banding inside the saddle, cap and tail rings. Tonemapping compensation: albedo picked ~one shade deeper than the naive daylight sample for exactly this reason; if the close-up still reads pale, deepen ginger before touching the lights."
+        "provenance": "Daniel's ruled spec (director's call, 2026-10-25) — canonical, superseding the photo-tuned pass: pure white face blaze, muzzle, chest, belly, legs and paws; ginger #E8AF54 (the colour Daniel specified) as a cap wrapping the top of the head around the ears and down the sides of the cheeks and a LARGE saddle over the whole back and upper sides, with faint darker tabby striping (ginger_dark #AE833C, derived from #E8AF54 by the same per-channel factors — 0.75, 0.75, 0.72 — the earlier pass applied to its base); tail WHITE with a ginger underside (no rings); eyes DARK (#1A1412); small pink nose. The previous build's photo-tuned values (ginger #C97020, ginger_dark #975417, green-gold eyes, substantially ginger ringed tail) are a spec defect under the ruling and must not drift back: tests/smoke.gd spec-locks these constants. Photos in cat_kit/reference/ remain the build and pattern reference."
       },
       "scale": 0.35,
       "sex": "male"
