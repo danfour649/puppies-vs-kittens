@@ -60,6 +60,7 @@ var cat: Node3D = null
 var mother: PvKRaccoon
 var kits: Array = []
 var objective_state := "active" # active -> won
+var _slowed_cats: Array = [] # cats currently wading (we set their seam)
 var perch_unlocked := false
 var hoard_revealed := false
 var objectives: Array = []
@@ -99,6 +100,60 @@ func speed_factor_at(pos: Vector3) -> float:
 		if d.length() < 1.0:
 			return PILE_FACTOR
 	return 1.0
+
+
+## The pile factor for a CAT: speed_factor_at() is XZ-only (fine for
+## the attic's own raccoons), so cats also need "in this room, at floor
+## level" — otherwise a cat on the floor below (or up on the collar
+## beams) would wade through air.
+func cat_pile_factor(c: Node3D) -> float:
+	var local := to_local(c.global_position)
+	if absf(local.x) > FOOTPRINT.x * 0.5 or absf(local.z) > FOOTPRINT.y * 0.5:
+		return 1.0
+	if local.y < -0.5 or local.y > 0.75:
+		return 1.0
+	return speed_factor_at(c.global_position)
+
+
+## Cats whose wading this zone manages: the setup()-wired cat, the
+## player (player_cat group), and the sibling — reached via the
+## ZoneManager's game handle, the same route zone travel uses.
+func _pile_candidates() -> Array:
+	var out: Array = []
+	if cat is PvKCat and not out.has(cat):
+		out.append(cat)
+	var pc := get_tree().get_first_node_in_group("player_cat") as PvKCat
+	if pc != null and not out.has(pc):
+		out.append(pc)
+	var zm := get_tree().get_first_node_in_group("zone_manager")
+	if zm != null:
+		var game := zm.get("game") as Node
+		if game != null:
+			var duo := game.get("duo") as Node
+			if duo != null:
+				var sib := duo.call("sibling_cat") as PvKCat
+				if sib != null and not out.has(sib):
+					out.append(sib)
+	return out
+
+
+## Insulation wading for cats: the raccoons read speed_factor_at()
+## themselves; cats get the PvKCat.speed_multiplier seam. Runs every
+## frame so entering/leaving a pile — or leaving the attic — just
+## works; any cat we slowed who is no longer in a pile resets to 1.0.
+func _apply_pile_slow() -> void:
+	var slowed_now: Array = []
+	for c in _pile_candidates():
+		var pc := c as PvKCat
+		if pc == null or not is_instance_valid(pc):
+			continue
+		if cat_pile_factor(pc) < 1.0:
+			pc.speed_multiplier = PILE_FACTOR
+			slowed_now.append(pc)
+	for c in _slowed_cats:
+		if is_instance_valid(c) and not slowed_now.has(c):
+			(c as PvKCat).speed_multiplier = 1.0
+	_slowed_cats = slowed_now
 
 
 func _ready() -> void:
@@ -569,6 +624,7 @@ func _process(delta: float) -> void:
 	var pc := get_tree().get_first_node_in_group("player_cat")
 	if pc != null and pc != cat:
 		setup(pc)
+	_apply_pile_slow()
 	_time += delta
 	# Dust motes drift slowly inside the shaft.
 	for i in _dust.size():

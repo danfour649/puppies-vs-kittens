@@ -64,6 +64,11 @@ var stamina_drain := 22.0
 var stamina_regen := 14.0
 var max_hp := 120.0
 var jump_velocity := 6.0
+## External move-speed multiplier (walk/stalk/sprint), default 1.0.
+## Owned by the zone the cat is standing in — the attic sets 0.55 while
+## a cat wades through insulation — and the owner resets it to 1.0 when
+## the cat leaves. Composes with DuoSystem's walk_speed scaling.
+var speed_multiplier := 1.0
 
 # --- read-only state (the controller contract) -------------------------------
 var anim_state := "idle"
@@ -601,7 +606,7 @@ func _physics_process(delta: float) -> void:
 	if _input_dir.length() > 0.05 and not is_lounging and not is_fainted and _hiss_t < 0.0 and _strike_t < 0.0:
 		moving = true
 		var sprinting := _input_sprint and stamina > 1.0
-		speed = stalk_speed if _input_stalk else (sprint_speed if sprinting else walk_speed)
+		speed = (stalk_speed if _input_stalk else (sprint_speed if sprinting else walk_speed)) * speed_multiplier
 		want = _input_dir.normalized() * speed
 		if sprinting and not _input_stalk:
 			stamina = maxf(0.0, stamina - stamina_drain * delta)

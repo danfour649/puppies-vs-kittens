@@ -73,6 +73,42 @@ func _run() -> void:
 	check(absf(_attic.speed_factor_at(Vector3(0.8, 0.0, 2.6)) - 0.55) < 0.001, "inside a pile the cat is slowed (factor %.2f)" % _attic.speed_factor_at(Vector3(0.8, 0.0, 2.6)))
 	check(absf(_attic.speed_factor_at(Vector3(-1.0, 0.0, 0.5)) - 1.0) < 0.001, "open floor is full speed")
 
+	# --- insulation slows the CAT itself (the PvKCat speed seam) -------------
+	# (a) In a pile the zone writes the 0.55 multiplier onto the cat, and a
+	# driven walk covers ~0.55x the open-floor distance.
+	_place(_cat, Vector3(0.8, 0.05, 2.6)) # pile 1 centre
+	await frames(6)
+	check(absf(_cat.speed_multiplier - 0.55) < 0.01, "cat in a pile carries the 0.55 multiplier (got %.2f)" % _cat.speed_multiplier)
+	var pile_start: Vector3 = _cat.global_position
+	_cat.set_move_input(Vector3(1, 0, 0), false, false)
+	await frames(30)
+	_cat.set_move_input(Vector3.ZERO, false, false)
+	var pile_dist := Vector2(_cat.global_position.x - pile_start.x, _cat.global_position.z - pile_start.z).length()
+	check(pile_dist > 0.35 and pile_dist < 0.95, "pile walk is slowed (covered %.2f m in 0.5 s; expect ~0.66)" % pile_dist)
+	# (b) Open floor: the multiplier resets to 1.0 and the same walk is full speed.
+	_place(_cat, Vector3(-1.0, 0.05, 0.5))
+	await frames(6)
+	check(absf(_cat.speed_multiplier - 1.0) < 0.01, "cat on open floor is back to full speed (got %.2f)" % _cat.speed_multiplier)
+	var open_start: Vector3 = _cat.global_position
+	_cat.set_move_input(Vector3(1, 0, 0), false, false)
+	await frames(30)
+	_cat.set_move_input(Vector3.ZERO, false, false)
+	var open_dist := Vector2(_cat.global_position.x - open_start.x, _cat.global_position.z - open_start.z).length()
+	check(open_dist > 0.9 and open_dist < 1.5, "open-floor walk is unslowed (covered %.2f m in 0.5 s; expect ~1.2)" % open_dist)
+	check(absf(pile_dist / open_dist - 0.55) < 0.12, "pile/open walk ratio is ~0.55 (got %.2f)" % (pile_dist / open_dist))
+	# (c) Raccoons still read the factor themselves — behaviour unchanged.
+	var rcheck = RaccoonScene.new()
+	add_child(rcheck)
+	rcheck.zone = _attic
+	rcheck.set_target(_cat)
+	_place(rcheck, Vector3(0.8, 0.05, 2.6))
+	check(absf(rcheck._speed_factor() - 0.55) < 0.001, "raccoon in a pile still reads 0.55 itself")
+	_place(rcheck, Vector3(-1.0, 0.05, 0.5))
+	check(absf(rcheck._speed_factor() - 1.0) < 0.001, "raccoon on open floor still reads 1.0 itself")
+	rcheck.queue_free()
+	_place(_cat, Vector3(4.55, 0.05, 3.55)) # back to the hatch corner for what follows
+	await frames(6)
+
 	# --- contact damage cooldown (unit-level, spare raccoon) --------------
 	var spare = RaccoonScene.new()
 	spare.set_role("mother")
