@@ -96,7 +96,10 @@ func _run() -> void:
 	cat.velocity = Vector3.ZERO
 	_follow(cat, 1.15, -0.28, PI * 0.75)
 	# -- 3) Idle repertoire: leave him standing; ~13 s in.
-	await _wait(12.5)
+	# 7.2 s of idle lands mid-repertoire (cycle 17 s: sit at 4-11 s,
+	# first groom bout 6.1-7.3 s) — the earlier 12.5 s wait landed
+	# AFTER the sit window and showed a plain stand.
+	await _wait(7.2)
 	await _shot("realism_idle")
 	# -- 4) Aggie close-up (the tortie read, wherever she is posted).
 	var aggie = _game.aggie

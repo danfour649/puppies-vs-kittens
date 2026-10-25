@@ -239,7 +239,7 @@ func _coat_material() -> Material:
 		var m := StandardMaterial3D.new()
 		m.albedo_color = coat
 		m.roughness = 0.95
-		m.albedo_texture = _bake_coat_texture(coat, [mottle_orange, mottle_cream, coat.lightened(0.16), coat.darkened(0.25)], 707)
+		m.albedo_texture = _bake_coat_texture(coat, [mottle_orange, mottle_cream, coat.lightened(0.16), coat.darkened(0.25)], 707, 150)
 		_coat_mat = m
 	return _coat_mat
 
@@ -258,13 +258,13 @@ func _saddle_material() -> Material:
 ## falloff, drawn at wrapped x so the sphere seam never shows a cut,
 ## plus per-pixel fur noise. Tones are applied as MULTIPLIERS around
 ## 1.0 (tone/base per channel), keeping albedo_color the palette truth.
-func _bake_coat_texture(base: Color, tones: Array, seed_off: int) -> ImageTexture:
+func _bake_coat_texture(base: Color, tones: Array, seed_off: int, blobs := 90) -> ImageTexture:
 	var size := 192
 	var img := Image.create(size, size, false, Image.FORMAT_RGBA8)
 	img.fill(Color(1, 1, 1))
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(mottle_cfg.get("seed", 1)) + seed_off
-	for i in 90:
+	for i in blobs:
 		var tone: Color = tones[rng.randi() % tones.size()]
 		var mult := Color(
 			clampf(tone.r / maxf(base.r, 0.02), 0.55, 1.5),
@@ -428,9 +428,13 @@ func _scatter(parent: Node3D, center: Vector3, radii: Vector3, count: int, rng: 
 		var r := sqrt(maxf(0.0, 1.0 - y * y))
 		var dir := Vector3(cos(theta) * r, y, sin(theta) * r)
 		var pos := center + Vector3(dir.x * radii.x, dir.y * radii.y, dir.z * radii.z)
-		var s := rng.randf_range(smin, smax)
+		var s := rng.randf_range(smin, smax) * 0.9
 		var tone: Color = tones[rng.randi() % tones.size()]
-		var mi := _ell(parent, pos, Vector3(s, s * 0.38, s * rng.randf_range(0.7, 1.1)), tone, Vector3(rng.randf_range(-0.4, 0.4), rng.randf() * TAU, rng.randf_range(-0.4, 0.4)))
+		# REALISM PASS 1 (tuning): each patch is muted 25-50% toward
+		# the dark base and pressed flatter — a tone IN the fur over
+		# the baked coat texture, not a disc stuck on top of it.
+		tone = tone.lerp(coat, rng.randf_range(0.25, 0.5))
+		var mi := _ell(parent, pos, Vector3(s, s * 0.30, s * rng.randf_range(0.7, 1.1)), tone, Vector3(rng.randf_range(-0.4, 0.4), rng.randf() * TAU, rng.randf_range(-0.4, 0.4)))
 		_mottles.append(mi)
 	mottle_count = _mottles.size()
 

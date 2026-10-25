@@ -137,13 +137,13 @@ func _run() -> void:
 	check(absf((cat._hips["FL"] as Node3D).rotation.x) < 0.08, "legs settle back to stance at rest")
 
 	# --- coats: baked textures exist and carry real variation -------
-	var cm = aggie._coat_material()
+	var cm := aggie._coat_material() as StandardMaterial3D
 	check(cm != null, "aggie has a baked coat material")
 	if cm != null:
 		check(cm.albedo_color.is_equal_approx(aggie.coat), "coat albedo_color stays the palette base")
 		check(cm.albedo_texture != null, "coat texture baked")
 		if cm.albedo_texture != null:
-			var img := cm.albedo_texture.get_image()
+			var img := (cm.albedo_texture as ImageTexture).get_image()
 			var lo := 10.0
 			var hi := -10.0
 			for gx in range(0, img.get_width(), 9):
@@ -152,7 +152,7 @@ func _run() -> void:
 					lo = minf(lo, r)
 					hi = maxf(hi, r)
 			check(hi - lo > 0.08, "coat texture varies across the fur (range %.2f)" % (hi - lo))
-	var sm = cat._saddle_material()
+	var sm := cat._saddle_material() as StandardMaterial3D
 	check(sm != null and sm.albedo_texture != null, "willie's saddle wears the soft-band texture")
 	check(sm.albedo_color.is_equal_approx(cat.ginger), "saddle albedo_color stays the palette ginger")
 
