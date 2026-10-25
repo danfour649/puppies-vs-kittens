@@ -39,6 +39,34 @@ func _alive_mice(game: Node) -> Array:
 	return out
 
 
+## HARDENED (flurry-phase flakes): park every mouse except `keep`
+## at the yard corner farthest from it. The suite's "freeze"
+## (m.cat = null) only stops mice FLEEING - they keep wandering
+## (measured ~2.9 m in 6 s), and one paw swipe catches EVERY mouse
+## inside the catch radius (main._on_paw_swiped), so a bystander
+## that has wandered into the arc turns a staged single catch
+## into a double, and three downstream checks fail on the
+## arithmetic (caught=2; the flurry drop then leaves caught=1;
+## the escape leaves alive=6). Parking is staging only: no check
+## reads a bystander's position, the parked mice wander back
+## during the later phases, and the win loop travels to each
+## mouse wherever it is.
+func _park_bystanders(game: Node, keep: PvKMouse) -> void:
+	var corners: Array[Vector3] = [
+		Vector3(11.0, 0, 8.0), Vector3(11.0, 0, -8.0),
+		Vector3(-11.0, 0, 8.0), Vector3(-11.0, 0, -8.0)]
+	var best := corners[0]
+	var bd := -1.0
+	for c: Vector3 in corners:
+		var d := Vector2(c.x - keep.global_position.x, c.z - keep.global_position.z).length()
+		if d > bd:
+			bd = d
+			best = c
+	for m: Variant in game.mice:
+		if is_instance_valid(m) and m != keep and (m as PvKMouse).state != "caught":
+			(m as PvKMouse).global_position = best
+
+
 func _ready() -> void:
 	_run()
 
@@ -98,9 +126,24 @@ func _run() -> void:
 	# Freeze the mice so catch checks are about mechanics, not fleeing.
 	for m: Variant in game.mice:
 		m.cat = null
+	_park_bystanders(game, game.mice[0])
 	await _catch_one(game, willie, game.mice[0])
 	check(game.caught_count == 1, "Willie caught a mouse (caught=%d)" % game.caught_count)
 	# Provocation: park Aggie beside Willie and let him meow.
+	# HARDENED (flurry-phase flakes): stage it in the open first.
+	# Willie stands wherever the staged catch left him - the
+	# target mouse can wander anywhere in the yard, so a trunk,
+	# the garden chair or another solid can sit inside the 1.2 m
+	# between Aggie's park spot and Willie. Her dash steering is
+	# a straight line with no way around an obstacle: she presses
+	# head-on into it until the dash times out, the flurry never
+	# starts, and she flees instead (probe: 4 of 51 staged yard
+	# spots wedge - both trunks and the garden chair among
+	# them). Moving Willie to the yard centre changes only where
+	# the sequence is staged: the dash, the paw hits, the dropped
+	# catch and the flee are all still the real thing.
+	willie.velocity = Vector3.ZERO
+	willie.global_position = Vector3(0, 0.05, 0)
 	duo.sibling.autonomous = false
 	aggie.velocity = Vector3.ZERO
 	aggie.global_position = willie.global_position + Vector3(1.2, 0.05, 0)
@@ -202,6 +245,7 @@ func _run() -> void:
 	for m: Variant in game2.mice:
 		m.cat = null
 	var mouse2: PvKMouse = game2.mice[0]
+	_park_bystanders(game2, mouse2) # same bystander rule as phase A
 	player2.velocity = Vector3.ZERO
 	player2.global_position = Vector3(0, 0.05, 1.7)
 	player2.rotation.y = 0.0
