@@ -37,6 +37,13 @@ const OFFER_MAX_DIST := 4.2
 const EAT_RADIUS := 1.15 ## around the chocolate itself
 const EAT_TIME := 1.0 ## seconds of deliberate holding to eat
 const LEAD_TIME := 0.55 ## prediction horizon for corner-cutting
+const PROG_WINDOW := 0.9 ## progress-watch window (s): wanting to
+# move but ending the window where she started = wedged
+const PROG_MIN := 0.12 ## net displacement (m) below which a
+# window counts as NO progress, however fast she slid in place
+const DETOUR_TIME := 2.2 ## how long a wedge detour runs
+const DETOUR_REACH := 1.35 ## first detour waypoint distance (m),
+# anchored on HER position, sideways along the obstacle
 const SLIP_JUMP := 0.9 ## m in ONE frame: no cat moves this far in a
 # frame — a jump this big is a vanish (travel, respawn, a scripted
 # relocation) and she loses him: grabs end, pursuit breaks off.
@@ -76,10 +83,12 @@ var _grab_t := 0.0
 var _grab_cool := 0.0
 var _eat_held := false ## test/touch seam: hold-to-eat without a keyboard
 var _last_sign := Vector2i.ZERO
-var _stuck_t := 0.0
-var _last_pos := Vector3.ZERO
+var _prog_anchor := Vector3.ZERO
+var _prog_t := 0.0
 var _detour_t := 0.0
 var _detour_side := 1.0
+var _detour_point := Vector3.ZERO
+var _detour_fails := 0
 var _rng := RandomNumberGenerator.new()
 var _last_cat: PvKCat = null
 var _last_cat_pos := Vector3.ZERO
@@ -220,14 +229,18 @@ func steering_target() -> Vector3:
 		var tx := predicted.x - o.x
 		if (hx - HouseSpec.DIVIDER_X) * (tx - HouseSpec.DIVIDER_X) < 0.0:
 			var hz := actor.global_position.z - o.z
-			if absf(hz) > 0.9: # not already in the doorway band
+			# "In the doorway" must mean ALIGNED WITH THE OPENING:
+			# the gap spans |z| <= DIVIDER_GAP.size.y / 2 (0.6), and
+			# with her capsule radius (0.20) she is only truly lined
+			# up at |hz| <= 0.35. The old 0.9 band dropped routing
+			# while she was still BESIDE the gap: she steered
+			# straight at the cat, into the wall, and the target
+			# flip-flopped at the band edge forever (the furniture
+			# stall - GF local (-2.09, 0.90), dist frozen at 5.30).
+			if absf(hz) > HouseSpec.DIVIDER_GAP.size.y * 0.5 - 0.25:
 				return Vector3(o.x + HouseSpec.DIVIDER_X, actor.global_position.y, o.z)
 	if _detour_t > 0.0:
-		var to := predicted - actor.global_position
-		to.y = 0.0
-		if to.length() > 0.05:
-			var side := Vector3(-to.normalized().z, 0, to.normalized().x) * _detour_side
-			return predicted + side * 1.1
+		return _detour_point
 	return predicted
 
 
@@ -371,7 +384,7 @@ func _step_pursue(delta: float, cat: PvKCat) -> void:
 		_enter_offer()
 		return
 	# Steer at the predicted point; if the world won't let her
-	# through, bias sideways for a moment (the corner-slide).
+	# through, the progress watch below walks her along it.
 	var point := steering_target()
 	var to := point - actor.global_position
 	to.y = 0.0
@@ -380,17 +393,43 @@ func _step_pursue(delta: float, cat: PvKCat) -> void:
 		_face(point, delta)
 	else:
 		actor.set_move_dir(Vector3.ZERO)
+	# THE PROGRESS WATCH (this replaces a speed-based stuck timer
+	# that was blind to the furniture stall): wanting to move but
+	# ending a window where she started = wedged - whether she is
+	# stone-still or SLIDING along a wall in a target flip-flop.
+	# Raw speed could not see the stall (0.4-0.76 m/s of slide,
+	# 0.01 m of progress in 35 s); net displacement cannot miss it.
 	if _detour_t > 0.0:
 		_detour_t -= delta
-	if actor.speed_now < 0.15 and to.length() > 1.0:
-		_stuck_t += delta
-		if _stuck_t > 0.8:
-			_stuck_t = 0.0
-			_detour_t = 1.1
-			_detour_side = -_detour_side
+		if to.length() < 0.30:
+			_detour_t = 0.0 # arrived at the waypoint - resume
+		_prog_anchor = actor.global_position
+		_prog_t = 0.0
+	elif to.length() > 0.6:
+		_prog_t += delta
+		if _prog_t >= PROG_WINDOW:
+			if _flat(actor.global_position, _prog_anchor) < PROG_MIN:
+				# Wedged. Walk ALONG the obstacle: a waypoint
+				# anchored on HER OWN position, sideways from
+				# the line to her target. (The old detour aimed
+				# at a point beside the CAT - still behind the
+				# wall - so it could never free her.) Alternate
+				# sides; reach further on consecutive wedges.
+				_detour_side = -_detour_side
+				_detour_fails += 1
+				var dir := to.normalized()
+				var side := Vector3(-dir.z, 0, dir.x) * _detour_side
+				var reach := DETOUR_REACH * (1.0 + 0.5 * float(_detour_fails - 1))
+				_detour_point = actor.global_position + side * reach
+				_detour_point.y = actor.global_position.y
+				_detour_t = DETOUR_TIME
+			else:
+				_detour_fails = 0
+			_prog_anchor = actor.global_position
+			_prog_t = 0.0
 	else:
-		_stuck_t = 0.0
-	_last_pos = actor.global_position
+		_prog_anchor = actor.global_position
+		_prog_t = 0.0
 	# The grab itself.
 	if _grab_cool <= 0.0 and flat <= GRAB_RANGE and _can_grab(cat):
 		_begin_grab()

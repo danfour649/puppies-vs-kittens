@@ -274,5 +274,65 @@ func _run() -> void:
 	check(game.run_over, "rat poison ends the run the same way")
 	await free_game(game)
 
+	# ================= instance E: across the furniture line ==============
+	# Regression for the furniture stall (found by the close-out
+	# in-game drive, 2026-10-25): the divider routing used to drop
+	# out at |z| <= 0.9 while the actual gap is |z| <= 0.6, so a
+	# cat east of the living-room furniture line left her pinned
+	# at GF local (-2.09, 0.90) in a target flip-flop, dist
+	# frozen (the front-door cat: 5.30 m, never grabbed). These
+	# stagings park a STATIONARY cat across the divider and
+	# require the grab, front-door + mid-room + the mirror.
+	# EACH STAGE GETS A FRESH GAME: a grab at the front-door
+	# entry ends with the cat popping free ON the door connector
+	# disc, which travels him outside - shared-instance staging
+	# inherits current_zone = outside, which silently disables
+	# the very routing under test (that desync bit this suite's
+	# first draft: E2 "passed" on an outside follow-grab and E3
+	# ran with her_zone stuck outside, routing off).
+	print("GLENYS TESTS E: pursuit across the furniture line (stall regression)")
+	origin = HouseSpec.zone_origin(HouseSpec.GROUND_FLOOR)
+	var stages: Array = [
+		["front-door cat, her in the NW kitchen", Vector3(-4.5, 0.1, 3.2), Vector3(2.5, 0.0, 3.55)],
+		["mid-room cat, her in the NW kitchen", Vector3(-4.5, 0.1, 3.2), Vector3(0.5, 0.0, 1.5)],
+		["kitchen cat, her in the living room (mirror)", Vector3(-0.5, 0.1, 1.0), Vector3(-4.5, 0.0, 3.2)],
+	]
+	for st in stages:
+		game = await load_game()
+		sys = game.get("glenys") as GlenysSystem
+		actor = sys.actor
+		game.duo.choose("willie")
+		game.zones.travel(HouseSpec.GROUND_FLOOR, "EntryFrontDoor", true)
+		await frames(6)
+		sys.force_wake()
+		cat = game.cat
+		cat.set_lounge(false)
+		actor.global_position = origin + (st[1] as Vector3)
+		actor.velocity = Vector3.ZERO
+		cat.global_position = origin + (st[2] as Vector3)
+		cat.velocity = Vector3.ZERO
+		# The cat's teleport is a vanish: burn her slip-pause off
+		# instantly, then pin forget and offers out of the run.
+		var w := 0
+		while sys.state != "pursue" and w < 300:
+			if sys.state == "forget":
+				sys.set("_forget_left", 0.01)
+			if sys.state == "reset":
+				sys.set("_reset_left", 0.01)
+			await frames(1)
+			w += 1
+		sys.set("_forget_t", 9999.0)
+		sys.set("_offer_t", 9999.0)
+		sys.set("_grab_cool", 0.0)
+		t = 0
+		while t < 1500 and sys.state != "grab":
+			await frames(1)
+			t += 1
+			if t % 120 == 0:
+				sys.set("_forget_t", 9999.0)
+				sys.set("_offer_t", 9999.0)
+		check(sys.state == "grab", "she corners a stationary cat across the furniture line: %s (%d frames)" % [st[0], t])
+		await free_game(game)
+
 	print("GLENYS TESTS DONE: %d passed, %d failed" % [_pass, _fail])
 	get_tree().quit(1 if _fail > 0 else 0)
