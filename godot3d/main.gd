@@ -44,6 +44,13 @@ var zones: ZoneManager = null
 var objectives: PvKObjectives = null
 var lives := 9
 var module: MasseyModule = null # MASSEY MODULE (§9): owns zones/objectives/occupants assembly
+## Zone roots live in the module now (MasseyModule._zone_roots, with
+## zone_root(id) as its accessor). This read-only delegation keeps
+## main's pre-module _zone_roots surface working for the harness
+## (tests/test_playtest.gd, glenys/tests_glenys.gd read it directly).
+var _zone_roots: Dictionary:
+	get:
+		return module._zone_roots if module != null else {}
 var _faint_t := -1.0
 var _banner_t := 0.0
 var _lbl_hp: Label
