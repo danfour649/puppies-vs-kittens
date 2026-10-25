@@ -19,6 +19,10 @@ const OutsideScene := preload("res://zones/outside/outside_system.gd")
 const OccupantScript := preload("res://occupants/occupant.gd")
 const OccupantSystemScript := preload("res://occupants/occupant_system.gd")
 const OccupantsRoomScript := preload("res://occupants/occupants_room.gd")
+# GLENYS: the cat-chaser (glenys/) — Daniel's mother, her cane, and
+# the two poisons that are the game's only lethal hazards.
+const GlenysScript := preload("res://glenys/glenys.gd")
+const GlenysSystemScript := preload("res://glenys/glenys_system.gd")
 
 const MOUSE_COUNT := 7
 const YARD := Rect2(-12.4, -9.4, 24.8, 18.8) # inside the fence
@@ -48,6 +52,8 @@ var _hp_bar: ProgressBar
 var _lbl_lives: Label
 var outside: OutsideSystem = null # OUTSIDE
 var occupants: OccupantSystem = null # OCCUPANTS (hub)
+var glenys: GlenysSystem = null # GLENYS (the cat-chaser)
+var run_over := false # POISON: a poison death ends the run (no respawn)
 var catch_radius := 0.62
 var duo_shake := Vector3.ZERO
 var _mouse_seq := 0
@@ -84,6 +90,7 @@ func _ready() -> void:
 	cat.global_position = Vector3(2.5, 0.1, -6.2)
 	cat.rotation.y = PI # face into the yard (+Z); model forward is -Z
 	cat.paw_swiped.connect(_on_paw_swiped)
+	cat.poisoned.connect(_on_cat_poisoned)
 	_build_camera()
 	_build_hud()
 	_touch = TouchScene.new()
@@ -97,6 +104,7 @@ func _ready() -> void:
 	add_child(duo)
 	duo.setup(self)
 	aggie = duo.aggie_cat # shots seam: main's Aggie handle is the duo sibling
+	aggie.poisoned.connect(_on_cat_poisoned)
 	cat.add_to_group("player_cat") # enemies hunt this group
 	_build_zones()
 	# OUTSIDE: trees + squirrels, feeder birds + ambush, the street
@@ -426,7 +434,7 @@ func drop_caught_mouse() -> void:
 
 
 func attempt_strike() -> void:
-	if not won:
+	if not won and not run_over:
 		cat.strike()
 
 
@@ -459,7 +467,7 @@ func restart_game() -> void:
 
 ## MASSEY: Space / POUNCE — jump on the ground, pounce mid-air.
 func _jump_or_pounce() -> void:
-	if won or cat == null:
+	if won or run_over or cat == null:
 		return
 	if duo != null and duo.input_locked():
 		return
@@ -512,6 +520,7 @@ func _build_zones() -> void:
 	add_child(hud)
 	hud.setup(objectives, zones)
 	_build_occupants()
+	_build_glenys()
 
 
 
@@ -569,6 +578,40 @@ func _occupant_stations(seat_x: float, origin: Vector3) -> Array:
 		d["pos"] = origin + (d["pos"] as Vector3)
 		out.append(d)
 	return out
+
+
+## GLENYS moves into the ground floor: Daniel's mother, cane and
+## all. She notices the cats once they come into HER house — after
+## that she follows them anywhere (see glenys/glenys_system.gd).
+func _build_glenys() -> void:
+	var actor := GlenysScript.new() as Glenys
+	actor.name = "Glenys"
+	add_child(actor)
+	var home := HouseSpec.zone_origin(HouseSpec.GROUND_FLOOR) + Vector3(-6.8, 0.0, 3.1)
+	actor.place_at(home, PI * 0.75)
+	glenys = GlenysSystemScript.new() as GlenysSystem
+	glenys.name = "GlenysSystem"
+	add_child(glenys)
+	glenys.setup(self, actor)
+	objectives.declare("glenys:escape_artist", HouseSpec.GROUND_FLOOR, "Escape Glenys x3", 3)
+
+
+## POISON — the run-ending death, and the ONLY one. It routes here
+## solely from the cat's own eat_poison (her chocolate, eaten on
+## purpose; the basement rat poison, gotten into) — never from
+## damage. No life is spent and there is no hub respawn: the run
+## is over. R restarts. (The nine-lives faint flow is untouched.)
+func _on_cat_poisoned(c: PvKCat, source: String) -> void:
+	if run_over or c != cat:
+		return # only the playable cat's poisoning ends the run
+	run_over = true
+	duo_shake = Vector3.ZERO
+	if source == "chocolate":
+		_banner.text = "The chocolate was poison, just as warned.\nGlenys only meant it as a treat — she's beside herself.\nRun over. Press R to play again."
+	else:
+		_banner.text = "Into the old rat poison — no coming back from that.\nRun over. Press R to play again."
+	_banner.visible = true
+	_banner_t = 0.0
 
 
 func _on_occupant_score(event_name: String, points: int, _pos: Vector3) -> void:
@@ -646,6 +689,10 @@ func _physics_process(_delta: float) -> void:
 		# the smoke test drives straight through it.)
 		if duo != null and duo.input_locked():
 			dir = Vector3.ZERO
+		if run_over: # POISON: the run is over; the cat goes nowhere.
+			dir = Vector3.ZERO
+			sprint = false
+			stalk = false
 	cat.set_move_input(dir, sprint, stalk)
 
 
@@ -696,7 +743,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _process(delta: float) -> void:
-	if not won:
+	if not won and not run_over:
 		elapsed += delta
 	var target := cat.global_position + Vector3(0, 0.3, 0) + duo_shake # DUO shake
 	if cam_anchor != null:
