@@ -34,6 +34,7 @@ var _target := Vector3.ZERO
 var _calm_t := 0.0
 var _time := 0.0
 var _phase := 0.0
+var _bound_ph := 0.0 # REALISM PASS 1: bound cycle phase (flee/hop)
 var _model: Node3D
 var _body: Node3D
 var _tail: Node3D
@@ -151,10 +152,20 @@ func _physics_process(delta: float) -> void:
 			_step_forage(delta)
 		"flee":
 			_step_toward(home_tree.global_position + _out_dir() * 0.40, OutsideLayout.SQUIRREL_RUN_SPEED, delta)
+			# REALISM PASS 1: the bounding gait — back arches, body
+			# porpoises, tail arcs a beat behind the bound.
+			_bound_ph += delta * (11.0 + OutsideLayout.SQUIRREL_RUN_SPEED * 1.6)
+			_body.position.y = absf(sin(_bound_ph)) * 0.085
+			_body.rotation.x = sin(_bound_ph) * 0.30
+			_tail.rotation.x = -0.30 + sin(_bound_ph - 1.1) * 0.32
+			_tail.rotation.z = sin(_bound_ph - 1.1) * 0.14
 			if _flat_dist(global_position, home_tree.global_position) < 0.42:
 				state = "climb"
 				climb_y = 0.0
 		"climb":
+			# Settle out of the bound as the trunk takes over.
+			_body.position.y = lerpf(_body.position.y, 0.0, 0.35)
+			_body.rotation.x = lerpf(_body.rotation.x, 0.0, 0.35)
 			climb_y = minf(climb_y + OutsideLayout.SQUIRREL_CLIMB_SPEED * delta, home_tree.branch_y)
 			global_position = home_tree.surface_point(climb_y, _out_dir())
 			_face(home_tree.global_position, delta) # nose into the trunk
@@ -209,8 +220,9 @@ func _step_forage(delta: float) -> void:
 			_body.rotation.x = -0.52
 			_body.position.y = 0.06
 		"hop":
-			_body.rotation.x = 0.0
+			_body.rotation.x = sin(_phase) * 0.18
 			_body.position.y = absf(sin(_phase)) * 0.10
+			_tail.rotation.x = -0.25 + sin(_phase - 1.0) * 0.25 # tail arcs behind the hop
 			_step_toward(_target, 1.7, delta)
 			if _flat_dist(global_position, _target) < 0.2:
 				_mode_t = 0.0

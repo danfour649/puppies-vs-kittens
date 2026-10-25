@@ -288,6 +288,31 @@ static func build_ground_floor(k: Kit) -> Dictionary:
 	k.omni(Vector3(-5.0, 2.3, -1.0), Color(1.0, 0.9, 0.75), 0.85, 7.5)
 	k.omni(Vector3(4.5, 2.3, 0.5), Color(1.0, 0.92, 0.78), 0.85, 7.5)
 	k.omni(Vector3(2.5, 2.3, 3.6), Color(1.0, 0.95, 0.82), 0.5, 5.0)
+	# REALISM PASS 1 dressing: floor + wall texture variation — plank
+	# strips across the living room, a tile checker in the kitchen
+	# (kept clear of the stairwell hole), wainscot + picture frames
+	# on the living-room south wall. Visual only: no statics added,
+	# no HouseSpec geometry touched.
+	var plank_a := Color(0.60, 0.47, 0.33)
+	var plank_b := Color(0.55, 0.42, 0.29)
+	var lx := -1.55
+	var pi := 0
+	while lx < 8.3:
+		k.box(Vector3(0.58, 0.008, 9.2), Vector3(lx + 0.29, 0.004, 0.0), plank_a if pi % 2 == 0 else plank_b, false)
+		lx += 0.62
+		pi += 1
+	var tile_a := Color(0.78, 0.75, 0.68)
+	var tile_b := Color(0.68, 0.66, 0.60)
+	for tx in range(-8, -2):
+		for tz in range(-4, 4):
+			var c := Vector2(tx + 0.65, tz + 0.65)
+			if HouseSpec.STAIRWELL.grow(0.35).has_point(c):
+				continue
+			k.box(Vector3(1.24, 0.008, 1.24), Vector3(c.x, 0.004, c.y), tile_a if (tx + tz) % 2 == 0 else tile_b, false)
+	k.box(Vector3(10.1, 0.5, 0.04), Vector3(3.35, 0.25, 4.70), Color(0.83, 0.78, 0.68), false)
+	for fx: float in [1.8, 6.9]:
+		k.box(Vector3(0.8, 1.0, 0.05), Vector3(fx, 1.7, 4.70), wood.darkened(0.1), false)
+		k.box(Vector3(0.66, 0.86, 0.055), Vector3(fx, 1.7, 4.70), Color(0.75, 0.72, 0.6), false)
 	return {"drawer": drawer, "water_bowl": bowl, "sofa": sofa}
 
 

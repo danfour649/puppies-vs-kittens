@@ -93,6 +93,10 @@ func get_caught() -> void:
 	tw.tween_callback(queue_free)
 
 
+var _flap_ph := 0.0 # REALISM PASS 1
+var _glide := 0.0 # REALISM PASS 1: 0 = flapping, 1 = gliding
+
+
 func _physics_process(delta: float) -> void:
 	if state == "caught" or _body == null:
 		return
@@ -107,11 +111,19 @@ func _physics_process(delta: float) -> void:
 		if vel.length() > 0.01:
 			var yaw := atan2(-vel.x, -vel.z)
 			rotation.y = lerp_angle(rotation.y, yaw, 1.0 - exp(-10.0 * delta))
-		# Wings work hard in flight.
-		var flap := sin(_time * 30.0) * 0.75
-		_wing_l.rotation.z = 0.15 + flap
-		_wing_r.rotation.z = -0.15 - flap
-		_body.rotation.x = 0.0
+		# REALISM PASS 1: flap / glide cycle. The arc's rise works
+		# the wings; the top and the descent glide on a held
+		# dihedral; arrivals flare — wings wide, body pitched up.
+		var vspeed := vel.y / maxf(delta, 0.001)
+		var glide_want := 1.0 if (vspeed < -0.35 or _t > 0.8) else 0.0
+		_glide = move_toward(_glide, glide_want, delta * 1.6)
+		_flap_ph += delta * (24.0 + 10.0 * (1.0 - _glide))
+		var flap_amt := clampf(1.0 - _glide * 0.88 + clampf(vspeed * 0.25, -0.1, 0.3), 0.08, 1.0)
+		var flap := sin(_flap_ph) * 0.78 * flap_amt
+		var dihedral := 0.15 + _glide * 0.22
+		_wing_l.rotation.z = dihedral + flap
+		_wing_r.rotation.z = -dihedral - flap
+		_body.rotation.x = lerpf(_body.rotation.x, -0.30 if (state == "arrive" and _t > 0.85) else 0.0, 0.3)
 		if _t >= 1.0:
 			_flying = false
 			if state == "arrive":

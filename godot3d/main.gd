@@ -212,6 +212,76 @@ func _build_environment() -> void:
 	_static_box(statics, Vector3(0.5, 2.6, 0.5), Vector3(-8.5, 1.3, -5.0))
 	_static_box(statics, Vector3(2.4, 1.5, 1.2), Vector3(9.9, 0.75, -6.05))
 	_static_box(statics, Vector3(0.7, 0.46, 0.7), CHAIR_SEAT + Vector3(0, -0.23, 0))
+	_dress_yard(env)
+
+
+## REALISM PASS 1 dressing: grass tufts + flower dots, a hedge line
+## inside the south fence, and the house's exterior trim (door frame,
+## window sills + muntins, corner boards, eaves fascia, porch posts).
+## Visual only — no statics, no layout or HouseSpec changes.
+func _dress_yard(env: Node3D) -> void:
+	var trim := Color(0.92, 0.9, 0.85)
+	var wood_dark := Color(0.42, 0.31, 0.21)
+	var hedge := Color(0.16, 0.32, 0.12)
+	var blade_mesh := CylinderMesh.new()
+	blade_mesh.top_radius = 0.0
+	blade_mesh.bottom_radius = 0.018
+	blade_mesh.height = 0.24
+	blade_mesh.radial_segments = 5
+	var blade_mats: Array = [_mat(Color(0.26, 0.44, 0.18)), _mat(Color(0.36, 0.55, 0.24))]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4211
+	var keep_out: Array = [Vector2(2.5, -8.7), Vector2(4.5, 4.5), Vector2(-8.5, -5.0), Vector2(9.9, -6.05)]
+	var keep_r: Array = [1.7, 1.1, 1.3, 1.3]
+	var placed := 0
+	var tries := 0
+	while placed < 14 and tries < 60:
+		tries += 1
+		var cx := rng.randf_range(-12.2, 12.2)
+		var cz := rng.randf_range(-9.2, 9.5)
+		var bad := false
+		for i in keep_out.size():
+			if Vector2(cx - keep_out[i].x, cz - keep_out[i].y).length() < keep_r[i]:
+				bad = true
+		if bad:
+			continue
+		placed += 1
+		for b in 3:
+			var blade := MeshInstance3D.new()
+			blade.mesh = blade_mesh
+			blade.material_override = blade_mats[rng.randi() % blade_mats.size()]
+			blade.position = Vector3(cx + rng.randf_range(-0.09, 0.09), 0.11, cz + rng.randf_range(-0.09, 0.09))
+			blade.rotation = Vector3(rng.randf_range(-0.28, 0.28), rng.randf() * TAU, rng.randf_range(-0.28, 0.28))
+			blade.scale = Vector3.ONE * rng.randf_range(0.75, 1.45)
+			env.add_child(blade)
+		if placed % 2 == 0:
+			var dot := MeshInstance3D.new()
+			var sm := SphereMesh.new()
+			sm.radius = 0.032
+			sm.height = 0.064
+			sm.radial_segments = 8
+			sm.rings = 4
+			dot.mesh = sm
+			dot.material_override = _mat(Color(0.95, 0.88, 0.55) if placed % 4 == 0 else Color(0.9, 0.9, 0.92))
+			dot.position = Vector3(cx + 0.14, 0.1, cz + 0.1)
+			env.add_child(dot)
+	# South-fence hedge line (inside the fence, slight height jitter).
+	for i in 9:
+		_box(env, Vector3(2.55, 0.5 + 0.08 * sin(i * 2.3), 0.5), Vector3(-11.0 + i * 2.75, 0.27, 9.55), hedge.darkened(0.05 * (i % 3)))
+	# House trim.
+	_box(env, Vector3(0.12, 2.2, 0.14), Vector3(1.92, 1.32, -9.94), trim) # door jambs
+	_box(env, Vector3(0.12, 2.2, 0.14), Vector3(3.08, 1.32, -9.94), trim)
+	_box(env, Vector3(1.28, 0.12, 0.14), Vector3(2.5, 2.44, -9.94), trim) # lintel
+	for wx: float in [-4.5, 6.5]:
+		_box(env, Vector3(1.6, 0.07, 0.16), Vector3(wx, 1.32, -9.95), trim) # sill
+		_box(env, Vector3(0.05, 0.9, 0.13), Vector3(wx, 1.9, -9.96), trim) # muntins
+		_box(env, Vector3(1.3, 0.05, 0.13), Vector3(wx, 1.9, -9.96), trim)
+	for sx: float in [-1.0, 1.0]:
+		_box(env, Vector3(0.18, 3.4, 0.1), Vector3(sx * 8.45, 1.7, -9.96), trim) # corner boards
+	_box(env, Vector3(17.6, 0.18, 0.06), Vector3(0, 3.38, -9.32), trim) # eaves fascia
+	_box(env, Vector3(0.12, 1.5, 0.12), Vector3(0.0, 0.99, -7.55), wood_dark) # porch posts
+	_box(env, Vector3(0.12, 1.5, 0.12), Vector3(5.0, 0.99, -7.55), wood_dark)
+	_box(env, Vector3(1.4, 0.12, 0.5), Vector3(2.5, 0.06, -7.12), Color(0.55, 0.42, 0.3)) # step
 
 
 func _build_lights() -> void:

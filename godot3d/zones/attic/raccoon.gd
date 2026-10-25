@@ -672,8 +672,13 @@ func _process(delta: float) -> void:
 				body_pitch = lerpf(-0.22, 0.0, minf(1.0, (_state_t - 0.14) / 0.2))
 			if _hips.has("FR"):
 				(_hips["FR"] as Node3D).rotation.x = -1.0 if _state_t >= 0.10 and _state_t < 0.26 else 0.0
+	# REALISM PASS 1: the waddle — a raccoon's whole body rolls side
+	# to side over its stride, with a little bounce on top.
+	var waddle := sin(_phase) * 0.085 if moving else 0.0
+	if moving and state != "dead":
+		body_y += absf(sin(_phase)) * 0.02
 	if state != "stagger":
-		_body.rotation.z = lerpf(_body.rotation.z, 1.85, _flop_k) if state == "dead" else 0.0
+		_body.rotation.z = lerpf(_body.rotation.z, 1.85, _flop_k) if state == "dead" else waddle
 	if state == "dead":
 		body_y = -0.10 * _flop_k
 	_body.scale = body_scale

@@ -221,6 +221,45 @@ func _build_frontage() -> void:
 	_static(statics, Vector3(36.0, 1.2, 0.6), Vector3(0, 0.6, -23.6))
 	_static(statics, Vector3(0.6, 1.2, 10.6), Vector3(-17.8, 0.6, -18.5))
 	_static(statics, Vector3(0.6, 1.2, 10.6), Vector3(17.8, 0.6, -18.5))
+	# REALISM PASS 1 dressing: road wear patches, worn edge lines,
+	# sidewalk cracks, front-lawn tufts, hedge-top jitter. Visual only.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 99
+	for i in 6:
+		var wc: Color = asphalt.lightened(0.05) if i % 2 == 0 else asphalt.darkened(0.18)
+		_box(env, Vector3(rng.randf_range(1.2, 2.8), 0.008, rng.randf_range(0.8, 1.7)), Vector3(rng.randf_range(-16.0, 16.0), 0.004, rng.randf_range(-18.6, -15.2)), wc)
+	for ez: float in [-14.35, -19.45]:
+		var ex := -17.0
+		var seg := 0
+		while ex < 16.0:
+			if seg % 3 != 2: # the worn gaps in the paint
+				_box(env, Vector3(3.0, 0.01, 0.11), Vector3(ex + 1.5, 0.005, ez), Color(0.72, 0.70, 0.62))
+			ex += 4.4
+			seg += 1
+	for i in 5:
+		_box(env, Vector3(0.05, 0.012, 0.86), Vector3(rng.randf_range(-15.0, 15.0), 0.002, -13.65), Color(0.4, 0.4, 0.38))
+	var blade_mesh := CylinderMesh.new()
+	blade_mesh.top_radius = 0.0
+	blade_mesh.bottom_radius = 0.018
+	blade_mesh.height = 0.24
+	blade_mesh.radial_segments = 5
+	var blade_mats: Array = [_mat(Color(0.26, 0.44, 0.18)), _mat(Color(0.36, 0.55, 0.24))]
+	for c in 8:
+		var cx := rng.randf_range(-12.0, 12.0)
+		if absf(cx - 7.2) < 1.9:
+			cx += 4.0 # keep the driveway mouth clear
+		var cz := rng.randf_range(-13.1, -12.7)
+		for b in 3:
+			var blade := MeshInstance3D.new()
+			blade.mesh = blade_mesh
+			blade.material_override = blade_mats[rng.randi() % blade_mats.size()]
+			blade.position = Vector3(cx + rng.randf_range(-0.08, 0.08), 0.10, cz + rng.randf_range(-0.08, 0.08))
+			blade.rotation = Vector3(rng.randf_range(-0.28, 0.28), rng.randf() * TAU, rng.randf_range(-0.28, 0.28))
+			blade.scale = Vector3.ONE * rng.randf_range(0.75, 1.4)
+			env.add_child(blade)
+	for sx: float in [-13.45, 13.45]:
+		for i in 2:
+			_box(env, Vector3(0.56, 0.2, 0.95), Vector3(sx, 0.98, -12.4 + i * 1.3), hedge.lightened(0.06))
 
 
 func _build_corolla() -> void:
