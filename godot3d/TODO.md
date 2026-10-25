@@ -64,9 +64,9 @@ Aggie: an urge meter, a "Find Willie" objective, and occasional
 involuntary roll-and-yowl interrupts. Cartoonish throughout — comedy
 in behaviour, never anatomy.
 
-- [ ] Heat cycle FSM + SiblingAI heat modes (seek / solicit)
-- [ ] Yowl synth (MeowAudio variant: louder, longer)
-- [ ] Willie NPC response table (stare / groom / knock drink / mount attempt)
-- [ ] Player-Aggie urge meter + Find Willie objective + interrupts
-- [ ] No-kittens punchline popup (first mount attempt)
-- [ ] tests_heat suite; full battery green
+- [x] Heat cycle FSM + SiblingAI heat modes (seek / solicit)
+- [x] Yowl synth (MeowAudio variant: louder, longer)
+- [x] Willie NPC response table (stare / groom / knock drink / mount attempt)
+- [x] Player-Aggie urge meter + Find Willie objective + interrupts
+- [x] No-kittens punchline popup (first mount attempt)
+- [x] tests_heat suite; full battery green

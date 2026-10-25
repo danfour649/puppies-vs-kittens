@@ -446,7 +446,7 @@ func _build_hud() -> void:
 	_popup_label = _hud_banner("", 26, Color(1, 0.95, 0.85), 222)
 	_urge_label = Label.new()
 	_urge_label.text = "Aggie's urge"
-	_urge_label.position = Vector2(18, 178)
+	_urge_label.position = Vector2(18, 210)
 	_urge_label.add_theme_font_size_override("font_size", 18)
 	_urge_label.add_theme_color_override("font_color", Color(1, 1, 1))
 	_urge_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.55))
@@ -455,7 +455,7 @@ func _build_hud() -> void:
 	_urge_label.visible = false
 	_hud_layer.add_child(_urge_label)
 	_urge_bar = ProgressBar.new()
-	_urge_bar.position = Vector2(18, 204)
+	_urge_bar.position = Vector2(18, 236)
 	_urge_bar.size = Vector2(190, 16)
 	_urge_bar.min_value = 0.0
 	_urge_bar.max_value = 100.0
@@ -473,7 +473,7 @@ func _build_hud() -> void:
 	_hud_layer.add_child(_urge_bar)
 	_objective_label = Label.new()
 	_objective_label.text = "Objective: Find Willie"
-	_objective_label.position = Vector2(18, 228)
+	_objective_label.position = Vector2(18, 260)
 	_objective_label.add_theme_font_size_override("font_size", 18)
 	_objective_label.add_theme_color_override("font_color", Color(1, 0.85, 0.9))
 	_objective_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.55))
