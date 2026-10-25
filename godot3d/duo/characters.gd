@@ -15,6 +15,18 @@ const DATA_PATH := "res://cat_kit/cat_species.json"
 ## RESTART reloads the scene, and the choice should survive that.
 static var last_choice := ""
 
+## Select-screen data (MK-pattern select, Daniel 2026-10-25): ONE
+## short line per cat and the cat's real start. The positions are the
+## game's actual spawns — Willie is placed by main.gd in front of the
+## porch door, Aggie by DuoSystem on the garden chair — and the
+## minimap marks exactly these, so the screen never lies.
+const WILLIE_LINE := "Big. Loud. Knocks your drink over."
+const AGGIE_LINE := "Small calico. Wins every fight."
+const WILLIE_START_NAME := "The Front Porch"
+const WILLIE_START_POS := Vector3(2.5, 0.1, -6.2) # main.gd's spawn literal
+const AGGIE_START_NAME := "The Garden Chair"
+const AGGIE_START_POS := Vector3(4.5, 0.52, 4.5) # DuoSystem's chair spawn
+
 const WILLIE_TRAITS := [
 	"Big & plush — the handsome boy",
 	"Meows CONSTANTLY (M key / MEOW button)",
@@ -92,6 +104,9 @@ static func _willie_from_flat(d: Dictionary) -> Dictionary:
 		"stamina_regen": float(g.get("stamina_regen", 14.0)),
 		"traits": WILLIE_TRAITS.duplicate(),
 		"blurb": "The big boy. Loud, plush, and in everyone's way.",
+		"line": WILLIE_LINE,
+		"start_name": WILLIE_START_NAME,
+		"start_pos": WILLIE_START_POS,
 		"meow": "willie",
 	}
 
@@ -116,6 +131,9 @@ static func _aggie_default() -> Dictionary:
 		"stamina_regen": 16.0,
 		"traits": AGGIE_TRAITS.duplicate(),
 		"blurb": "The little terror. Chill — until he starts meowing.",
+		"line": AGGIE_LINE,
+		"start_name": AGGIE_START_NAME,
+		"start_pos": AGGIE_START_POS,
 		"meow": "aggie",
 	}
 
@@ -153,6 +171,13 @@ static func _overlay(chars: Dictionary, id: String, e: Dictionary) -> void:
 			base["traits"] = tr
 	if e.has("blurb"):
 		base["blurb"] = String(e["blurb"])
+	if e.has("line"):
+		base["line"] = String(e["line"])
+	if e.has("start_name"):
+		base["start_name"] = String(e["start_name"])
+	if typeof(e.get("start_pos")) == TYPE_ARRAY and (e["start_pos"] as Array).size() >= 3:
+		var sp: Array = e["start_pos"]
+		base["start_pos"] = Vector3(float(sp[0]), float(sp[1]), float(sp[2]))
 	chars[id] = base
 
 

@@ -33,8 +33,10 @@ Two cats, one yard — see `duo/README.md` for the full tour.
 
 - **Character select** at game start: play as **Willie** (big, plush,
   meows constantly) or as his sister **Aggie** (small, wiry, chill
-  but vicious — faster, with a burst strike). Keys **1 / 2**, mouse,
-  or touch. The other cat is in the yard with you as a sibling NPC,
+  but vicious — faster, with a burst strike). The highlighted cat
+  is rendered live on a spotlight stage, its start marked on a
+  minimap; arrows / mouse move, Enter / click or keys **1 / 2**
+  pick. The other cat is in the yard with you as a sibling NPC,
   lounging and wandering.
 - **Meow** — **M** key or the **MEOW** touch button. Procedural
   audio, no assets. NPC Willie meows on his own every 6–10 s.

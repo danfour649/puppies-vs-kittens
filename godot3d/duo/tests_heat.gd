@@ -38,10 +38,16 @@ func _flat(a: Vector3, b: Vector3) -> float:
 
 
 func _cat_count(game: Node) -> int:
+	# Counts GAME-WORLD cats. The MK character select (PR #20) keeps a
+	# preview build of each roster cat inside its stage SubViewport —
+	# those are display mannequins in their own World3D, not game cats,
+	# so SubViewport subtrees are not descended into.
 	var n := 0
 	var stack: Array = [game]
 	while not stack.is_empty():
 		var node: Node = stack.pop_back()
+		if node is SubViewport:
+			continue
 		if node is PvKCat:
 			n += 1
 		for c: Node in node.get_children():
