@@ -13,6 +13,7 @@ extends Node
 const CatScene := preload("res://cat_kit/cat.gd")
 const SiblingAIScene := preload("res://duo/sibling_ai.gd")
 const ProvocationScene := preload("res://duo/provocation.gd")
+const HeatSystemScene := preload("res://duo/heat_system.gd")
 const CharacterSelectScene := preload("res://duo/character_select.gd")
 
 const LOUNGE_SPOTS: Array = [
@@ -32,6 +33,7 @@ var aggie_cat: PvKCat = null
 var player_cat: PvKCat = null
 var sibling: SiblingAI = null
 var prov: Provocation = null
+var heat: HeatSystem = null
 var select_ui: CharacterSelect = null
 var aura: MeshInstance3D = null
 
@@ -86,6 +88,10 @@ func setup(game_node: Node) -> void:
 	prov.name = "Provocation"
 	add_child(prov)
 	prov.setup(aggie_cat, willie_cat, sibling, self)
+	heat = HeatSystemScene.new()
+	heat.name = "HeatSystem"
+	add_child(heat)
+	heat.setup(self, aggie_cat, willie_cat)
 	aggie_cat.paw_swiped.connect(_on_aggie_paw)
 	_build_hud()
 	select_ui = CharacterSelectScene.new()
@@ -135,6 +141,8 @@ func choose(id: String) -> void:
 	# Swap roles between the same two instances.
 	sibling.unbind()
 	prov.reset()
+	if heat != null:
+		heat.reset()
 	var old := player_cat
 	player_cat = want
 	game.set("cat", player_cat)
