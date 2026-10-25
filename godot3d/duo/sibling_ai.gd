@@ -23,7 +23,24 @@ var lounge_spots: Array = []
 ##   | heat_seek | heat_solicit              (Aggie in heat, NPC)
 ##   | heat_stare | heat_groom | heat_knock | heat_knock_done
 ##   | heat_mount | heat_mount_hold          (Willie in heat, NPC)
-var mode := "idle"
+## The name is the shared state machine. Territorial stalk / crouch /
+## pounce is the other-cat profile (other_cat.gd); this sibling stays
+## on the modes the duo and heat suites already drive.
+const _MODES: Array[String] = [
+	"idle", "to_lounge", "lounge", "wander", "dash", "flurry", "flee",
+	"heat_seek", "heat_solicit", "heat_stare", "heat_groom", "heat_knock",
+	"heat_knock_done", "heat_mount", "heat_mount_hold",
+]
+var _fsm: CreatureFSM
+var mode: String:
+	get:
+		return _fsm.state if _fsm != null else "idle"
+	set(value):
+		if _fsm != null:
+			_fsm.change_to(value)
+var sees_player := false
+var _brain: CreatureBrain
+var _sense := CreaturePerception.new()
 ## When false, the cat holds its current mode (tests + cut moments);
 ## provocation commands work regardless.
 var autonomous := true
@@ -40,8 +57,19 @@ var _heat_target := Vector3.ZERO
 var _heat_hopped := false
 
 
+func _init() -> void:
+	_fsm = CreatureFSM.new()
+	for s: String in _MODES:
+		_fsm.add_state(s)
+	_fsm.change_to("idle")
+
+
 func _ready() -> void:
 	_rng.randomize()
+	_brain = CreatureBrain.new()
+	_brain.bind_profile("other_cat", _rng.randi())
+	_sense.sight_range = 8.0
+	_sense.sight_fov_deg = 150.0
 
 
 func bind(c: PvKCat, player: PvKCat, spots: Array) -> void:
@@ -195,6 +223,8 @@ func _physics_process(delta: float) -> void:
 	if mode != "lounge" and cat.is_lounging:
 		cat.set_lounge(false)
 	_timer -= delta
+	if player_cat != null and is_instance_valid(player_cat) and cat != null and is_instance_valid(cat):
+		sees_player = _sense.can_see(cat.global_position, cat.forward_dir(), player_cat.global_position, false)
 	match mode:
 		"lounge":
 			cat.set_move_input(Vector3.ZERO, false, false)

@@ -35,10 +35,23 @@ signal hp_changed(rat: PvKRat)
 @export var active := true ## tests / the hub can freeze the brain
 
 var hp: int
-var state := "idle" ## idle, wander, chase, flee, dead
+## idle, wander, chase, flee, dead — the name lives on the shared
+## state machine. Combat transitions go through CreatureBrain.decide_rat.
+var _fsm: CreatureFSM
+var state: String:
+	get:
+		return _fsm.state if _fsm != null else "idle"
+	set(value):
+		if _fsm != null:
+			_fsm.change_to(value)
 var _startle_t := 0.0 ## set by startle() — a cat hiss freezes the rat
 var target_cat: Node3D = null
 var den := Vector3.ZERO
+## A new object in the den. Empty unless a caller sets it — rats
+## steer around it (neophobia). Mice, given the same object, would not.
+var novel_pos := Vector3.ZERO
+var novel_active := false
+var _sense := CreaturePerception.new()
 
 const COAT := Color(0.30, 0.26, 0.22)
 const COAT_ALPHA := Color(0.20, 0.17, 0.15)
@@ -59,6 +72,13 @@ var _parts: Array = [] ## [MeshInstance3D, original Material] for the hit flash
 var _flash_mat: StandardMaterial3D
 var _bar: Node3D = null
 var _bar_fg: MeshInstance3D = null
+
+
+func _init() -> void:
+	_fsm = CreatureFSM.new()
+	for s: String in ["idle", "wander", "chase", "flee", "dead"]:
+		_fsm.add_state(s)
+	_fsm.change_to("idle")
 
 
 func _ready() -> void:
@@ -296,26 +316,24 @@ func _physics_process(delta: float) -> void:
 		else:
 			to_cat.y = 0.0
 			dist = to_cat.length()
+			# Hearing is the aggro sense. The radius matches the old
+			# distance check, and a cat just outside it must NOT look
+			# like "no cat" (that would cancel a flee early).
+			_sense.hearing_range = aggro_radius
+			if not _sense.hears(global_position, target_cat.global_position, 1.0, aggro_radius):
+				dist = aggro_radius
 
-	# Flee: alone (no packmates near) and down to the last hit point.
-	if state != "flee" and hp <= 1 and dist < aggro_radius and _packmates_nearby() == 0:
-		state = "flee"
-		_flee_t = 2.5
-	if state == "flee":
-		_flee_t -= delta
-		if _flee_t <= 0.0 or dist == INF:
-			state = "idle"
-			_timer = 0.5
-		else:
-			_drive(-to_cat.normalized(), flee_speed, delta)
-			move_and_slide()
-			return
-
-	if dist < aggro_radius:
-		state = "chase"
-	elif state == "chase":
-		state = "idle"
-		_timer = 0.3
+	# Pack combat — owned by the shared brain, same thresholds as before.
+	var decision := CreatureBrain.decide_rat(state, hp, dist, _packmates_nearby(), aggro_radius, _flee_t, delta)
+	state = String(decision["state"])
+	_flee_t = float(decision["flee_t"])
+	if bool(decision.get("set_timer", false)):
+		_timer = float(decision["timer"])
+	if bool(decision.get("fleeing", false)):
+		var away := -to_cat.normalized() if to_cat.length() > 0.01 else Vector3(0, 0, 1)
+		_drive(away, flee_speed, delta)
+		move_and_slide()
+		return
 
 	match state:
 		"chase":
@@ -334,6 +352,8 @@ func _physics_process(delta: float) -> void:
 				state = "wander"
 				var a := _rng.randf() * TAU
 				_target = den + Vector3(cos(a), 0, sin(a)) * _rng.randf_range(0.4, 2.0)
+				if novel_active:
+					_target = CreatureBrain.steer_neophobia(_target, global_position, novel_pos, CreatureProfiles.neophobia_of("rat"))
 				_timer = 5.0
 		"wander":
 			var to := _target - global_position

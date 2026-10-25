@@ -21,10 +21,22 @@ const SKINS := [
 	{"back": Color(0.30, 0.42, 0.62), "breast": Color(0.80, 0.83, 0.86)}, # blue jay
 ]
 
-var state := "arrive"
+## arrive / peck / leave / flee / caught — names on the shared machine.
+## Feeder birds are still commanded (fly_to / burst_off). Songbirds
+## that think for themselves live in songbird.gd and opt in with
+## flock_brain_enabled.
+var _fsm: CreatureFSM
+var state: String:
+	get:
+		return _fsm.state if _fsm != null else "arrive"
+	set(value):
+		if _fsm != null:
+			_fsm.change_to(value)
+var flock_brain_enabled := false
 var perch_kind := "" ## "feeder" or "ground"
 var perch_pos := Vector3.ZERO
 var peck_time := 3.0
+var _song: CreatureBrain
 
 var _from := Vector3.ZERO
 var _to := Vector3.ZERO
@@ -49,7 +61,16 @@ func setup(skin: int, seed_: int) -> void:
 	_rng.seed = seed_
 
 
+func _init() -> void:
+	_fsm = CreatureFSM.new()
+	for s: String in ["arrive", "peck", "leave", "flee", "caught"]:
+		_fsm.add_state(s)
+	_fsm.change_to("arrive")
+
+
 func _ready() -> void:
+	_song = CreatureBrain.new()
+	_song.bind_profile("songbird", _rng.randi())
 	_build_model()
 
 
@@ -134,6 +155,19 @@ func _physics_process(delta: float) -> void:
 				departed.emit(self)
 				queue_free()
 	elif state == "peck":
+		if flock_brain_enabled:
+			var intent := _song.step(delta, {
+				"pos": global_position,
+				"forward": CreaturePerception.forward_from_yaw(rotation.y),
+				"has_cat": false,
+				"indoor": false,
+				"lights": [],
+				"flock": [],
+				"sounds": [],
+			})
+			if String(intent.get("state", "")) == "panic_light":
+				burst_off(intent.get("target", global_position + Vector3(0, 2, 0)))
+				return
 		_peck_t += delta
 		# Peck-peck-peck: the front dips in little bursts.
 		var burst := fmod(_time * 1.4, 1.0)

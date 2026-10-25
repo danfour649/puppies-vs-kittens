@@ -1,0 +1,58 @@
+name: Web
+
+# Builds the HTML5 night and keeps it as an artifact. On a push to
+# main it also publishes GitHub Pages, if Pages is enabled for the
+# repo. The export is single-threaded GL Compatibility, which is
+# what Godot's web template can run without cross-origin isolation.
+on:
+  push:
+    branches: [main, "cursor/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Godot 4.7
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/godot" "$HOME/.local/share/godot/export_templates/4.7.stable"
+          curl -fsSL -o /tmp/godot.zip "https://github.com/godotengine/godot-builds/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip"
+          curl -fsSL -o /tmp/templates.tpz "https://github.com/godotengine/godot-builds/releases/download/4.7-stable/Godot_v4.7-stable_export_templates.tpz"
+          unzip -q /tmp/godot.zip -d "$HOME/godot"
+          unzip -q /tmp/templates.tpz -d /tmp/godot-templates
+          cp -a /tmp/godot-templates/templates/. "$HOME/.local/share/godot/export_templates/4.7.stable/"
+          chmod +x "$HOME/godot/Godot_v4.7-stable_linux.x86_64"
+      - name: Export Web
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/godot3d/build/web"
+          "$HOME/godot/Godot_v4.7-stable_linux.x86_64" --headless --path "$GITHUB_WORKSPACE/godot3d" --import --quit
+          "$HOME/godot/Godot_v4.7-stable_linux.x86_64" --headless --path "$GITHUB_WORKSPACE/godot3d" --export-release "Web" "$GITHUB_WORKSPACE/godot3d/build/web/index.html"
+          test -f "$GITHUB_WORKSPACE/godot3d/build/web/index.html"
+          test -f "$GITHUB_WORKSPACE/godot3d/build/web/index.wasm"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: willie-aggie-web
+          path: godot3d/build/web
+          if-no-files-found: error
+      - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: godot3d/build/web
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: export
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -21,10 +21,19 @@ var state := "idle"
 var home := Vector3.ZERO
 var bounds := Rect2(-11.5, -8.5, 23.0, 17.0)
 var cat: Node3D = null
+## World hour the shared brain reads. The yard has no clock; evening
+## keeps the mice awake (they are nocturnal). The basement night
+## passes its own hour.
+var world_hour := 21.0
+var scent_map: CatScentMap = null
+var wall_query: Callable = Callable()
+var nibble_anchors: Array = []
+var heard_sounds: Array = []
 
 var _target := Vector3.ZERO
 var _timer := 0.0
 var _flee_t := 0.0
+var _brain: CreatureBrain
 var _phase := 0.0
 var _time := 0.0
 var _model: Node3D
@@ -39,6 +48,8 @@ func _ready() -> void:
 	_phase = _rng.randf() * TAU
 	_timer = _rng.randf_range(0.3, 2.0)
 	_target = global_position
+	_brain = CreatureBrain.new()
+	_brain.bind_profile("mouse", _rng.randi())
 	_build_model()
 
 
@@ -104,40 +115,87 @@ func _clamp_bounds(p: Vector3) -> Vector3:
 	return p
 
 
+func _brain_intent(delta: float) -> Dictionary:
+	if _brain == null:
+		_brain = CreatureBrain.new()
+		_brain.bind_profile("mouse", 1)
+	# A harness can pin state back to idle; the shared machine follows.
+	if state == "idle" and _brain.fsm.state == "flee":
+		_brain.fsm.change_to("idle")
+		_flee_t = 0.0
+	_brain.flee_t = _flee_t
+	var p := global_position
+	var scent := 0.0
+	if scent_map != null:
+		scent = scent_map.danger_at(p)
+	var pull := Vector3.ZERO
+	if wall_query.is_valid():
+		pull = wall_query.call(p)
+	else:
+		pull = _edge_pull(p)
+	var novel := {}
+	if scent_map != null:
+		novel = scent_map.nearest_novel(p, 1.5)
+	var has_cat := cat != null and is_instance_valid(cat)
+	var intent: Dictionary = _brain.step(delta, {
+		"pos": p,
+		"forward": CreaturePerception.forward_from_yaw(rotation.y),
+		"hour": world_hour,
+		"has_cat": has_cat,
+		"cat_pos": cat.global_position if has_cat else p,
+		"scent": scent,
+		"sounds": heard_sounds,
+		"wall_pull": pull,
+		"home": home,
+		"flee_range": FLEE_RADIUS,
+		"novel": novel,
+		"nibble_anchors": nibble_anchors,
+		"bounds_min": Vector3(bounds.position.x, 0.0, bounds.position.y),
+		"bounds_max": Vector3(bounds.position.x + bounds.size.x, 0.0, bounds.position.y + bounds.size.y),
+	})
+	_flee_t = _brain.flee_t
+	if state != "caught":
+		# The yard still says "wander" for a mouse that is out nibbling
+		# or reusing a runway, so older readers keep working.
+		var brain_state := String(intent.get("state", "idle"))
+		if brain_state == "nibble" or brain_state == "runway":
+			state = "wander"
+		else:
+			state = brain_state
+	intent["target"] = _clamp_bounds(intent.get("target", p))
+	return intent
+
+
+func _edge_pull(p: Vector3) -> Vector3:
+	var min_x := bounds.position.x
+	var max_x := bounds.position.x + bounds.size.x
+	var min_z := bounds.position.y
+	var max_z := bounds.position.y + bounds.size.y
+	var best := 1.4
+	var pull := Vector3.ZERO
+	var edges := [
+		[min_x - p.x, Vector3(-1, 0, 0)],
+		[p.x - max_x, Vector3(1, 0, 0)],
+		[min_z - p.z, Vector3(0, 0, -1)],
+		[p.z - max_z, Vector3(0, 0, 1)],
+	]
+	for edge: Array in edges:
+		var gap := absf(float(edge[0]))
+		if gap < best:
+			best = gap
+			var dir: Vector3 = edge[1]
+			pull = dir * clampf(1.0 - gap / 1.4, 0.0, 1.0)
+	return pull
+
+
 func _process(delta: float) -> void:
 	if state == "caught" or _body == null:
 		return
 	_time += delta
-	_timer -= delta
+	var intent := _brain_intent(delta)
+	var speed := float(intent.get("speed", 0.0))
+	_target = intent.get("target", global_position)
 	var p := global_position
-	var speed := 0.0
-	# Flee check first, like wildlife.gd _step.
-	var fleeing := false
-	if cat != null:
-		var away := Vector3(p.x - cat.global_position.x, 0, p.z - cat.global_position.z)
-		if away.length() < FLEE_RADIUS:
-			fleeing = true
-			if state != "flee":
-				state = "flee"
-				_flee_t = 0.0
-			_flee_t += delta
-			_target = _clamp_bounds(p + away.normalized() * 6.0)
-			speed = FLEE_SPEED if _flee_t < 1.2 else FLEE_TIRED_SPEED
-	if not fleeing:
-		if state == "flee":
-			state = "idle"
-			_timer = 0.4
-		match state:
-			"idle":
-				if _timer <= 0.0:
-					state = "wander"
-					_target = _clamp_bounds(home + Vector3(_rng.randf_range(-3.0, 3.0), 0, _rng.randf_range(-3.0, 3.0)))
-					_timer = 6.0
-			"wander":
-				speed = WANDER_SPEED
-				if p.distance_to(_target) < 0.15 or _timer <= 0.0:
-					state = "idle"
-					_timer = _rng.randf_range(0.8, 3.0)
 	if speed > 0.0:
 		var to := _target - p
 		to.y = 0.0
