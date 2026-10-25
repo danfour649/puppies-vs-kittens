@@ -48,27 +48,35 @@ func _run() -> void:
 	await _frames(6)
 	var sys: GlenysSystem = game.get("glenys")
 	var actor: Glenys = sys.actor
-	sys.force_wake()
 	sys.set("_forget_t", 9999.0)
 	sys.set("_offer_t", 9999.0)
 	var origin := HouseSpec.zone_origin(HouseSpec.GROUND_FLOOR)
 	var cat: PvKCat = game.cat
 	cat.set_lounge(false)
 
-	# (1) PURSUIT — she is mid-room, mid-stride, cane down, the cat
-	# a couple of metres ahead of her in the living room.
+	# (1) PURSUIT — staged with her switched OFF (she wakes the
+	# instant the cat enters her floor, so any earlier staging
+	# plays out live and the vanish rule quite rightly fires).
+	# Cat placed, Glenys placed, then she wakes and genuinely
+	# walks him down for the camera: mid-room, mid-stride, cane
+	# cycling, the cat ahead of her.
+	sys.set_active(false)
 	cat.global_position = origin + Vector3(3.4, 0.1, 1.4)
 	cat.velocity = Vector3.ZERO
-	actor.global_position = origin + Vector3(-0.7, 0.1, 0.5)
-	await _frames(46) # let the gait and the cane cycle get going
+	actor.global_position = origin + Vector3(0.2, 0.1, 0.7)
+	sys.set_active(true)
+	sys.force_wake()
+	await _frames(95) # properly mid-stride: gait + cane cycle rolling
 	_camera(origin + Vector3(4.9, 1.5, 4.6), origin + Vector3(1.2, 0.75, 1.0))
 	await _shot("pursuit")
 
 	# (2) GRAB — caught: held up at her chest, prompt on screen.
+	# Captured within a couple of physics frames of the grab so the
+	# pose in frame is the hold itself.
 	sys.debug_grab()
-	await _frames(8)
+	await _frames(2)
 	var a := actor.global_position
-	_camera(a + Vector3(1.35, 0.75, 1.55), a + Vector3(0, 0.95, 0))
+	_camera(a + Vector3(1.35, 0.75, 1.55), a + Vector3(0, 1.0, 0))
 	await _shot("grab")
 
 	print("GLENYS SHOTS DONE")

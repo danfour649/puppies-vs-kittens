@@ -192,12 +192,16 @@ func _build_model() -> void:
 		else:
 			_arm_r = sh
 
-	# Head on its pivot: low, forward, grey bun behind.
+	# Head on its pivot: low, forward, grey bun behind. The pivot
+	# sits LOW so the skull nests into the cardigan's shoulder
+	# curve (a floating head reads wrong instantly), with a short
+	# neck column bridging the two.
+	_taper(_model, Vector3(0, 1.21, -0.03), 0.052, 0.078, 0.16, SKIN) # neck
 	_head_pivot = Node3D.new()
-	_head_pivot.position = Vector3(0, 1.33, -0.05)
+	_head_pivot.position = Vector3(0, 1.26, -0.05)
 	_model.add_child(_head_pivot)
 	_ell(_head_pivot, Vector3(0, 0.07, -0.01), Vector3(0.205, 0.225, 0.21), SKIN) # skull
-	_ell(_head_pivot, Vector3(0, 0.115, 0.025), Vector3(0.215, 0.15, 0.215), HAIR) # hair cap
+	_ell(_head_pivot, Vector3(0, 0.10, 0.012), Vector3(0.225, 0.19, 0.225), HAIR) # hair cap — wider than the skull so a grey rim crowns it from the front too
 	_ell(_head_pivot, Vector3(0, 0.155, 0.095), Vector3(0.10, 0.10, 0.10), HAIR) # the bun
 	for sx: float in [-1.0, 1.0]:
 		_ell(_head_pivot, Vector3(sx * 0.042, 0.075, -0.105), Vector3(0.026, 0.026, 0.02), Color(0.10, 0.09, 0.09)) # eyes

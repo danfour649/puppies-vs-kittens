@@ -154,6 +154,7 @@ func player_target() -> PvKCat:
 func set_active(on: bool) -> void:
 	if on and state == "disabled":
 		state = "dormant"
+		_last_cat = null # fresh eyes: no vanish verdicts off stale tracking
 		actor.visible = true
 		actor.set_physics_process(true)
 	elif not on:
@@ -448,6 +449,10 @@ func _step_grab(delta: float, cat: PvKCat) -> void:
 	cat.velocity = Vector3.ZERO
 	cat.global_position = actor.hold_point_global()
 	cat.rotation.y = actor.rotation.y + PI
+	# The pin itself moves him (up to ~1 m from a max-range grab):
+	# resync the vanish tracker so SHE never counts as a vanish.
+	_last_cat = cat
+	_last_cat_pos = cat.global_position
 	# Struggle input: rapid direction changes (keys or stick).
 	var v := Vector2.ZERO
 	if Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT):
@@ -596,6 +601,7 @@ func _enter_forget() -> void:
 
 func _wake() -> void:
 	state = "pursue"
+	_last_cat = null # she starts tracking from where he is NOW
 	actor.set_pose("walk")
 	_offer_t = OFFER_FIRST
 	_forget_t = _rng.randf_range(FORGET_EVERY[0], FORGET_EVERY[1])
