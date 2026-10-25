@@ -9,11 +9,12 @@ extends CharacterBody3D
 ## Characters (cat_species.json -> characters): `willie` (default) and
 ## `aggie`. Call set_character("aggie") right after new(), before
 ## add_child — the model is built in _ready from the character record.
-## Colouring is each cat's own, from Daniel's photos of the real cats
-## (reference/ in this folder): Willie is white with rich-orange tabby
-## patches (cap, big saddle, ringed tail, faint darker striping);
-## Aggie is a dark tortoiseshell — a seeded scatter of orange/cream
-## mottle shells over a warm black-brown base.
+## Colouring is each cat's own, per Daniel's ruled spec (2026-10-25;
+## see cat_kit/README.md): Willie is white with #E8AF54 ginger tabby
+## patches (cap, big saddle, white tail with a ginger underside,
+## faint darker striping) and dark eyes; Aggie is a dark calico — a
+## seeded scatter of orange/cream mottle shells over a warm
+## black-brown base.
 ##
 ## Animation is entirely code-driven pose math (idle breathing, gait,
 ## crouch, lounge flop, strike), in the spirit of wildlife.gd's
@@ -34,12 +35,12 @@ const INVULN_TIME := 0.8 # brief mercy window after any landed hit
 var character_id := "willie"
 var species_name := "Willie"
 var coat := Color(1, 1, 1)
-var ginger := Color(0.780, 0.439, 0.125)
-var ginger_dark := Color(0.592, 0.329, 0.090)
+var ginger := Color(0.9098, 0.6863, 0.3294) # #E8AF54 — Daniel's ruled ginger (2026-10-25)
+var ginger_dark := Color(0.682, 0.515, 0.237) # #AE833C — derived from #E8AF54 (x0.75, x0.75, x0.72)
 var mottle_orange := Color(0.690, 0.431, 0.173)
 var mottle_cream := Color(0.749, 0.659, 0.478)
 var nose_color := Color(0.851, 0.549, 0.478)
-var eye_color := Color(0.541, 0.604, 0.231)
+var eye_color := Color(0.10, 0.08, 0.07) # dark — Willie's ruled eye colour
 var inner_ear_color := Color(0.89, 0.65, 0.56)
 var pattern := "bicolor"
 var model_scale := 0.35
@@ -117,6 +118,7 @@ var _hiss_t := -1.0
 var _hiss_k := 0.0
 var _faint_k := 0.0
 var _tail_segs: Array = [] # [MeshInstance3D, base diameter] — the hiss puff
+var _tail_underside: Array = [] # Willie's ginger tail-underside shells (ruled spec)
 
 static var _doc: Dictionary = {}
 static var _doc_loaded := false
@@ -503,8 +505,8 @@ func _build_model() -> void:
 
 
 ## Willie's markings: a LARGE ginger saddle over the whole back and
-## upper sides (photo truth), a small chest bib, and faint darker
-## tabby striping inside the saddle.
+## upper sides, a small chest bib, and faint darker tabby striping
+## inside the saddle (Daniel's ruled spec, 2026-10-25).
 func _build_bicolor_body() -> void:
 	_saddle_patch = _ell_m(_body, Vector3(0, 0.612, 0.04), Vector3(0.468, 0.335, 0.82), _saddle_material())
 	_ell(_body, Vector3(0, 0.605, 0.335), Vector3(0.46, 0.31, 0.38), ginger)
@@ -521,9 +523,12 @@ func _build_bicolor_body() -> void:
 
 
 func _stripe(parent: Node3D, pos: Vector3, dia: Vector3, rot: Vector3) -> void:
-	# REALISM PASS 1: stripes sit 30% toward the ginger — a tone in the
-	# fur, not ribs laid over it (the baked saddle shading does the rest).
-	_stripes.append(_ell(parent, pos, dia, ginger_dark.lerp(ginger, 0.30), rot))
+	# Stripes wear the derived ginger_dark exactly. (Realism pass 1 sat
+	# them 30% toward the ginger, but that softening belonged to the
+	# photo-tuned palette; under Daniel's 2026-10-25 ruling the spec-lock
+	# wins — tests/smoke.gd locks the stripe albedo to ginger_dark. The
+	# baked saddle shading still does the tonal blending.)
+	_stripes.append(_ell(parent, pos, dia, ginger_dark, rot))
 	stripe_count = _stripes.size()
 
 
@@ -604,7 +609,7 @@ func _build_head() -> void:
 		ear.scale.z = 0.05
 		_ears.append([ear, sx, ear.rotation])
 		_ell(_head, Vector3(sx * 0.088, 0.15, -0.032), Vector3(0.05, 0.09, 0.02), inner_ear_color)
-	# Eyes: green-gold/hazel for both cats (photo truth).
+	# Eyes: per-character from the data — Willie's dark (ruled spec, 2026-10-25), Aggie's green-gold.
 	for sx: float in [-1.0, 1.0]:
 		_eyes.append(_ell(_head, Vector3(sx * 0.067, 0.045, -0.178), Vector3(0.034, 0.034, 0.034), eye_color, Vector3.ZERO, 0.25))
 	_ell(_head, Vector3(0, -0.018, -0.222), Vector3(0.042, 0.028, 0.026), nose_color, Vector3.ZERO, 0.5)
@@ -646,19 +651,22 @@ func _build_tail() -> void:
 		[0.17, 0.016, 0.096], [0.22, 0.027, 0.090], [0.265, 0.041, 0.082],
 		[0.31, 0.057, 0.074], [0.355, 0.079, 0.066], [0.400, 0.114, 0.058],
 	]
-	var tail_cols: Array
-	if pattern == "tortoiseshell":
-		tail_cols = [coat, coat, coat, coat, coat, coat, coat, coat, coat]
-	else: # Willie's tail: substantially ginger, ringed with the darker tone
-		tail_cols = [coat, ginger, ginger_dark, ginger, ginger_dark, ginger, ginger_dark, ginger, ginger]
+	# Tail segments are the coat colour for both cats (white for
+	# Willie, her dark base for Aggie). Willie's tail (Daniel's ruled
+	# spec, 2026-10-25): WHITE with a ginger underside — a flattened
+	# ginger shell hugging the lower half of each segment. No rings.
 	var seg_pos: Array = []
 	for i in segs.size():
 		var s: Array = segs[i]
 		var pos := Vector3(0, float(s[1]), float(s[0]))
 		seg_pos.append([pos, float(s[2]) * tail_k])
-		var seg_mi := _ell(_tail, pos, Vector3.ONE * float(s[2]) * tail_k, tail_cols[i])
+		var seg_mi := _ell(_tail, pos, Vector3.ONE * float(s[2]) * tail_k, coat)
 		_tail_segs.append([seg_mi, float(s[2]) * tail_k])
 		_tail_base.append(pos)
+		if pattern != "tortoiseshell":
+			var dia := float(s[2]) * tail_k
+			var under := _ell(_tail, pos + Vector3(0, -dia * 0.32, 0), Vector3(dia * 0.94, dia * 0.48, dia * 0.94), ginger)
+			_tail_underside.append(under)
 	if pattern == "tortoiseshell":
 		# Orange running through the dark tail (photo truth).
 		var rng := _mottle_rng()

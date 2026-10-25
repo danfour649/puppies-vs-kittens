@@ -69,27 +69,31 @@ below.
 
 ### Willie — the big plush boy (player cat, scale 0.35)
 
-Daniel's boy, and the game's player character. Photo truth (from
-`reference/reference-willie-basket.jpg` and
-`reference/reference-willie-table.jpg`; these override the v0.1
-hand-drawn sprite where they differ): pure white face blaze,
-muzzle, chest, belly, legs and paws; **rich orange tabby** — a cap
-wrapping the top of the head around the ears and down the sides of
-the cheeks, a **large saddle** over the whole back and upper sides,
-and a substantially ginger, ringed tail; green-gold eyes; pink
-nose.
+Daniel's boy, and the game's player character. **Canonical
+appearance is Daniel's ruled spec (director's call, 2026-10-25),
+which supersedes the earlier photo-tuned pass** (the photos in
+`reference/` remain the build and pattern reference): pure white
+face blaze, muzzle, chest, belly, legs and paws; **ginger tabby**
+— a cap wrapping the top of the head around the ears and down the
+sides of the cheeks, a **large saddle** over the whole back and
+upper sides, and a **white tail with a ginger underside** (no
+rings); **dark eyes**; pink nose.
 
-- Palette: coat `#FFFFFF`; ginger `#C97020` (inside the
-  #C26D1E–#CD7A2A band Daniel specified — "definitely darker
-  orange" than the v0.1 art's #E8AF54); tabby striping
-  `ginger_dark #975417` — a faint, darker banding laid as thin
-  flattened shells across the saddle, two on the cap, and
-  alternating into the tail rings; eyes `#8A9A3B`; nose `#D98C7A`.
-- Tonemapping compensation: raw photo medians sample muted
-  (#A68041-ish) under indoor light and shadow, and the game's ACES
-  tonemapper + midday sun desaturate further (the old #E8AF54 build
-  rendered pale gold). The albedo is therefore set rich and tuned
-  by eye against the photos in the standing `willie_closeup` shot.
+- Palette (SPEC-LOCKED by Daniel's 2026-10-25 ruling; the smoke
+  test asserts these constants): coat `#FFFFFF`; ginger `#E8AF54`
+  — the colour Daniel specified; tabby striping `ginger_dark
+  #AE833C` — derived from `#E8AF54` by the same per-channel
+  factors (x0.75, x0.75, x0.72) the earlier pass applied to its
+  base, laid as thin flattened shells across the saddle and two
+  on the cap; tail white with a ginger underside shell under each
+  segment; eyes dark `#1A1412`; nose `#D98C7A`.
+- History: an earlier pass photo-tuned the albedo richer
+  (`#C97020` / `#975417`, green-gold `#8A9A3B` eyes, ringed tail)
+  as tonemapping compensation. Daniel ruled that a spec defect
+  (2026-10-25): his recorded values above are canonical even
+  where the render reads lighter. Do not "fix" the palette back
+  toward the photos — the spec-lock assertions in `tests/smoke.gd`
+  fail the build if they drift.
 - Build: **plush** — thick torso (0.44 unit wide), full chest and
   haunches, legs a touch shorter relative to the body, tail 1.3×
   thick. Scale **0.35**, up from the GTA stray's 0.32: he is a big
@@ -101,19 +105,20 @@ nose.
   Aggie's attack trigger (below). Behaviour lands in the later GTA
   slices; this kit carries the definition.
 
-### Aggie — the wiry tortie (NPC, scale 0.25)
+### Aggie — the wiry calico (NPC, scale 0.25)
 
-Willie's much smaller sister — "chill but vicious". Daniel calls
-her a calico; the photos (`reference/reference-aggie-drawer.jpg`,
-`reference/reference-aggie-plant.jpg`) show a **dark
-tortoiseshell**: warm black-brown base with irregular orange and
-cream mottling everywhere, a mostly dark face with orange mottling
-and a cream/orange throat and chest, a dark tail with orange
-running through it, green-gold eyes like his.
+Willie's much smaller sister — "chill but vicious". A **dark
+calico** (Daniel's recorded word for her coat; photos in
+`reference/reference-aggie-drawer.jpg` and
+`reference/reference-aggie-plant.jpg`): warm black-brown base with
+irregular orange and cream mottling everywhere, a mostly dark
+face with orange mottling and a cream/orange throat and chest, a
+dark tail with orange running through it, green-gold eyes (hers
+stay green-gold — the dark-eye ruling is Willie's).
 
 - Palette: base `#241C17` (photo median); mottle orange `#B06E2C`;
   mottle cream `#BFA87A`; eyes `#8A9A3B`; nose near-black brown.
-- Tortie technique: a **seeded scatter** of small flattened
+- Calico technique: a **seeded scatter** of small flattened
   ellipsoid shells in the two tones, hugging the torso (denser),
   head, legs and tail over the dark base — irregular sizes,
   rotations and placement driven by `palette.mottle.seed`
