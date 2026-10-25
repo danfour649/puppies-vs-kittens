@@ -38,7 +38,7 @@ func show_character(id: String) -> void:
 		# Frame by the cat's real scale: Willie 0.35 fills more of the
 		# light than Aggie 0.25, exactly as he should.
 		var s := float(cat.model_scale)
-		_camera.position = Vector3(0.0, 0.16 + 0.62 * s, -(0.30 + 2.9 * s))
+		_camera.position = Vector3(0.0, 0.15 + 0.58 * s, -(0.28 + 2.55 * s))
 		_camera.rotation = Vector3(deg_to_rad(-6.0), PI, 0.0)
 
 
@@ -54,16 +54,16 @@ func _build_room() -> void:
 	var we := WorldEnvironment.new()
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.008, 0.008, 0.013)
+	env.background_color = Color(0.022, 0.019, 0.028)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.13, 0.14, 0.18)
-	env.ambient_light_energy = 0.5
+	env.ambient_light_color = Color(0.15, 0.145, 0.17)
+	env.ambient_light_energy = 0.65
 	we.environment = env
 	add_child(we)
 
 	var floor_mat := StandardMaterial3D.new()
-	floor_mat.albedo_color = Color(0.045, 0.045, 0.055)
-	floor_mat.roughness = 1.0
+	floor_mat.albedo_color = Color(0.055, 0.052, 0.065)
+	floor_mat.roughness = 0.75
 	var floor_mesh := BoxMesh.new()
 	floor_mesh.size = Vector3(16, 0.1, 16)
 	floor_mesh.material = floor_mat
@@ -73,7 +73,7 @@ func _build_room() -> void:
 	add_child(floor_mi)
 
 	var wall_mat := StandardMaterial3D.new()
-	wall_mat.albedo_color = Color(0.028, 0.028, 0.042)
+	wall_mat.albedo_color = Color(0.042, 0.038, 0.058)
 	wall_mat.roughness = 1.0
 	var wall_mesh := BoxMesh.new()
 	wall_mesh.size = Vector3(16, 8, 0.2)
@@ -82,6 +82,25 @@ func _build_room() -> void:
 	wall.mesh = wall_mesh
 	wall.position = Vector3(0, 4, 2.4)
 	add_child(wall)
+
+	# Halo glow on the wall behind the pedestal: the spotlight reads
+	# against a composed backdrop, not a void.
+	var halo_mat := StandardMaterial3D.new()
+	halo_mat.albedo_color = Color(0.16, 0.12, 0.04)
+	halo_mat.emission_enabled = true
+	halo_mat.emission = Color(0.50, 0.36, 0.10)
+	halo_mat.emission_energy_multiplier = 0.45
+	var halo_mesh := SphereMesh.new()
+	halo_mesh.radius = 0.85
+	halo_mesh.height = 1.7
+	halo_mesh.radial_segments = 48
+	halo_mesh.rings = 24
+	halo_mesh.material = halo_mat
+	var halo := MeshInstance3D.new()
+	halo.mesh = halo_mesh
+	halo.scale = Vector3(1, 1, 0.06)
+	halo.position = Vector3(0, 0.52, 2.26)
+	add_child(halo)
 
 	# Physics: the floor, plus the pedestal disc as a static shape (the
 	# disc MESH rides the turntable; its collision stays put — the disc
