@@ -120,10 +120,10 @@ func _physics_process(delta: float) -> void:
 			if _drive(_target, 0.45, false) or _timer <= 0.0:
 				go_lounge_nearest()
 		"to_lounge":
-			if _drive(_target, 0.55, false):
+			if _drive(_target, 0.55, false, false, _lounge_arrive_radius()):
 				_arrive_lounge()
 		"flee":
-			if _drive(_target, 1.0, true):
+			if _drive(_target, 1.0, true, false, _lounge_arrive_radius()):
 				_arrive_lounge()
 		"dash":
 			if player_cat != null and is_instance_valid(player_cat):
@@ -139,13 +139,25 @@ func _physics_process(delta: float) -> void:
 			cat.set_move_input(Vector3.ZERO, false, false)
 
 
+## Arrival radius for lounge-bound drives. A furniture spot is
+## unreachable on foot: the garden chair's seat slab (0.66 x 0.58,
+## top at y 0.46) stops the capsule at a flat ~0.50 m from centre —
+## outside the stock 0.45 arrival radius — so a WALKED lounge
+## arrival could never fire and the cat wedged against the chair
+## forever (she only ever lounged there from her spawn point on
+## it). _arrive_lounge snaps the final stretch onto the spot, so
+## an elevated spot gets a hop-on radius; floor spots keep stock.
+func _lounge_arrive_radius() -> float:
+	return 0.8 if _target.y > 0.1 else 0.45
+
+
 ## Drive toward a point. Returns true on arrival (within snap range).
 ## Unless `chase` is set (target IS the player), steering bends away
 ## from the player's cat so paths curve around it.
-func _drive(point: Vector3, frac: float, sprint: bool, chase := false) -> bool:
+func _drive(point: Vector3, frac: float, sprint: bool, chase := false, arrive := 0.45) -> bool:
 	var to := point - cat.global_position
 	to.y = 0.0
-	if to.length() < 0.45:
+	if to.length() < arrive:
 		cat.set_move_input(Vector3.ZERO, false, false)
 		return true
 	var dir := to.normalized()
