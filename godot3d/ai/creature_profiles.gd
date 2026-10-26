@@ -7,8 +7,9 @@ extends RefCounted
 ## (they do not cache), freeze or flee on cat scent or sound, and
 ## they are NOT strongly wary of new objects.
 ## Rats: the same senses, but they ARE wary of new things.
-## Songbirds: forage, flock, alarm, mob outdoors; indoors they
-## panic-fly toward light.
+## Songbirds: forage, flock, alarm, mob outdoors. The alarm call
+## warns birds who have not seen the cat. Indoors they call, then
+## panic-fly toward a window.
 ## The other cat: territorial, crepuscular, perches high, and
 ## hunts stalk → crouch → pounce.
 

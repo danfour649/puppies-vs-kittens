@@ -216,6 +216,21 @@ func _mouse() -> void:
 	var back: Dictionary = comer.step(0.8, _ctx({"scent": 0.0, "home": Vector3(3, 0, 0)}))
 	check(String(back["state"]) == "return", "once it is quiet she comes back")
 	check(back["target"].distance_to(Vector3(3, 0, 0)) < 0.05, "she comes back to her own spot")
+	var nester := CreatureBrain.new()
+	nester.bind_profile("mouse", 1)
+	nester.step(0.1, _ctx({"scent": 0.95, "home": Vector3(3, 0, 0)}))
+	var along: Dictionary = nester.step(0.8, _ctx({
+		"scent": 0.0,
+		"home": Vector3(3, 0, 0),
+		"wall_pull": Vector3(1, 0, 0),
+	}))
+	check(String(along["state"]) == "return" and String(along["note"]) == "nest", "the way home is a nest return")
+	check(along["target"].x > 3.8, "she hugs the wall on the way back to the nest (x %.2f)" % along["target"].x)
+	var still := CreatureBrain.new()
+	still.bind_profile("mouse", 1)
+	still.step(0.1, _ctx({"scent": 0.5}))
+	var held: Dictionary = still.step(0.2, _ctx({"scent": 0.0}))
+	check(String(held["state"]) == "freeze" and float(held["speed"]) == 0.0, "a freeze holds after the scent thins")
 
 
 func _noise() -> void:
@@ -270,14 +285,17 @@ func _bird() -> void:
 	check(String(mob["state"]) == "mob" and bool(mob["mob"]), "the next beat, the flock mobs")
 	var indoor := CreatureBrain.new()
 	indoor.bind_profile("songbird", 1)
-	var panic: Dictionary = indoor.step(0.1, _ctx({
+	var indoor_ctx := {
 		"has_cat": true,
 		"cat_pos": Vector3(0, 0, -2),
 		"indoor": true,
 		"lights": [Vector3(4, 1.6, 1)],
 		"flock": [],
-	}))
-	check(String(panic["state"]) == "panic_light", "indoors a songbird panic-flies")
+	}
+	var called: Dictionary = indoor.step(0.1, _ctx(indoor_ctx))
+	check(String(called["state"]) == "alarm" and bool(called["alarm"]), "indoors the first sight is an alarm call")
+	var panic: Dictionary = indoor.step(0.1, _ctx(indoor_ctx))
+	check(String(panic["state"]) == "panic_light", "indoors a songbird panic-flies after the call")
 	var light: Vector3 = panic["target"]
 	check(light.distance_to(Vector3(4, 1.6, 1)) < 0.05, "the panic aims at the light, not the cat")
 	var calm := CreatureBrain.new()
@@ -295,15 +313,28 @@ func _bird() -> void:
 	check(flock["target"].x > 5.0, "flocking steers toward the others")
 	var to_glass := CreatureBrain.new()
 	to_glass.bind_profile("songbird", 1)
-	var glass: Dictionary = to_glass.step(0.1, _ctx({
+	var glass_ctx := {
 		"has_cat": true,
 		"cat_pos": Vector3(0, 0, -2),
 		"indoor": true,
 		"lights": [Vector3(0.3, 1.2, 0)],
 		"windows": [Vector3(6.0, 1.6, 1.0)],
 		"flock": [],
-	}))
+	}
+	to_glass.step(0.1, _ctx(glass_ctx))
+	var glass: Dictionary = to_glass.step(0.1, _ctx(glass_ctx))
 	check(String(glass["state"]) == "panic_light" and String(glass["note"]) == "window", "indoors the panic is toward a window")
+	var warned := CreatureBrain.new()
+	warned.bind_profile("songbird", 1)
+	var flush: Dictionary = warned.step(0.1, _ctx({
+		"has_cat": false,
+		"indoor": true,
+		"lights": [Vector3(0.3, 1.2, 0)],
+		"windows": [Vector3(6.0, 1.6, 1.0)],
+		"sounds": [{"pos": Vector3(1.2, 0, 0), "loudness": 0.85, "kind": "alarm"}],
+		"flock": [],
+	}))
+	check(String(flush["state"]) == "panic_light" and String(flush["note"]) == "warned", "an alarm call flushes a bird who never saw the cat")
 	var glass_at: Vector3 = glass["target"]
 	check(glass_at.distance_to(Vector3(6.0, 1.6, 1.0)) < 0.05, "a far window beats a nearer lamp")
 
