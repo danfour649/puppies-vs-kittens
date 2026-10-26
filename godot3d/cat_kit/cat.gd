@@ -75,6 +75,11 @@ var speed_multiplier := 1.0
 
 # --- read-only state (the controller contract) -------------------------------
 var anim_state := "idle"
+## An ethology overlay (chatter, wiggle, loaf, …). CatSculpt blends a
+## clip of this name when the rig has one, and does nothing when it
+## does not. Gameplay never depends on the clip being present.
+var manner := ""
+var manner_k := 0.0
 var stamina := 100.0
 var is_lounging := false
 ## HEAT: the courtship pose blend (Aggie's solicitation -- a rocking

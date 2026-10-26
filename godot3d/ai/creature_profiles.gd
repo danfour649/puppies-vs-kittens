@@ -106,7 +106,7 @@ static func other_cat() -> Dictionary:
 		"pounce_range": 0.85,
 		"crouch_time": 0.35,
 		"pounce_time": 0.32,
-		"states": ["perch", "patrol", "stalk", "crouch", "pounce", "recover"],
+		"states": ["perch", "patrol", "stalk", "crouch", "ambush", "pounce", "recover"],
 	}
 
 

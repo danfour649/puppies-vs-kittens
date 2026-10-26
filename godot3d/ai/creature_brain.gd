@@ -541,6 +541,9 @@ func _step_cat(delta: float, ctx: Dictionary) -> Dictionary:
 		return _intent("patrol", 0.6, patrol, false, false, "territory")
 	var crouch_r := float(profile.get("crouch_range", 1.65))
 	var pounce_r := float(profile.get("pounce_range", 0.85))
+	var from_cover := _ambush_intent(pos, prey, pounce_r, ctx)
+	if not from_cover.is_empty():
+		return from_cover
 	if _hunt == "pounce":
 		_pounce_t += delta
 		if _pounce_t >= float(profile.get("pounce_time", 0.32)):
@@ -560,7 +563,7 @@ func _step_cat(delta: float, ctx: Dictionary) -> Dictionary:
 			_hunt = "pounce"
 			_pounce_t = 0.0
 			return _intent("pounce", float(profile.get("pounce_speed", 4.4)), prey, false, false, "pounce")
-		return _intent("crouch", 0.0, pos, false, false, "crouch")
+		return _intent("crouch", 0.0, pos, false, false, "wiggle")
 	_hunt = "stalk"
 	_crouch_t = 0.0
 	var stalk_speed := float(profile.get("stalk_speed", 0.85))
@@ -697,6 +700,28 @@ func _clamp_target(target: Vector3, ctx: Dictionary) -> Vector3:
 	target.z = clampf(target.z, mn.z, mx.z)
 	target.y = 0.0
 	return target
+
+
+## Under the furniture: slip to a cover that sits between her and
+## the prey, wait, and pounce when it crosses the mouth of the hide.
+func _ambush_intent(pos: Vector3, prey: Vector3, pounce_r: float, ctx: Dictionary) -> Dictionary:
+	var covers: Array = ctx.get("covers", [])
+	if covers.is_empty() or _hunt == "pounce" or _hunt == "recover":
+		return {}
+	var cover := CatManners.ambush_cover(pos, prey, covers)
+	if cover == Vector3.INF:
+		return {}
+	var at := Vector2(pos.x - cover.x, pos.z - cover.z).length()
+	var prey_d := Vector2(prey.x - cover.x, prey.z - cover.z).length()
+	if at > 0.5:
+		_hunt = "ambush"
+		return _intent("ambush", float(profile.get("stalk_speed", 0.85)), cover, false, false, "to-cover")
+	if prey_d > pounce_r:
+		_hunt = "ambush"
+		return _intent("ambush", 0.0, cover, false, false, "wait")
+	_hunt = "pounce"
+	_pounce_t = 0.0
+	return _intent("pounce", float(profile.get("pounce_speed", 4.4)), prey, false, false, "ambush-pounce")
 
 
 func _intent(state: String, speed: float, target: Vector3, alarm: bool, mob: bool, note: String) -> Dictionary:

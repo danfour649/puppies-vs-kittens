@@ -45,6 +45,7 @@ func _run() -> void:
 	_rat()
 	_bird()
 	_cat()
+	_manners()
 	_creatures()
 	print("AI TESTS DONE: %d passed, %d failed" % [_pass, _fail])
 	get_tree().quit(1 if _fail > 0 else 0)
@@ -343,6 +344,7 @@ func _cat() -> void:
 		"perches": [Vector3(0, 1.5, 0)],
 	}))
 	check(String(pounce["state"]) == "pounce" and float(pounce["speed"]) > 3.0, "after the crouch, the pounce")
+	check(String(crouch["note"]) == "wiggle", "the crouch before the pounce is the butt-wiggle")
 
 	var picked := CreatureBrain.contested_prey(
 		Vector3.ZERO,
@@ -390,6 +392,60 @@ func _cat() -> void:
 		"perches": [Vector3(0, 1.6, 0)],
 	}))
 	check(String(nap["state"]) == "perch", "at noon she stays on the box even if Willie walks in")
+
+
+func _manners() -> void:
+	check(CatManners.wiggle_accuracy(0.0) < 0.5, "a pounce with no wiggle is a rough guess")
+	check(CatManners.wiggle_accuracy(1.0) == 1.0, "a finished wiggle lands where he aimed")
+	var wide := CatManners.pounce_offset(Vector3(0, 0, -1), 0.0, 1.0)
+	var tight := CatManners.pounce_offset(Vector3(0, 0, -1), 1.0, 1.0)
+	check(wide.length() > 0.5 and tight.length() < 0.01, "the miss shrinks as the wiggle finishes (%.2f)" % wide.length())
+	var birds: Array = [Vector3(0, 0.4, -4.0)]
+	var chat := CatManners.chatter_bird(Vector3(0, 0, 0), Vector3(0, 0, -1), Vector3(0, 1.2, -1.2), birds)
+	check(is_equal_approx(chat.z, -4.0), "at the window, facing the glass, he chatters at the bird (got %s)" % chat)
+	var away := CatManners.chatter_bird(Vector3(0, 0, 0), Vector3(1, 0, 0), Vector3(0, 1.2, -1.2), birds)
+	check(away == Vector3.INF, "turned away from the glass, he does not chatter")
+	check(CatManners.zoomies_wants(true, 12.0), "the litter tray sets off zoomies even at noon")
+	check(CatManners.zoomies_wants(false, 18.5), "dusk is enough on its own")
+	check(not CatManners.zoomies_wants(false, 12.0), "noon, and no tray, and he stays put")
+	check(CatManners.blink_ready(0.8, 0.1, true), "close and calm, they slow-blink")
+	check(not CatManners.groom_ready(0.8, 0.1, true), "allogrooming waits until they trust each other")
+	check(CatManners.groom_ready(0.7, 0.5, true), "once the trust is there, they groom")
+	check(CatManners.groom_heal() > CatManners.rest_heal("knead", 1.0), "a shared groom heals more than a moment of kneading")
+	check(CatManners.rest_heal("loaf", 1.0) > CatManners.rest_heal("knead", 1.0), "the loaf is the deeper rest")
+	check(CatManners.greeting(Vector3.ZERO, Vector3(0, 0, -1), Vector3(0, 0, -1.5), true), "tail up as he walks toward Glenys")
+	check(not CatManners.greeting(Vector3.ZERO, Vector3(1, 0, 0), Vector3(0, 0, -1.5), true), "walking past her is not the greeting")
+	check(CatManners.knock_mess() >= 8.0, "batting a thing off a ledge stirs the house")
+	var cover := CatManners.ambush_cover(Vector3.ZERO, Vector3(0, 0, -4), [Vector3(0, 0, -1.2), Vector3(6, 0, 0)])
+	check(is_equal_approx(cover.z, -1.2), "she picks the cover between her and the mouse (got %s)" % cover)
+	var ambusher := CreatureBrain.new()
+	ambusher.bind_profile("other_cat", 3)
+	var slip: Dictionary = ambusher.step(0.1, _ctx({
+		"hour": 19.0,
+		"has_prey": true,
+		"prey_pos": Vector3(0, 0, -4),
+		"perches": [Vector3(0, 1.2, 0)],
+		"covers": [Vector3(0, 0, -1.2)],
+	}))
+	check(String(slip["state"]) == "ambush" and String(slip["note"]) == "to-cover", "she slips toward the furniture instead of the open")
+	var wait: Dictionary = ambusher.step(0.1, _ctx({
+		"pos": Vector3(0, 0, -1.2),
+		"hour": 19.0,
+		"has_prey": true,
+		"prey_pos": Vector3(0, 0, -3.2),
+		"perches": [Vector3(0, 1.2, 0)],
+		"covers": [Vector3(0, 0, -1.2)],
+	}))
+	check(String(wait["state"]) == "ambush" and float(wait["speed"]) == 0.0, "under the furniture she waits")
+	var strike: Dictionary = ambusher.step(0.1, _ctx({
+		"pos": Vector3(0, 0, -1.2),
+		"hour": 19.0,
+		"has_prey": true,
+		"prey_pos": Vector3(0, 0, -1.7),
+		"perches": [Vector3(0, 1.2, 0)],
+		"covers": [Vector3(0, 0, -1.2)],
+	}))
+	check(String(strike["state"]) == "pounce" and String(strike["note"]) == "ambush-pounce", "the mouse crosses the hide, and she pounces")
 
 
 func _creatures() -> void:

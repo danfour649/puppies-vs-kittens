@@ -63,6 +63,10 @@ func note_noise(gait: String, amount: float) -> void:
 			rate = 1.1
 		"stalk":
 			rate = 0.12
+		"zoomies":
+			rate = 3.2
+		"knock":
+			rate = 9.0
 		_:
 			rate = 0.0
 	mess = clampf(mess + rate * amount, 0.0, 100.0)
