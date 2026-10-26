@@ -91,8 +91,15 @@ func _build(cat: Node) -> bool:
 	body.material_override = _baked_material(body)
 	body.set_meta("baked_coat", true)
 	body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-	_relax_hip_weights(body, skeleton)
+	_repair_coat_skin(body, skeleton)
 	_seat_on_floor(root, body)
+	# Stay on the full cage. A generated LOD collapses the neck and
+	# reads as a blocky toy once the cat is small on screen.
+	body.lod_bias = 12.0
+	# The manner pose is applied by the skeleton modifier. It has to
+	# run after the idle clip, or the clip writes the drooping tail
+	# back on top of the greeting.
+	skeleton.modifier_callback_mode_process = Skeleton3D.MODIFIER_CALLBACK_MODE_PROCESS_IDLE
 	_hide_primitives(cat)
 	_loops(player)
 	tree = _make_tree(player, root)
@@ -163,63 +170,97 @@ func _baked_material(mi: MeshInstance3D) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
 	if src != null:
 		mat = src.duplicate() as StandardMaterial3D
-	mat.roughness = 0.82
+	mat.roughness = 0.84
 	mat.roughness_texture = null
 	mat.metallic = 0.0
-	mat.metallic_specular = 0.04
-	mat.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
+	mat.metallic_specular = 0.0
+	mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 	mat.rim_enabled = true
-	mat.rim = 0.08
-	mat.rim_tint = 0.35
+	mat.rim = 0.04
+	mat.rim_tint = 0.15
 	mat.normal_enabled = false
+	# Full 2048 albedo: linear samples, mipmaps for distance, anisotropy
+	# on the grazing angles of the flank.
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	return mat
 
 
-## Hip and thigh vertices were sharing the tail bones. Lifting the
-## tail then stretched that skin into a pale smear. The weight moves
-## onto whichever spine, root or thigh bone already owns the vertex.
-func _relax_hip_weights(mi: MeshInstance3D, sk: Skeleton3D) -> void:
+## Hip and chest vertices were sharing the tail, or carrying a facet
+## normal that caught the fill as a pale patch. Tail weight on the
+## body moves back to the spine or thigh. Chest and hip normals are
+## blended toward the face normal so a single facet cannot flare.
+func _repair_coat_skin(mi: MeshInstance3D, sk: Skeleton3D) -> void:
 	if mi.mesh == null or mi.mesh.get_surface_count() < 1:
 		return
 	var arrays: Array = mi.mesh.surface_get_arrays(0)
 	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var norms: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
 	var bones_a: PackedInt32Array = arrays[Mesh.ARRAY_BONES]
 	var weights: PackedFloat32Array = arrays[Mesh.ARRAY_WEIGHTS]
-	if bones_a.is_empty() or weights.is_empty():
+	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+	if verts.is_empty():
 		return
 	var changed := false
-	for v in verts.size():
-		var p: Vector3 = verts[v]
-		if p.y < 0.22 or p.y > 0.58 or p.z < -0.5 or p.z > -0.12 or absf(p.x) > 0.2:
-			continue
-		var top_b := 0
-		var top_w := 0.0
-		var tail_w := 0.0
-		for k in 4:
-			var b := bones_a[v * 4 + k]
-			var w := weights[v * 4 + k]
-			var name := sk.get_bone_name(b) if b >= 0 and b < sk.get_bone_count() else ""
-			if name.begins_with("tail"):
-				tail_w += w
-			elif w > top_w:
-				top_w = w
-				top_b = b
-		if tail_w < 0.18 or top_w <= 0.0:
-			continue
-		for k in 4:
-			var b2 := bones_a[v * 4 + k]
-			var name2 := sk.get_bone_name(b2) if b2 >= 0 and b2 < sk.get_bone_count() else ""
-			if name2.begins_with("tail"):
-				weights[v * 4 + k] = 0.0
-		for k in 4:
-			if bones_a[v * 4 + k] == top_b:
-				weights[v * 4 + k] += tail_w
-				break
-		changed = true
+	if not bones_a.is_empty() and not weights.is_empty():
+		var stride := int(weights.size() / verts.size())
+		var spine := sk.find_bone("spine1")
+		for v in verts.size():
+			var p: Vector3 = verts[v]
+			var on_tail := p.z < -0.46 and absf(p.x) < 0.12 and p.y < 0.42
+			if on_tail:
+				continue
+			var top_b := spine
+			var top_w := 0.0
+			var tail_w := 0.0
+			for k in stride:
+				var b := bones_a[v * stride + k]
+				var w := weights[v * stride + k]
+				var name := sk.get_bone_name(b) if b >= 0 and b < sk.get_bone_count() else ""
+				if name.begins_with("tail"):
+					tail_w += w
+				elif w > top_w:
+					top_w = w
+					top_b = b
+			if tail_w < 0.04 or top_b < 0:
+				continue
+			for k in stride:
+				var b2 := bones_a[v * stride + k]
+				var name2 := sk.get_bone_name(b2) if b2 >= 0 and b2 < sk.get_bone_count() else ""
+				if name2.begins_with("tail"):
+					weights[v * stride + k] = 0.0
+			for k in stride:
+				if bones_a[v * stride + k] == top_b:
+					weights[v * stride + k] += tail_w
+					break
+			changed = true
+		arrays[Mesh.ARRAY_WEIGHTS] = weights
+	if not norms.is_empty() and indices.size() >= 3:
+		var acc: PackedVector3Array = PackedVector3Array()
+		acc.resize(verts.size())
+		for t in range(0, indices.size() - 2, 3):
+			var i0 := indices[t]
+			var i1 := indices[t + 1]
+			var i2 := indices[t + 2]
+			var fn: Vector3 = (verts[i1] - verts[i0]).cross(verts[i2] - verts[i0])
+			acc[i0] = acc[i0] + fn
+			acc[i1] = acc[i1] + fn
+			acc[i2] = acc[i2] + fn
+		for v in verts.size():
+			var p2: Vector3 = verts[v]
+			var chest := p2.y > 0.24 and p2.y < 0.58 and p2.z > -0.05 and p2.z < 0.34 and absf(p2.x) < 0.16
+			var hip := p2.y > 0.16 and p2.y < 0.58 and p2.z < -0.02 and p2.z > -0.5 and absf(p2.x) < 0.2
+			if not chest and not hip:
+				continue
+			if acc[v].length_squared() < 0.000001:
+				continue
+			var face_n := acc[v].normalized()
+			var had := norms[v].normalized() if norms[v].length_squared() > 0.0001 else face_n
+			norms[v] = (had * 0.2 + face_n * 0.8).normalized()
+			changed = true
+		arrays[Mesh.ARRAY_NORMAL] = norms
 	if not changed:
 		return
 	var mesh := ArrayMesh.new()
-	arrays[Mesh.ARRAY_WEIGHTS] = weights
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	mi.mesh = mesh
 
@@ -348,6 +389,7 @@ func _make_tree(player: AnimationPlayer, root: Node) -> AnimationTree:
 	at.tree_root = blend
 	root.add_child(at)
 	at.anim_player = at.get_path_to(player)
+	at.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_PHYSICS
 	at.active = true
 	print("SCULPT anims ", player.get_animation_list(), " blends ", _blends.keys())
 	return at

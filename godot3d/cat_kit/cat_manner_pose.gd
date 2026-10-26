@@ -1,11 +1,14 @@
 class_name CatMannerPose
 extends RefCounted
 
-## Local -Z lifts this rig's tail up and back. The old world-up bend
+## Local +Z lifts this rig's tail up and back. The old world-up bend
 ## swung it forward over the shoulders.
 const TAIL_LIFT := Vector3.BACK
 ## Local +X cranes the head toward the ceiling. Stay inside a small range.
 const SPINE_UP := Vector3(1, 0, 0)
+## Radians on tail00..tail07 for a greeting. The first bones stand the
+## tail up; the last bones keep turning so the tip hooks forward.
+const GREET_TAIL: Array[float] = [1.15, 0.8, 0.45, 0.15, 0.9, 1.4, 1.8, 2.1]
 ## Procedural fallbacks for the nine manners. They run only when
 ## the rig has no clip of that name. Rotations are in the bone's
 ## own frame: bend lifts the bone toward world up, spin turns it
@@ -75,8 +78,8 @@ static func apply(sk: Skeleton3D, bones: Dictionary, manner: String, amount: flo
 			_ears(sk, bones, 0.04 * k, 0.2 * k)
 			_tail_curve(sk, bones, 0.08 * k, 0.3 * k)
 		"greet":
-			_tail_curve(sk, bones, 0.48 * k, 0.04 * k)
-			_bend(sk, bones, "head", -0.04 * k)
+			_tail_curve(sk, bones, 1.05 * k, 0.08 * k)
+			_bend(sk, bones, "head", -0.03 * k)
 			_ears(sk, bones, -0.18 * k, 0.0)
 		"ambush":
 			_curve_bend(sk, bones.get("spine_chain", []), -0.06 * k, -0.12 * k)
@@ -96,7 +99,7 @@ static func apply(sk: Skeleton3D, bones: Dictionary, manner: String, amount: flo
 static func apply_life(sk: Skeleton3D, bones: Dictionary, time_s: float, breath: float, tail_k: float, ear_yaw: float, ear_twitch: float, head_yaw: float, head_pitch: float) -> void:
 	var inhale := sin(time_s * TAU * 0.42)
 	_curve_bend(sk, bones.get("spine_chain", []), 0.02 * inhale * breath, 0.045 * inhale * breath)
-	_bend(sk, bones, "head", -0.02 * inhale * breath + clampf(head_pitch, -0.12, 0.1))
+	_bend(sk, bones, "head", -0.02 * inhale * breath + clampf(head_pitch, -0.05, 0.08))
 	_spin(sk, bones, "head", clampf(head_yaw, -0.35, 0.35))
 	_spin(sk, bones, "neck", head_yaw * 0.35)
 	var sway := sin(time_s * 1.4) * 0.12 * tail_k
@@ -119,22 +122,27 @@ static func _ears(sk: Skeleton3D, bones: Dictionary, pitch: float, spread: float
 
 
 ## `base` is the lift at the rump, `side` swings the tail off to one side.
+## A positive base stands the chain into a question mark: up from the
+## rump, then a hook at the tip. One bone alone left the tip hanging.
 static func _tail_curve(sk: Skeleton3D, bones: Dictionary, base: float, side: float) -> void:
 	var chain: Array = bones.get("tail_chain", [])
 	if chain.is_empty():
-		_local(sk, int(bones.get("tail", -1)), TAIL_LIFT, clampf(base, -0.28, 0.28))
+		_local(sk, int(bones.get("tail", -1)), TAIL_LIFT, clampf(base, -0.5, 1.2))
 		_local(sk, int(bones.get("tail", -1)), Vector3.UP, clampf(side, -0.3, 0.3))
 		return
 	var last := chain.size() - 1
+	if absf(base) > 0.6:
+		var sgn := signf(base)
+		var scale := absf(base) / 1.05
+		for i in chain.size():
+			var u := float(i) / float(maxi(last, 1))
+			var ang := sgn * GREET_TAIL[mini(i, GREET_TAIL.size() - 1)] * scale
+			_local(sk, int(chain[i]), TAIL_LIFT, clampf(ang, -1.4, 1.4))
+			_local(sk, int(chain[i]), Vector3.UP, clampf(side * u, -0.2, 0.2))
+		return
 	for i in chain.size():
 		var u := float(i) / float(maxi(last, 1))
-		# Only the base stands the tail up. Bending every bone curls it
-		# forward over the shoulders on this rig.
-		var lift := 0.0
-		if i == 0:
-			lift = base
-		elif i == chain.size() - 1:
-			lift = -absf(base) * 0.2
+		var lift := base if i == 0 else (-absf(base) * 0.2 if i == last else 0.0)
 		_local(sk, int(chain[i]), TAIL_LIFT, clampf(lift, -0.34, 0.55))
 		_local(sk, int(chain[i]), Vector3.UP, clampf(side * u, -0.25, 0.25))
 
@@ -169,7 +177,9 @@ static func _bend(sk: Skeleton3D, bones: Dictionary, role: String, radians: floa
 	if not bones.has(role):
 		return
 	if role == "head" or role == "neck":
-		radians = clampf(radians, -0.16, 0.16)
+		# Downward pitch tucks the skull into the shoulders. The upward
+		# limit stays small so a greet cannot crane at the ceiling.
+		radians = clampf(radians, -0.05, 0.1)
 	elif role.begins_with("arm") or role.begins_with("thigh") or role.begins_with("paw"):
 		radians = clampf(radians, -0.5, 0.5)
 	_bend_index(sk, int(bones[role]), radians)
