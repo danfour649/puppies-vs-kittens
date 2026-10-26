@@ -98,6 +98,13 @@ static func _is_clutter(mi: MeshInstance3D) -> bool:
 	if kind == "stack" or kind == "wall":
 		return true
 	var size := (mi.mesh as BoxMesh).size
+	# A free-standing block, not a wall or a counter. Swap it for a
+	# pile so a tall slab does not stay one featureless face.
+	if size.y > 0.65 and size.y >= maxf(size.x, size.z) * 0.72:
+		var wide := maxf(size.x, size.z)
+		var thin := minf(size.x, size.z)
+		if thin > 0.32 and wide < 1.75 and wide < thin * 3.4:
+			return true
 	if size.x < 0.28 or size.y < 0.22 or size.z < 0.28:
 		return false
 	if size.x > 1.6 or size.y > 1.6 or size.z > 1.6:
@@ -172,12 +179,19 @@ static func _fill_clutter(root: Node3D, meshes: Array, key: String, kinds: Array
 		if side:
 			jx += footprint * 0.28 * (1.0 if (seed + i) % 2 == 0 else -1.0)
 			y = lo.y
+		var sag := rng.randf() < 0.36
+		var sy := s * (rng.randf_range(0.76, 0.88) if sag else rng.randf_range(0.94, 1.05))
+		var sx := s * rng.randf_range(0.9, 1.1)
+		var sz := s * rng.randf_range(0.9, 1.1)
 		inst.global_position = Vector3(cx + jx, y, cz + jz)
 		inst.rotation.y = rng.randf() * TAU
-		inst.scale = Vector3(s, s, s)
+		if rng.randf() < 0.42:
+			inst.rotation.x = rng.randf_range(-0.09, 0.09)
+			inst.rotation.z = rng.randf_range(-0.16, 0.16)
+		inst.scale = Vector3(sx, sy, sz)
 		_tint(inst, rng, id)
 		if not side:
-			y += bounds.y * s * 0.9
+			y += bounds.y * sy * 0.92
 
 
 static func _swap_books(root: Node3D) -> void:
@@ -321,27 +335,50 @@ static func _place(root: Node3D, id: String) -> Node3D:
 	return inst
 
 
+const _SHADE := preload("res://house/cardboard_shade.gdshader")
+
+
+static func _shade_ids() -> Dictionary:
+	return {
+		"boxes": true, "box_open": true, "box_crush": true, "box_tape": true,
+		"box_label": true, "bags": true, "bins": true, "books": true, "papers": true,
+	}
+
+
 static func _tint(inst: Node3D, rng: RandomNumberGenerator, id: String) -> void:
 	var kraft := bool(KRAFT.get(id, false))
-	var tint := Color(0.72, 0.64, 0.52) if kraft else Color(1.0, 0.98, 0.96)
-	tint.r = clampf(tint.r + rng.randf_range(-0.05, 0.05), 0.35, 1.0)
-	tint.g = clampf(tint.g + rng.randf_range(-0.04, 0.04), 0.3, 1.0)
-	tint.b = clampf(tint.b + rng.randf_range(-0.03, 0.04), 0.25, 1.0)
-	var rough := rng.randf_range(0.9, 0.98) if kraft else rng.randf_range(0.72, 0.9)
-	for node: Node in inst.find_children("*", "MeshInstance3D", true, false):
-		var mi := node as MeshInstance3D
-		var src := mi.get_active_material(0) as StandardMaterial3D
-		var m := src.duplicate() as StandardMaterial3D if src != null else StandardMaterial3D.new()
-		m.albedo_color = tint
-		m.roughness = rough
-		mi.material_override = m
+	# A light multiply keeps the photo's own stains. A heavy kraft
+	# multiply turned every box into one flat colour.
+	var tint := Color(0.9, 0.84, 0.74) if kraft else Color(1.0, 0.98, 0.96)
+	tint.r = clampf(tint.r + rng.randf_range(-0.1, 0.08), 0.4, 1.0)
+	tint.g = clampf(tint.g + rng.randf_range(-0.08, 0.07), 0.35, 1.0)
+	tint.b = clampf(tint.b + rng.randf_range(-0.06, 0.06), 0.28, 1.0)
+	var rough := rng.randf_range(0.82, 0.98) if kraft else rng.randf_range(0.7, 0.9)
+	var shade := bool(_shade_ids().get(id, false))
 	if inst is MeshInstance3D:
-		var self_mi := inst as MeshInstance3D
-		var src2 := self_mi.get_active_material(0) as StandardMaterial3D
-		var m2 := src2.duplicate() as StandardMaterial3D if src2 != null else StandardMaterial3D.new()
-		m2.albedo_color = tint
-		m2.roughness = rough
-		self_mi.material_override = m2
+		_tint_mesh(inst as MeshInstance3D, tint, rough, shade)
+	for node: Node in inst.find_children("*", "MeshInstance3D", true, false):
+		_tint_mesh(node as MeshInstance3D, tint, rough, shade)
+
+
+static func _tint_mesh(mi: MeshInstance3D, tint: Color, rough: float, shade: bool) -> void:
+	if mi == null:
+		return
+	var src := mi.get_active_material(0) as StandardMaterial3D
+	var tex: Texture2D = src.albedo_texture if src != null else null
+	if shade and tex != null:
+		var sm := ShaderMaterial.new()
+		sm.shader = _SHADE
+		sm.set_shader_parameter("albedo_tex", tex)
+		sm.set_shader_parameter("tint", Vector3(tint.r, tint.g, tint.b))
+		sm.set_shader_parameter("rough", rough)
+		sm.set_shader_parameter("edge", 0.32)
+		mi.material_override = sm
+		return
+	var m := src.duplicate() as StandardMaterial3D if src != null else StandardMaterial3D.new()
+	m.albedo_color = tint
+	m.roughness = rough
+	mi.material_override = m
 
 
 static func _scene(id: String) -> PackedScene:

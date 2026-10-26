@@ -18,6 +18,6 @@ func _build() -> void:
 	HouseSurfaces.dress(self, zone_id)
 	HouseSurfaces.lay_kitchen(self)
 	HouseProps.dress(self, zone_id)
-	HouseSurfaces.dress_rest(self)
+	HouseSurfaces.dress_rest(self, zone_id)
 	HouseDecals.scatter(self, zone_id)
 	FloorAmbience.attach(self, "ground")

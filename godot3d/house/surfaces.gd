@@ -52,7 +52,7 @@ static func _floor_tex(floor_id: String, pos: Vector3) -> String:
 	return "hardwood"
 
 
-static func _paint(mi: MeshInstance3D, name: String, rough: float) -> void:
+static func _paint(mi: MeshInstance3D, name: String, rough: float, scale := Vector3(TILE, TILE, TILE)) -> void:
 	var albedo := _load_tex(name, "albedo")
 	if albedo == null:
 		return
@@ -69,7 +69,7 @@ static func _paint(mi: MeshInstance3D, name: String, rough: float) -> void:
 		m.roughness_texture = rough_tex
 	m.uv1_triplanar = true
 	m.uv1_world_triplanar = true
-	m.uv1_scale = Vector3(TILE, TILE, TILE)
+	m.uv1_scale = scale
 	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	mi.material_override = m
 
@@ -108,9 +108,10 @@ static func lay_kitchen(root: Node3D) -> void:
 		_paint(mi, "linoleum", 0.72)
 
 
-## Flat slabs the floor and wall pass leaves alone: rug, counters,
-## wainscot, picture frames, shelves, and the thin cardboard walls.
-static func dress_rest(root: Node) -> void:
+## Slabs the floor and wall pass leaves alone. Floor photos stay on
+## horizontal faces. Anything standing up gets plaster, wallpaper,
+## kraft, or vertical-grain beam wood.
+static func dress_rest(root: Node, floor_id: String = "") -> void:
 	for n: Node in root.find_children("*", "MeshInstance3D", true, false):
 		var mi := n as MeshInstance3D
 		if mi == null or not mi.visible or not (mi.mesh is BoxMesh):
@@ -120,27 +121,64 @@ static func dress_rest(root: Node) -> void:
 		var mat := mi.material_override as StandardMaterial3D
 		if mat != null and mat.albedo_texture != null:
 			continue
-		var size := (mi.mesh as BoxMesh).size
 		var c := mat.albedo_color if mat != null else Color(0.55, 0.45, 0.35)
 		if c.b > c.r + 0.08 and c.b > 0.55:
 			continue
 		if c.r < 0.16 and c.g < 0.16 and c.b < 0.18:
 			continue
-		var which := "hardwood"
-		var rough := 0.84
-		# Box-like cardboard (maze walls, tunnel lids, leftover piles).
-		# Long counters and stair treads stay wood.
-		var boxy := size.x < 1.7 and size.z < 1.7 and size.y > 0.08 and size.y < 2.2
-		if _cardboard(c) and boxy:
+		var ext := _world_extent(mi)
+		var flat := ext.y <= minf(ext.x, ext.z)
+		var which := "plaster"
+		var rough := 0.9
+		var scale := Vector3(0.7, 0.7, 0.7)
+		if flat:
+			var pos := mi.global_position
+			if ext.y < 0.08 and ext.x > 1.0 and ext.z > 0.8 and c.r > c.b + 0.08 and c.r < 0.7:
+				which = "rug"
+				rough = 0.92
+				scale = Vector3(0.8, 0.8, 0.8)
+			else:
+				which = _floor_tex(floor_id, pos)
+				rough = 0.84
+				scale = Vector3(TILE, TILE, TILE)
+		elif _cardboard(c):
 			which = "kraft"
 			rough = 0.96
-		elif size.y < 0.08 and size.x > 1.0 and size.z > 0.8 and c.r > c.b + 0.08:
-			which = "rug"
-			rough = 0.92
-		elif c.r > 0.72 and c.g > 0.68 and (size.y > 0.35 or maxf(size.x, size.z) > 1.5):
+			scale = Vector3(1.5, 1.5, 1.5)
+		elif c.r > 0.72 and c.g > 0.68:
 			which = "wallpaper"
 			rough = 0.9
-		_paint(mi, which, rough)
+			scale = Vector3(0.65, 0.65, 0.65)
+		elif _wood(c) or floor_id == HouseSpec.ATTIC:
+			which = "beam"
+			rough = 0.88
+			# Grain in the beam map runs with image V, which triplanar
+			# lays along world Y on a side face.
+			scale = Vector3(1.1, 1.6, 1.1)
+		elif floor_id == HouseSpec.BASEMENT:
+			which = "concrete"
+			rough = 0.92
+			scale = Vector3(0.8, 0.8, 0.8)
+		_paint(mi, which, rough, scale)
+
+
+static func _world_extent(mi: MeshInstance3D) -> Vector3:
+	var size := (mi.mesh as BoxMesh).size
+	var he := size * 0.5
+	var xf := mi.global_transform
+	var lo := Vector3(INF, INF, INF)
+	var hi := Vector3(-INF, -INF, -INF)
+	for sx in [-1.0, 1.0]:
+		for sy in [-1.0, 1.0]:
+			for sz in [-1.0, 1.0]:
+				var p := xf * Vector3(he.x * sx, he.y * sy, he.z * sz)
+				lo = lo.min(p)
+				hi = hi.max(p)
+	return hi - lo
+
+
+static func _wood(c: Color) -> bool:
+	return c.r > c.g and c.g + 0.02 > c.b and c.r > 0.28 and c.r < 0.82 and c.b < 0.55
 
 
 static func _cardboard(c: Color) -> bool:
