@@ -240,10 +240,11 @@ func _ready() -> void:
 	add_child(voice)
 	var col := CollisionShape3D.new()
 	var cap := CapsuleShape3D.new()
-	cap.radius = 0.15
-	cap.height = 0.46
+	var fit := model_scale / 0.35
+	cap.radius = 0.15 * fit
+	cap.height = maxf(0.46 * fit, cap.radius * 2.0 + 0.04)
 	col.shape = cap
-	col.position = Vector3(0, 0.23, 0)
+	col.position = Vector3(0, cap.height * 0.5, 0)
 	add_child(col)
 	floor_snap_length = 0.2
 	motion_mode = MOTION_MODE_GROUNDED

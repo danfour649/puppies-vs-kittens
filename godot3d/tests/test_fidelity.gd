@@ -42,7 +42,7 @@ func _run() -> void:
 		check(verts.size() > 1500, "sculpted cage is a real mesh (%d verts)" % verts.size())
 		check(sculpt.skeleton != null and sculpt.skeleton.get_bone_count() >= 20, "skeleton has a spine, legs and tail (%d)" % sculpt.skeleton.get_bone_count())
 		check(sculpt.tree != null, "animation blend tree is wired")
-	check(cat.whisker_count >= 12, "willie has whiskers (%d)" % cat.whisker_count)
+	check(cat.whisker_count >= 8, "willie has whiskers (%d)" % cat.whisker_count)
 	var whiskers := cat.find_children("Whisker*", "MeshInstance3D", true, false)
 	var longest := 0.0
 	var on_head := true

@@ -24,7 +24,9 @@ func _process_modification() -> void:
 		_add(sk, "tail00", Vector3(-0.7 * hiss, 0.0, 0.0))
 	var head := host.get("_head") as Node3D
 	if head != null:
-		_add(sk, "head", Vector3(head.rotation.x * 0.45, head.rotation.y * 0.55, 0.0))
+		var pitch := clampf(head.rotation.x * 0.45, -0.16, 0.16)
+		var yaw := clampf(head.rotation.y * 0.55, -0.4, 0.4)
+		_add(sk, "head", Vector3(pitch, yaw, 0.0))
 	var ears: Array = host.get("_ears")
 	if ears.size() == 2:
 		for i in 2:

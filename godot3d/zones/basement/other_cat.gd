@@ -38,8 +38,6 @@ func _ready() -> void:
 	body.set_character("aggie")
 	body.name = "Aggie"
 	add_child(body)
-	body.set_collision_layer_value(1, false)
-	body.set_collision_mask_value(1, false)
 	_manner_label = Label3D.new()
 	_manner_label.font_size = 42
 	_manner_label.pixel_size = 0.0032
@@ -106,24 +104,20 @@ func _process(delta: float) -> void:
 			target = _highest()
 	if state == "crouch":
 		speed = 0.0
-	var to := target - _pos
+	var to := target - body.global_position
 	var flat := Vector3(to.x, 0.0, to.z)
-	var step_len := minf(speed * delta, flat.length())
-	if step_len > 0.001 and flat.length() > 0.02:
-		_pos += flat.normalized() * step_len
+	if flat.length() > 0.02 and speed > 0.05:
 		var yaw := atan2(-flat.x, -flat.z)
 		body.rotation.y = lerp_angle(body.rotation.y, yaw, 1.0 - exp(-8.0 * delta))
-	# Vertical: perches are boxes. She climbs by simply going up
-	# once she is standing at the foot, and drops when she hunts.
-	var want_y := target.y if state == "perch" or state == "recover" else 0.05
-	if state == "stalk" or state == "crouch" or state == "pounce":
-		want_y = 0.05
-	_pos.y = move_toward(_pos.y, want_y, delta * (1.6 if want_y > _pos.y else 3.5))
-	body.global_position = _pos
-	body.velocity = Vector3.ZERO
-	var moving := flat.length() > 0.08 and speed > 0.05 and absf(_pos.y - want_y) < 0.3
+	# The capsule rides the floor. A perch that is actually up gets a
+	# jump once she is standing at its foot; gravity brings her down.
+	var want_y := target.y if state == "perch" or state == "recover" else body.global_position.y
+	var moving := flat.length() > 0.08 and speed > 0.05
 	var dir := flat.normalized() if moving else Vector3.ZERO
 	body.set_move_input(dir, state == "pounce", state == "stalk" or state == "crouch")
+	if want_y > body.global_position.y + 0.35 and flat.length() < 0.55 and body.is_on_floor():
+		body.velocity.y = body.jump_velocity
+	_pos = body.global_position
 	var strike: Node3D = null
 	if not live.is_empty():
 		var aim: Vector3 = intent.get("target", _pos)

@@ -27,6 +27,8 @@ func _process(_delta: float) -> void:
 	_cat.set("manner", _manner)
 	_cat.set("manner_k", 1.0)
 	_cat.set("manner_phase", _phase)
+	_cat.set("idle_time", 0.0)
+	_cat.set("_sit_k", 0.0)
 	_hunt._zoom_t = 0.0
 	if _hunt._manner_label != null:
 		_hunt._manner_label.visible = false
@@ -43,7 +45,7 @@ func _process(_delta: float) -> void:
 		var mesh := _mesh(_cat)
 		if mesh != null:
 			var center := (mesh.global_transform * mesh.get_aabb()).get_center()
-			_fill.global_position = center + Vector3(0.25, 0.35, 0.2)
+			_fill.global_position = center + Vector3(0.2, 0.55, 0.35)
 
 
 func _run() -> void:
@@ -64,12 +66,9 @@ func _run() -> void:
 		(lab as Node3D).visible = false
 	if _hunt.other != null:
 		_hunt.other.set_process(false)
-		if _hunt.other.body != null:
-			_hunt.other.body.set_physics_process(false)
 	var willie := _hunt.cat
 	willie.velocity = Vector3.ZERO
 	await _frames(8)
-	willie.set_physics_process(false)
 	willie.velocity = Vector3.ZERO
 	willie.rotation.y = PI
 	var home := willie.global_position
@@ -118,7 +117,6 @@ func _run() -> void:
 func _pin(cat: Node3D, at: Vector3) -> void:
 	if cat == null:
 		return
-	cat.set_physics_process(false)
 	cat.global_position = at
 	cat.velocity = Vector3.ZERO
 	cat.rotation.y = PI
@@ -156,8 +154,8 @@ func _frame_on(cat: Node3D) -> void:
 	var center := aabb.get_center()
 	_hunt.cam_lock = true
 	_hunt.cam_lock_pos = center
-	_hunt.cam_dist = clampf(maxf(aabb.size.x, aabb.size.z) * 1.55, 0.48, 1.05)
-	_hunt.cam_pitch = -0.28
+	_hunt.cam_dist = clampf(maxf(aabb.size.x, aabb.size.z) * 2.05, 0.62, 1.35)
+	_hunt.cam_pitch = -0.48
 	_hunt.cam_yaw = cat.rotation.y + PI * 0.72
 	_hunt._rig.global_position = center
 	if _hunt._arm != null:

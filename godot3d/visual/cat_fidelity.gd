@@ -17,18 +17,19 @@ static func dress(cat: Node) -> void:
 	var shells := 0
 	for mi in hosts:
 		var src := mi.material_override as StandardMaterial3D
-		for i in layers:
-			var t := float(i + 1) / float(layers)
+		var sculpted := not (mi.mesh is PrimitiveMesh)
+		var count := 2 if sculpted else layers
+		for i in count:
+			var t := float(i + 1) / float(count)
 			var shell := MeshInstance3D.new()
 			shell.name = "FurShell"
 			# Displace the mesh itself. A vertex-shader offset was not
 			# moving the silhouette under GL Compatibility.
 			# Short coat. The body spheres are radius 0.5, so 0.05 is a
 			# plush edge rather than a second, spikier cat.
-			var sculpted := not (mi.mesh is PrimitiveMesh)
 			# Sculpt shells sit just clear of the skin. Closer than this
 			# z-fights in GL; much further reads as a second skin.
-			var amount := lerpf(0.006, 0.016, t) if sculpted else lerpf(0.018, 0.055, t)
+			var amount := lerpf(0.006, 0.012, t) if sculpted else lerpf(0.018, 0.055, t)
 			shell.mesh = _extrude(mi.mesh, amount)
 			shell.transform = mi.transform
 			shell.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -47,10 +48,10 @@ static func dress(cat: Node) -> void:
 static func _is_fur_host(mi: MeshInstance3D) -> bool:
 	if mi == null or not mi.visible or not (mi.material_override is StandardMaterial3D):
 		return false
-	# Hunyuan Willie already has a painted coat. Shells on that mesh
-	# read as a second skin. Aggie still uses the procedural shells.
+	# A light shell over the baked albedo, desktop only. The low tier
+	# keeps the painted coat on its own.
 	if mi.get_meta("baked_coat", false):
-		return false
+		return VisualQuality.is_high()
 	var n := str(mi.name)
 	if n == "FurShell" or n == "NoseLeather" or n.begins_with("Whisker") or n.begins_with("Pupil") or n.begins_with("Cornea") or n.begins_with("Catchlight"):
 		return false
@@ -202,22 +203,25 @@ static func _add_whiskers(cat: Node) -> int:
 	# names, so those fat cylinders stayed on the head and crossed
 	# above the shoulders.
 	var mesh := CylinderMesh.new()
-	mesh.top_radius = 0.004
-	mesh.bottom_radius = 0.0015
-	mesh.height = 0.08
-	mesh.radial_segments = 6
+	mesh.top_radius = 0.0012
+	mesh.bottom_radius = 0.0002
+	mesh.height = 0.075
+	mesh.radial_segments = 4
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.78, 0.74, 0.66)
-	mat.roughness = 0.55
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = Color(0.86, 0.83, 0.76, 0.42)
+	mat.roughness = 0.92
+	mat.metallic_specular = 0.0
+	mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 	for side in [-1.0, 1.0]:
 		var tag := "L" if side < 0.0 else "R"
-		for i in 6:
+		for i in 4:
 			var w := MeshInstance3D.new()
 			w.name = "Whisker%s%d" % [tag, i]
 			w.mesh = mesh
 			w.material_override = mat
 			w.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			var along := lerpf(-0.22, 0.18, float(i) / 5.0)
+			var along := lerpf(-0.16, 0.14, float(i) / 3.0)
 			w.position = Vector3(side * 0.08, along * 0.02, -0.16)
 			w.rotation = Vector3(along * 0.4, 0.0, side * 1.35)
 			head.add_child(w)
