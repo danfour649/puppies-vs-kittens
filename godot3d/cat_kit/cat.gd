@@ -148,6 +148,7 @@ var _swipe_fired := false
 var _lounge_k := 0.0
 var _invuln_t := 0.0
 var _pounced := false
+var _lunge := Vector3.ZERO
 var _hiss_t := -1.0
 var _hiss_k := 0.0
 var _faint_k := 0.0
@@ -794,12 +795,15 @@ func pounce() -> bool:
 	if not strike():
 		return false
 	_pounced = true
-	velocity += forward_dir() * 4.2 + Vector3(0, 0.8, 0)
+	_lunge = forward_dir() * 4.2
+	velocity += _lunge + Vector3(0, 0.8, 0)
 	return true
 
 
+## True through the whole swipe. A floor snap must not
+## shorten the reach before the paw lands.
 func is_pouncing() -> bool:
-	return _pounced and not is_on_floor()
+	return _pounced
 
 
 ## Damage in, from enemies / cars / the world. `profile` is a
@@ -928,6 +932,8 @@ func _physics_process(delta: float) -> void:
 		if _strike_t >= 0.34:
 			_strike_t = -1.0
 			_strike_cd = strike_cooldown
+			_pounced = false
+			_lunge = Vector3.ZERO
 
 	var want := Vector3.ZERO
 	var speed := 0.0
@@ -944,8 +950,11 @@ func _physics_process(delta: float) -> void:
 	if not moving:
 		stamina = minf(stamina_max, stamina + stamina_regen * delta)
 
-	velocity.x = want.x
-	velocity.z = want.z
+	var carry := Vector3.ZERO
+	if _lunge.length() > 0.05 and _strike_t >= 0.0:
+		carry = _lunge
+	velocity.x = want.x + carry.x
+	velocity.z = want.z + carry.z
 	# Grounded stick only when not moving up — a fresh jump()
 	# sets velocity.y > 0 between frames and must survive this.
 	if is_on_floor() and velocity.y <= 0.0:
@@ -953,8 +962,9 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.y -= 22.0 * delta
 	move_and_slide()
-	if is_on_floor():
+	if is_on_floor() and _strike_t < 0.0:
 		_pounced = false
+		_lunge = Vector3.ZERO
 
 	if _strike_t >= 0.0:
 		anim_state = "strike"

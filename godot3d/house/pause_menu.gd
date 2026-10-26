@@ -49,6 +49,8 @@ func show_menu() -> void:
 	open = true
 	_root.visible = true
 	_note.text = ""
+	if game != null and game.has_method("_apply_hud"):
+		game.call("_apply_hud")
 	get_tree().paused = true
 
 
@@ -56,6 +58,8 @@ func close() -> void:
 	open = false
 	_root.visible = false
 	_save_settings()
+	if game != null and game.has_method("_apply_hud"):
+		game.call("_apply_hud")
 	if get_tree() != null:
 		get_tree().paused = false
 

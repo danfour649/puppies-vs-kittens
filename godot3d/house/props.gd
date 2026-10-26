@@ -250,6 +250,7 @@ static func _fill(root: Node3D, meshes: Array, id: String) -> void:
 	var inst := packed.instantiate() as Node3D
 	if inst == null:
 		return
+	inst.set_meta("hunyuan", id)
 	root.add_child(inst)
 	inst.global_position = Vector3((lo.x + hi.x) * 0.5, lo.y, (lo.z + hi.z) * 0.5)
 	# A generated chair or appliance keeps its own proportions.
@@ -315,6 +316,7 @@ static func _place(root: Node3D, id: String) -> Node3D:
 	var inst := packed.instantiate() as Node3D
 	if inst == null:
 		return null
+	inst.set_meta("hunyuan", id)
 	root.add_child(inst)
 	return inst
 

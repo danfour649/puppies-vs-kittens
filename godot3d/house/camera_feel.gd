@@ -115,7 +115,8 @@ func _fade_candidate(mi: MeshInstance3D) -> bool:
 
 func _clear_length(want: float, zone: String) -> float:
 	var origin := _arm.global_position
-	var dir := _arm.global_basis.y
+	# SpringArm3D parks the lens along local +Z.
+	var dir := _arm.global_basis.z
 	if dir.length() < 0.01:
 		return want
 	dir = dir.normalized()

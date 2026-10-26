@@ -47,10 +47,14 @@ const ATTIC_KEEP: Array[Rect2] = [
 
 
 var _motes: Array[MeshInstance3D] = []
-var _labels: Array[Label3D] = []
+var _labels: Array[Label] = []
+var _name_layer: CanvasLayer
 var _t := 0.0
 
-const LABEL_MARGIN := 16.0
+const LABEL_FONT := 15
+const LABEL_WIDTH := 168.0
+const LABEL_NEAR := 2.0
+const LABEL_HIDE := 2.15
 
 
 static func build(parent: Node3D, level: Dictionary) -> HoarderDressing:
@@ -356,24 +360,32 @@ func _motes_for(origin: Vector3, col: Color) -> void:
 		_motes.append(mote)
 
 
-func _name_label(text: String, pos: Vector3, size: int, px: float) -> void:
-	var lab := Label3D.new()
+func _name_label(text: String, pos: Vector3, _size: int, _px: float) -> void:
+	if _name_layer == null:
+		_name_layer = CanvasLayer.new()
+		_name_layer.name = "KeepsakeLabels"
+		_name_layer.layer = 6
+		add_child(_name_layer)
+		var host := Control.new()
+		host.set_anchors_preset(Control.PRESET_FULL_RECT)
+		host.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		host.name = "KeepsakeHost"
+		_name_layer.add_child(host)
+	var lab := Label.new()
 	lab.text = text
-	lab.font_size = size
-	lab.pixel_size = px
-	lab.width = 200.0
 	lab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lab.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	lab.position = pos
+	lab.custom_minimum_size = Vector2(LABEL_WIDTH, 0)
+	lab.size = Vector2(LABEL_WIDTH, LABEL_FONT * 2.0)
+	lab.add_theme_font_size_override("font_size", LABEL_FONT)
+	lab.add_theme_color_override("font_color", Color(0.97, 0.94, 0.88))
+	lab.add_theme_color_override("font_shadow_color", Color(0.08, 0.05, 0.04, 0.85))
+	lab.add_theme_constant_override("shadow_offset_x", 1)
+	lab.add_theme_constant_override("shadow_offset_y", 1)
+	lab.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lab.set_meta("home", pos)
-	lab.set_meta("px", px)
-	lab.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	lab.modulate = Color(0.97, 0.94, 0.88)
-	lab.outline_size = 6
-	lab.outline_modulate = Color(0.1, 0.07, 0.05, 0.8)
-	lab.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(lab)
+	lab.visible = false
+	_name_layer.get_child(0).add_child(lab)
 	_labels.append(lab)
 
 
@@ -383,92 +395,132 @@ func _process(delta: float) -> void:
 		var m := _motes[i]
 		m.position.y += sin(_t * 0.7 + float(i)) * delta * 0.04
 		m.position.x += cos(_t * 0.4 + float(i) * 1.4) * delta * 0.02
-	_clamp_names()
+	_place_names()
 
 
-## Long keepsake names wrap, then the whole block is kept on screen.
-func _clamp_names() -> void:
+## Nearest one or two names, about 15 px, inside the safe area.
+## Anything farther than a couple of metres fades out.
+func _place_names() -> void:
 	if _labels.is_empty():
 		return
 	var cam := get_viewport().get_camera_3d()
-	if cam == null:
-		return
 	var vp := get_viewport().get_visible_rect().size
-	if vp.x < 2.0 or vp.y < 2.0:
+	if cam == null or vp.x < 2.0 or vp.y < 2.0:
+		for lab: Label in _labels:
+			lab.visible = false
 		return
-	for lab: Label3D in _labels:
+	var ranked: Array[Dictionary] = []
+	for lab: Label in _labels:
 		if not is_instance_valid(lab):
 			continue
 		var home: Vector3 = lab.get_meta("home")
-		var base_px := float(lab.get_meta("px"))
-		lab.position = home
-		lab.pixel_size = base_px
-		var world := lab.global_position
-		if cam.is_position_behind(world):
+		var world := to_global(home)
+		ranked.append({
+			"lab": lab,
+			"world": world,
+			"dist": cam.global_position.distance_to(world),
+			"behind": cam.is_position_behind(world),
+		})
+	ranked.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["dist"]) < float(b["dist"]))
+	var shown := 0
+	var placed: Array[Rect2] = []
+	for item: Dictionary in ranked:
+		var lab: Label = item["lab"]
+		var world: Vector3 = item["world"]
+		var dist := float(item["dist"])
+		if bool(item["behind"]) or dist > LABEL_HIDE:
+			lab.visible = false
 			continue
-		if cam.global_position.distance_to(world) > 9.0:
+		var near := shown < 2 and dist <= LABEL_NEAR
+		var alpha := 0.0
+		if near:
+			alpha = 1.0 if dist <= 1.15 else lerpf(1.0, 0.55, (dist - 1.15) / (LABEL_NEAR - 1.15))
+			shown += 1
+		else:
+			alpha = lerpf(0.4, 0.0, clampf(dist / LABEL_NEAR, 0.0, 1.0))
+		if alpha < 0.06:
+			lab.visible = false
 			continue
-		var depth := _view_depth(cam, world)
-		if depth <= cam.near:
-			continue
+		var h := lab.get_minimum_size().y
+		if h < float(LABEL_FONT):
+			h = float(LABEL_FONT) * 2.2
+		var sz := Vector2(LABEL_WIDTH, h)
+		lab.size = sz
 		var screen := cam.unproject_position(world)
-		if screen.x < -vp.x or screen.x > vp.x * 2.0 or screen.y < -vp.y or screen.y > vp.y * 2.0:
+		var rect := _safe_label_rect(screen - sz * 0.5, sz, vp, placed)
+		if _hits_hud(rect, vp) or not _on_screen(rect, vp):
+			lab.visible = false
 			continue
-		var half := _screen_half(lab, cam, depth, vp)
-		var avail := vp - Vector2(LABEL_MARGIN, LABEL_MARGIN) * 2.0
-		var fit := 1.0
-		if half.x * 2.0 > avail.x and half.x > 0.0:
-			fit = minf(fit, avail.x / (half.x * 2.0))
-		if half.y * 2.0 > avail.y and half.y > 0.0:
-			fit = minf(fit, avail.y / (half.y * 2.0))
-		if fit < 0.999:
-			lab.pixel_size = base_px * fit
-			half *= fit
-		var clamped := _clamp_screen(screen, half, vp, LABEL_MARGIN)
-		if clamped.distance_squared_to(screen) > 0.25:
-			lab.global_position = cam.project_position(clamped, depth)
+		lab.visible = true
+		lab.modulate = Color(1, 1, 1, alpha)
+		lab.position = rect.position
+		placed.append(rect)
 
 
-func _view_depth(cam: Camera3D, world: Vector3) -> float:
-	var local: Vector3 = cam.global_transform.affine_inverse() * world
-	return -local.z
+func _hud_blockers(vp: Vector2) -> Array[Rect2]:
+	return [
+		Rect2(0, 0, 220, 100),
+		Rect2(0, vp.y - 300, 276, 300),
+		Rect2(vp.x * 0.5 - 280, vp.y - 172, 560, 172),
+	]
 
 
-func _screen_half(lab: Label3D, cam: Camera3D, depth: float, vp: Vector2) -> Vector2:
-	var font_px := _font_px(lab.text, lab.width, lab.font_size, lab.outline_size)
-	var world := font_px * lab.pixel_size
-	var center := cam.project_position(vp * 0.5, depth)
-	var edge := center + cam.global_transform.basis.x.normalized() * world.x * 0.5
-	edge += cam.global_transform.basis.y.normalized() * world.y * 0.5
-	if cam.is_position_behind(center) or cam.is_position_behind(edge):
-		var ppm := vp.y / maxf(0.05, 2.0 * depth * tan(deg_to_rad(cam.fov) * 0.5))
-		return world * 0.5 * ppm
-	return (cam.unproject_position(edge) - cam.unproject_position(center)).abs()
+func _hits_hud(rect: Rect2, vp: Vector2) -> bool:
+	for block: Rect2 in _hud_blockers(vp):
+		if rect.intersects(block):
+			return true
+	return false
 
 
-func _font_px(text: String, width: float, font_size: int, outline: int) -> Vector2:
-	var measured := Vector2(minf(width, maxf(1.0, text.length()) * font_size * 0.55), font_size * 1.4)
-	var font := ThemeDB.fallback_font
-	if font != null and text.length() > 0:
-		var size := font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, width, font_size, -1, TextServer.BREAK_WORD_BOUND | TextServer.BREAK_ADAPTIVE)
-		if size.x > 1.0 and size.y > 1.0:
-			measured = size
-	measured += Vector2(outline, outline) * 2.0
-	return measured * 1.08
+func _clamp_pos(pos: Vector2, sz: Vector2, vp: Vector2, margin: float) -> Vector2:
+	return Vector2(
+		clampf(pos.x, margin, maxf(margin, vp.x - margin - sz.x)),
+		clampf(pos.y, margin, maxf(margin, vp.y - margin - sz.y)))
 
 
-func _clamp_screen(point: Vector2, half: Vector2, vp: Vector2, margin: float) -> Vector2:
-	var lo := Vector2(margin + half.x, margin + half.y)
-	var hi := Vector2(vp.x - margin - half.x, vp.y - margin - half.y)
-	if lo.x > hi.x:
-		point.x = vp.x * 0.5
-	else:
-		point.x = clampf(point.x, lo.x, hi.x)
-	if lo.y > hi.y:
-		point.y = vp.y * 0.5
-	else:
-		point.y = clampf(point.y, lo.y, hi.y)
-	return point
+func _blocked_by(rect: Rect2, vp: Vector2, placed: Array[Rect2]) -> Rect2:
+	for block: Rect2 in _hud_blockers(vp):
+		if rect.intersects(block):
+			return block
+	for other: Rect2 in placed:
+		if rect.intersects(other):
+			return other
+	return Rect2()
+
+
+func _on_screen(rect: Rect2, vp: Vector2) -> bool:
+	return rect.position.x >= 8.0 and rect.position.y >= 8.0 and rect.end.x <= vp.x - 8.0 and rect.end.y <= vp.y - 8.0
+
+
+func _safe_label_rect(origin: Vector2, sz: Vector2, vp: Vector2, placed: Array[Rect2]) -> Rect2:
+	var margin := 12.0
+	var pos := _clamp_pos(origin, sz, vp, margin)
+	for _step in 6:
+		var hit := _blocked_by(Rect2(pos, sz), vp, placed)
+		if hit.size == Vector2.ZERO:
+			break
+		var options: Array[Vector2] = [
+			Vector2(hit.position.x - margin - sz.x, pos.y),
+			Vector2(hit.end.x + margin, pos.y),
+			Vector2(pos.x, hit.position.y - margin - sz.y),
+			Vector2(pos.x, hit.end.y + margin),
+		]
+		var best := pos
+		var best_d := 1.0e12
+		var found := false
+		for opt: Vector2 in options:
+			var clamped := _clamp_pos(opt, sz, vp, margin)
+			if _blocked_by(Rect2(clamped, sz), vp, placed).size != Vector2.ZERO:
+				continue
+			var d := clamped.distance_squared_to(origin)
+			if d < best_d:
+				best_d = d
+				best = clamped
+				found = true
+		if not found:
+			break
+		pos = best
+	return Rect2(pos, sz)
 
 
 func _mesh(size: Vector3, pos: Vector3, color: Color, solid: bool) -> MeshInstance3D:

@@ -65,8 +65,11 @@ var _mouse_seq := 0
 var cam_yaw := PI
 var cam_pitch := -0.48
 var cam_dist := 4.6
-## Indoors the lens sits at the shoulder. The yard keeps cam_dist.
-var indoor_zoom := 1.48
+## Indoors the lens sits just behind the shoulder, about at his eyes,
+## looking a little up into the room. The yard keeps cam_dist.
+const INDOOR_NEAR := 1.05
+const INDOOR_FAR := 1.85
+var indoor_zoom := 1.55
 var look_invert := false
 var look_sens := 1.0
 var pause_menu: PauseMenu = null
@@ -82,6 +85,7 @@ var _prov_bar: ProgressBar
 var _confirm: Label
 var _restart_left := 0.0
 var _banner: Label
+var _hud_layer: CanvasLayer
 var _touch: TouchControls3D
 var _feel: CameraFeel
 ## Shots seam: when set, the camera rig tracks this node instead of the cat.
@@ -148,6 +152,7 @@ func _ready() -> void:
 	if _touch != null:
 		_touch.pause_pressed.connect(pause_menu.toggle)
 		_touch.process_mode = Node.PROCESS_MODE_ALWAYS
+	_apply_hud()
 	# OUTSIDE: trees + squirrels, feeder birds + ambush, the street
 	# frontage (hostile traffic, the Corolla island, the fish
 	# treat) and pedestrians walking dogs.
@@ -496,6 +501,8 @@ func _build_camera() -> void:
 
 func _build_hud() -> void:
 	var layer := CanvasLayer.new()
+	layer.visible = false
+	_hud_layer = layer
 	add_child(layer)
 	var chip := PanelContainer.new()
 	chip.set_anchors_preset(Control.PRESET_TOP_LEFT)
@@ -787,25 +794,27 @@ func _indoors() -> bool:
 func _camera_target() -> Vector3:
 	if cam_anchor != null:
 		return cam_anchor.global_position
-	var pivot := 0.38 if _indoors() else 0.30
+	var pivot := 0.58 if _indoors() else 0.30
 	var shoulder := Vector3.ZERO
 	if _indoors() and _rig != null:
 		var right := _rig.global_transform.basis.x
 		right.y = 0.0
 		if right.length() > 0.001:
-			shoulder = right.normalized() * 0.24
+			shoulder = right.normalized() * 0.28
 	return cat.global_position + Vector3(0, pivot, 0) + shoulder + duo_shake
 
 
+## Positive indoor pitch lowers the lens and looks up into the hoard.
+## cam_pitch itself stays the yard angle.
 func _arm_pitch() -> float:
 	if _indoors():
-		return clampf(cam_pitch + 0.32, -0.62, -0.06)
+		return clampf(cam_pitch + 0.60, 0.04, 0.22)
 	return cam_pitch
 
 
 func _arm_length() -> float:
 	if _indoors():
-		return clampf(indoor_zoom, 1.05, 2.15)
+		return clampf(indoor_zoom, INDOOR_NEAR, INDOOR_FAR)
 	return cam_dist
 
 
@@ -843,11 +852,7 @@ func mice_left() -> int:
 # --- input + loop ------------------------------------------------------------
 
 func _physics_process(_delta: float) -> void:
-	if _touch != null:
-		# The roster and the night card sit under the paw's layer.
-		# Keep the paw off the screen until the player can actually walk.
-		var briefing := night != null and night.blocks_move()
-		_touch.set_blocked((duo != null and duo.input_locked()) or briefing)
+	_apply_hud()
 	var dir := Vector3.ZERO
 	var sprint := false
 	var stalk := false
@@ -926,17 +931,42 @@ func _unhandled_input(event: InputEvent) -> void:
 		var b := event as InputEventMouseButton
 		if b.pressed and b.button_index == MOUSE_BUTTON_WHEEL_UP:
 			if _indoors():
-				indoor_zoom = clampf(indoor_zoom - 0.18, 1.05, 2.15)
+				indoor_zoom = clampf(indoor_zoom - 0.18, INDOOR_NEAR, INDOOR_FAR)
 			else:
 				cam_dist = clampf(cam_dist - 0.5, 2.2, 9.0)
 		elif b.pressed and b.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			if _indoors():
-				indoor_zoom = clampf(indoor_zoom + 0.18, 1.05, 2.15)
+				indoor_zoom = clampf(indoor_zoom + 0.18, INDOOR_NEAR, INDOOR_FAR)
 			else:
 				cam_dist = clampf(cam_dist + 0.5, 2.2, 9.0)
 
 
+## Paw, corner chip, and compass stay off the cat picker, the night
+## card, and the pause menu. Play brings them back.
+func _hud_covered() -> bool:
+	if pause_menu != null and pause_menu.open:
+		return true
+	if duo != null and duo.input_locked():
+		return true
+	if night != null and night.blocks_move():
+		return true
+	return false
+
+
+func _apply_hud() -> void:
+	var cover := _hud_covered()
+	if _hud_layer != null:
+		_hud_layer.visible = not cover
+	if _touch != null:
+		_touch.set_blocked(cover)
+	if cover and night != null:
+		var comp := night.compass()
+		if comp != null:
+			comp.visible = false
+
+
 func _process(delta: float) -> void:
+	_apply_hud()
 	if not won and not run_over:
 		elapsed += delta
 	var target := _camera_target()
