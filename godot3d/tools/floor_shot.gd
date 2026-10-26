@@ -43,13 +43,16 @@ func _ready() -> void:
 	add_child(fill)
 	for i in 12:
 		await get_tree().process_frame
-	_quiet_for_review(zone)
 	var cam := Camera3D.new()
 	cam.fov = 50
 	cam.current = true
 	add_child(cam)
 	cam.look_at_from_position(eye, at)
+	# process_frame resumes before _process, which turns the nearest
+	# keepsake names back on. Hide them after that, before the draw.
 	await get_tree().process_frame
+	await RenderingServer.frame_pre_draw
+	_quiet_for_review(zone)
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
 	var err := img.save_png(out)
@@ -62,6 +65,12 @@ func _ready() -> void:
 func _quiet_for_review(zone: Node) -> void:
 	for n: Node in zone.find_children("*", "Label3D", true, false):
 		n.visible = false
+	for n: Node in zone.find_children("*", "CanvasLayer", true, false):
+		if n.name == "KeepsakeLabels":
+			n.visible = false
+	for n: Node in zone.find_children("*", "Label", true, false):
+		if n.has_meta("home"):
+			n.visible = false
 	for n: Node in zone.find_children("*", "", true, false):
 		var path := ""
 		if n.get_script() != null:
