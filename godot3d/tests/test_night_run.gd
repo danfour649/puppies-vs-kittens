@@ -27,6 +27,7 @@ func _ready() -> void:
 
 func _run() -> void:
 	print("NIGHT RUN TESTS")
+	await _briefing_tap()
 	await _round()
 	await _dawn()
 	await _caught()
@@ -35,13 +36,40 @@ func _run() -> void:
 	get_tree().quit(0 if _fail == 0 else 1)
 
 
+func _briefing_tap() -> void:
+	DuoCharacters.last_choice = ""
+	var game = load("res://main.tscn").instantiate()
+	add_child(game)
+	await frames(8)
+	game.duo.select_ui.confirm()
+	await frames(2)
+	check(game.night.phase == "briefing", "picking a cat opens the briefing")
+	var mb := InputEventMouseButton.new()
+	mb.pressed = true
+	mb.button_index = MOUSE_BUTTON_LEFT
+	mb.position = Vector2(200, 200)
+	Input.parse_input_event(mb)
+	await frames(2)
+	check(game.night.phase == "briefing", "the click that picked the cat does not skip the card")
+	game.night._brief_arm = 0.0
+	Input.parse_input_event(mb)
+	await frames(2)
+	check(game.night.phase == "playing", "a later tap begins the night")
+	game.queue_free()
+	await frames(2)
+
+
 func _boot():
 	var game = load("res://main.tscn").instantiate()
 	add_child(game)
 	await frames(12)
 	game.duo.choose("willie")
 	await frames(4)
+	check(not game.night._compass.visible, "the compass stays off the roster until the night starts")
+	check(game.night._compass.mouse_filter == Control.MOUSE_FILTER_STOP, "the compass takes a tap once it is showing")
 	game.night.start_playing()
+	await frames(2)
+	check(game.night._compass.visible, "the compass shows once the night is underway")
 	return game
 
 

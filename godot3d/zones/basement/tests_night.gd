@@ -94,6 +94,12 @@ func _gesture_math() -> void:
 	check(TouchControls3D.classify(4.0, 0.5) == "hold", "a still hold is a stalk")
 	check(absf(TouchControls3D.yaw_to_face(Vector3(0, 0, -1))) < 0.001, "facing -Z keeps yaw at 0")
 	check(absf(TouchControls3D.yaw_to_face(Vector3(1, 0, 0)) + PI * 0.5) < 0.001, "facing +X is a quarter turn")
+	var phone := Vector2(390, 844)
+	var paw := TouchControls3D.stick_size(phone)
+	check(12.0 + paw.x < phone.x * 0.5, "the paw stays left of centre on a phone (right edge %.0f)" % (12.0 + paw.x))
+	var tall := Vector2(1152, 2493)
+	var tall_paw := TouchControls3D.stick_size(tall)
+	check(12.0 + tall_paw.x < tall.x * 0.5, "the paw stays left of centre on a tall viewport")
 
 
 func _gestures() -> void:
