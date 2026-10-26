@@ -17,6 +17,7 @@ run() {
 run smoke tests/smoke.tscn
 run duo duo/tests_duo.tscn
 run massey tests/test_massey.tscn
+run circuit tests/test_circuit.tscn
 run basement zones/basement/tests_basement.tscn
 run attic zones/attic/tests_attic.tscn
 run outside zones/outside/tests_outside.tscn
