@@ -142,6 +142,10 @@ func _run() -> void:
 	await _physics(8)
 	if _game.duo != null:
 		_game.duo.choose("willie")
+	# The night card must not hold the scripted walk.
+	var night: Node = _game.get("night")
+	if night != null and night.has_method("start_playing"):
+		night.start_playing()
 	await _physics(10)
 	var boot_ms := Time.get_ticks_msec() - boot
 	print("PLAYTHROUGH boot ", boot_ms, " ms")
