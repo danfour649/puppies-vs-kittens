@@ -6,9 +6,10 @@ extends RefCounted
 const TAIL_LIFT := Vector3.BACK
 ## Local +X cranes the head toward the ceiling. Stay inside a small range.
 const SPINE_UP := Vector3(1, 0, 0)
-## Radians on tail00..tail07 for a greeting. The first bones stand the
-## tail up; the last bones keep turning so the tip hooks forward.
-const GREET_TAIL: Array[float] = [1.15, 0.8, 0.45, 0.15, 0.9, 1.4, 1.8, 2.1]
+## Radians on tail00..tail07 for a greeting. The rump bones lift the
+## mesh's own tail; the tip stays nearly straight so it cannot twist
+## into a stick.
+const GREET_TAIL: Array[float] = [0.72, 0.42, 0.22, 0.1, 0.02, 0.0, -0.03, -0.05]
 ## Procedural fallbacks for the nine manners. They run only when
 ## the rig has no clip of that name. Rotations are in the bone's
 ## own frame: bend lifts the bone toward world up, spin turns it
@@ -68,15 +69,22 @@ static func apply(sk: Skeleton3D, bones: Dictionary, manner: String, amount: flo
 			_ears(sk, bones, 0.08 * k, 0.22 * k)
 			_tail_curve(sk, bones, 0.15 * k, 0.4 * sin(time_s * 1.6) * k)
 		"loaf":
-			_bend(sk, bones, "arm_l", 0.45 * k)
-			_bend(sk, bones, "arm_r", 0.45 * k)
-			_bend(sk, bones, "paw_l", 0.35 * k)
-			_bend(sk, bones, "paw_r", 0.35 * k)
-			_bend(sk, bones, "thigh_l", 0.28 * k)
-			_bend(sk, bones, "thigh_r", 0.28 * k)
-			_curve_bend(sk, bones.get("spine_chain", []), -0.05 * k, -0.03 * k)
-			_ears(sk, bones, 0.04 * k, 0.2 * k)
-			_tail_curve(sk, bones, 0.08 * k, 0.3 * k)
+			# Local +X folds the elbows and hocks on this rig. Local +Y
+			# on the thigh brings the hind paw forward without lifting it.
+			# The right thigh is mirrored, so its yaw flips.
+			_local_named(sk, "upper_arm.L", Vector3.RIGHT, 0.5 * k)
+			_local_named(sk, "upper_arm.R", Vector3.RIGHT, 0.5 * k)
+			_local_named(sk, "forearm.L", Vector3.RIGHT, 0.65 * k)
+			_local_named(sk, "forearm.R", Vector3.RIGHT, 0.65 * k)
+			_local_named(sk, "thigh.L", Vector3.UP, 0.45 * k)
+			_local_named(sk, "thigh.R", Vector3.UP, -0.45 * k)
+			_local_named(sk, "shin.L", Vector3.RIGHT, -0.7 * k)
+			_local_named(sk, "shin.R", Vector3.RIGHT, -0.7 * k)
+			_local_named(sk, "hock.L", Vector3.RIGHT, -0.35 * k)
+			_local_named(sk, "hock.R", Vector3.RIGHT, -0.35 * k)
+			_curve_bend(sk, bones.get("spine_chain", []), -0.04 * k, -0.02 * k)
+			_ears(sk, bones, 0.02 * k, 0.06 * k)
+			_tail_curve(sk, bones, 0.1 * k, 0.16 * k)
 		"greet":
 			_tail_curve(sk, bones, 1.05 * k, 0.08 * k)
 			_bend(sk, bones, "head", -0.03 * k)
@@ -171,6 +179,10 @@ static func _local(sk: Skeleton3D, idx: int, axis: Vector3, radians: float) -> v
 	var q := sk.get_bone_pose_rotation(idx)
 	q *= Quaternion(axis.normalized(), radians)
 	sk.set_bone_pose_rotation(idx, q)
+
+
+static func _local_named(sk: Skeleton3D, bone_name: String, axis: Vector3, radians: float) -> void:
+	_local(sk, sk.find_bone(bone_name), axis, radians)
 
 
 static func _bend(sk: Skeleton3D, bones: Dictionary, role: String, radians: float) -> void:

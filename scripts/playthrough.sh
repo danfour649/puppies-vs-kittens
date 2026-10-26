@@ -40,3 +40,5 @@ test -f "$OUT/yard.png"
 test -f "$OUT/ground_floor.png"
 test -f "$OUT/basement.png"
 test -f "$OUT/attic.png"
+echo "playthrough: coat silhouette"
+"$GODOT" --headless --audio-driver Dummy --path "$ROOT/godot3d" res://tests/test_silhouette.tscn

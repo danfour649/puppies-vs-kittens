@@ -26,8 +26,9 @@ func _process(_delta: float) -> void:
 	if _cat == null:
 		return
 	_cat.set("manner", _manner)
-	_cat.set("manner_k", 1.0)
+	_cat.set("manner_k", 1.0 if _manner != "" else 0.0)
 	_cat.set("manner_phase", _phase)
+	_cat.set("anim_state", "idle")
 	_cat.set("idle_time", 0.0)
 	_cat.set("_sit_k", 0.0)
 	for i in _hold.size():
@@ -58,6 +59,7 @@ func _run() -> void:
 	add_child(world)
 	var floor := FloorScene.instantiate()
 	add_child(floor)
+	_hide_labels(floor)
 	await _frames(8)
 	var living := HouseSpec.anchor("living", "pvk")
 	# Just south of the room centre, on the hardwood side of the divider.
@@ -91,8 +93,10 @@ func _run() -> void:
 	DirAccess.make_dir_recursive_absolute("res://screenshots/hunt")
 	DirAccess.make_dir_absolute("/tmp/manner_close")
 	var shots: Array[Dictionary] = [
+		{"who": willie, "name": "willie_idle", "manner": "", "phase": 0.0},
 		{"who": willie, "name": "willie_greet", "manner": "greet", "phase": 0.0},
-		{"who": willie, "name": "willie_chatter", "manner": "chatter", "phase": 0.55},
+		{"who": willie, "name": "willie_loaf", "manner": "loaf", "phase": 0.0},
+		{"who": aggie, "name": "aggie_idle", "manner": "", "phase": 0.0},
 		{"who": aggie, "name": "aggie_greet", "manner": "greet", "phase": 0.0},
 		{"who": aggie, "name": "aggie_loaf", "manner": "loaf", "phase": 0.0},
 	]
@@ -111,6 +115,11 @@ func _run() -> void:
 		await _grab(str(shot["name"]))
 	print("CLOSEUPS ", _frame_i)
 	get_tree().quit()
+
+
+func _hide_labels(root: Node) -> void:
+	for node in root.find_children("*", "Label3D", true, false):
+		(node as GeometryInstance3D).visible = false
 
 
 func _pin(cat: Node3D, at: Vector3) -> void:

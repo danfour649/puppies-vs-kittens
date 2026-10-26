@@ -17,6 +17,17 @@ func _process_modification() -> void:
 	if not _mapped:
 		_bones = CatBoneMap.resolve(sk)
 		_mapped = true
+	var manner := str(host.get("manner"))
+	var amount := float(host.get("manner_k"))
+	var phase := float(host.get("manner_phase"))
+	var time_s := phase if phase >= 0.0 else Time.get_ticks_msec() / 1000.0
+	# The idle clip is a stride with the tail already lifted. Stacking
+	# a manner on top of it never reads as a loaf, and it turns the
+	# greeting tail into a stick. Start from the bind pose instead.
+	if manner != "" and amount > 0.01 and not _clip_owns(manner):
+		sk.reset_bone_poses()
+		CatMannerPose.apply(sk, _bones, manner, amount, time_s)
+		return
 	var hiss := float(host.get("_hiss_k"))
 	if hiss > 0.01:
 		_add(sk, "spine2", Vector3(-0.45 * hiss, 0.0, 0.0))
@@ -38,13 +49,7 @@ func _process_modification() -> void:
 			var rot: Vector3 = ears[i][2] if false else (ears[i][0] as Node3D).rotation
 			var bone := "ear.L" if i == 0 else "ear.R"
 			_add(sk, bone, Vector3(rot.x * 0.35, 0.0, rot.z * 0.35))
-	var manner := str(host.get("manner"))
-	var amount := float(host.get("manner_k"))
-	var phase := float(host.get("manner_phase"))
-	var time_s := phase if phase >= 0.0 else Time.get_ticks_msec() / 1000.0
-	_apply_life(sk, manner, time_s)
-	if manner != "" and amount > 0.01 and not _clip_owns(manner):
-		CatMannerPose.apply(sk, _bones, manner, amount, time_s)
+	_apply_life(sk, manner_now, time_s)
 
 
 func _apply_life(sk: Skeleton3D, manner: String, time_s: float) -> void:
