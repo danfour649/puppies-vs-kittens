@@ -1,0 +1,6 @@
+{
+  "framework": null,
+  "installCommand": "echo skip",
+  "buildCommand": "bash scripts/export-web.sh",
+  "outputDirectory": "godot3d/build/web"
+}
