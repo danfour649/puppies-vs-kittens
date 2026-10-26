@@ -13,12 +13,15 @@ func _ready() -> void:
 func _run() -> void:
 	var out := "res://screenshots/willie_portrait.png"
 	var face := false
+	var subject := "willie"
 	var args := OS.get_cmdline_user_args()
 	for i in args.size():
 		if args[i] == "--out" and i + 1 < args.size():
 			out = args[i + 1]
 		elif args[i] == "--face":
 			face = true
+		elif args[i] == "--subject" and i + 1 < args.size():
+			subject = args[i + 1]
 	var world := WorldEnvironment.new()
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
@@ -67,16 +70,19 @@ func _run() -> void:
 	aggie.velocity = Vector3.ZERO
 	aggie.position = Vector3(0.46, 0.0, 0.2)
 	aggie.rotation.y = 0.45
-	if face:
+	if face and subject == "aggie":
+		willie.visible = false
+	elif face:
 		aggie.visible = false
 	var cam := Camera3D.new()
 	cam.fov = 26.0 if face else 32.0
 	cam.current = true
 	add_child(cam)
 	await get_tree().process_frame
-	var focus := _face_focus(willie)
-	var forward: Vector3 = -willie.global_transform.basis.z
-	var right: Vector3 = willie.global_transform.basis.x
+	var hero: Node3D = aggie if subject == "aggie" else willie
+	var focus := _face_focus(hero)
+	var forward: Vector3 = -hero.global_transform.basis.z
+	var right: Vector3 = hero.global_transform.basis.x
 	if face:
 		cam.look_at_from_position(focus + forward * 0.2 + right * 0.07 + Vector3(0, 0.025, 0), focus)
 	else:

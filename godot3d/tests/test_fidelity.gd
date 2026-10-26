@@ -97,8 +97,16 @@ func _run() -> void:
 	var aggie = CatScript.new()
 	aggie.set_character("aggie")
 	add_child(aggie)
-	check(aggie.fur_shells >= VisualQuality.fur_shells(), "aggie wears the same fur pass (%d)" % aggie.fur_shells)
+	var aggie_baked := sculpt_baked(aggie)
+	check(aggie_baked, "aggie wears the generated coat")
+	check(aggie_baked or aggie.fur_shells >= VisualQuality.fur_shells(), "aggie keeps a coat (%d shells)" % aggie.fur_shells)
+	check(absf(aggie.model_scale - 0.25) < 0.001, "aggie stays at scale 0.25")
 	check(aggie.get("_sculpt") != null, "aggie wears the sculpted body")
+	var aggie_sculpt = aggie.get("_sculpt")
+	if aggie_sculpt != null and aggie_sculpt.body != null and aggie_sculpt.body.mesh != null:
+		var aggie_verts: PackedVector3Array = aggie_sculpt.body.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+		check(aggie_verts.size() > 1500, "aggie cage is a real mesh (%d verts)" % aggie_verts.size())
+		check(aggie_sculpt.skeleton != null and aggie_sculpt.skeleton.get_bone_count() >= 20, "aggie skeleton matches the cat rig (%d)" % aggie_sculpt.skeleton.get_bone_count())
 	check(aggie.whisker_count == cat.whisker_count, "aggie has whiskers too")
 	print("FIDELITY DONE: %d passed, %d failed" % [_pass, _fail])
 	get_tree().quit(0 if _fail == 0 else 1)

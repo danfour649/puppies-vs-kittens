@@ -10,6 +10,8 @@ const PoseMod := preload("res://cat_kit/cat_pose_modifier.gd")
 const MESH_SCENE := "res://cat_kit/meshes/cat.glb"
 const WILLIE_HIGH := "res://cat_kit/meshes/willie_lod0.glb"
 const WILLIE_LOW := "res://cat_kit/meshes/willie_lod2.glb"
+const AGGIE_HIGH := "res://cat_kit/meshes/aggie_lod0.glb"
+const AGGIE_LOW := "res://cat_kit/meshes/aggie_lod2.glb"
 const WILLIE_ALBEDO := "res://cat_kit/meshes/willie_albedo.png"
 const AGGIE_ALBEDO := "res://cat_kit/meshes/aggie_albedo.png"
 const NORMAL_MAP := "res://cat_kit/meshes/cat_normal.png"
@@ -38,12 +40,11 @@ static func attach(cat: Node) -> void:
 
 func _mesh_path(cat: Node) -> String:
 	if str(cat.get("character_id")) == "aggie":
-		return MESH_SCENE
+		return AGGIE_HIGH if VisualQuality.is_high() else AGGIE_LOW
 	return WILLIE_HIGH if VisualQuality.is_high() else WILLIE_LOW
 
 
 func _build(cat: Node) -> bool:
-	var willie := str(cat.get("character_id")) != "aggie"
 	var packed := load(_mesh_path(cat)) as PackedScene
 	if packed == null:
 		push_error("cat mesh missing")
@@ -83,13 +84,10 @@ func _build(cat: Node) -> bool:
 			mi.visible = false
 	body = chosen
 	body.name = "SculptBody"
-	if willie:
-		# The Hunyuan albedo is already on the mesh. A flat roughness
-		# beats the procedural normal, which was drawn for the other UV.
-		body.material_override = _baked_material(body)
-		body.set_meta("baked_coat", true)
-	else:
-		body.material_override = _coat_material(true)
+	# The Hunyuan albedo is already on the mesh. A flat roughness
+	# beats the procedural normal, which was drawn for the other UV.
+	body.material_override = _baked_material(body)
+	body.set_meta("baked_coat", true)
 	body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	_hide_primitives(cat)
 	_loops(player)
