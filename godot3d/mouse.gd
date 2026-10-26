@@ -57,6 +57,7 @@ func _ready() -> void:
 	_target = global_position
 	_brain = CreatureBrain.new()
 	_brain.bind_profile("mouse", _rng.randi())
+	add_to_group("prey")
 	_build_model()
 	_squeak = HouseAudio.make_player(self, "squeak", false)
 	_scurry = HouseAudio.make_player(self, "scurry", true)

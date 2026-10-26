@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://brourq3xb2brg"
-path="res://.godot/imported/manner_chatter.png-29ac7b2f1587f30fff14ad08e83c9235.ctex"
+uid="uid://dpt8n60vyr4ed"
+path="res://.godot/imported/manner_willie_wiggle.png-5705718a63994d373b1de76e61581a10.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://screenshots/hunt/manner_chatter.png"
-dest_files=["res://.godot/imported/manner_chatter.png-29ac7b2f1587f30fff14ad08e83c9235.ctex"]
+source_file="res://screenshots/hunt/manner_willie_wiggle.png"
+dest_files=["res://.godot/imported/manner_willie_wiggle.png-5705718a63994d373b1de76e61581a10.ctex"]
 
 [params]
 

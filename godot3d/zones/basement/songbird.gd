@@ -33,6 +33,7 @@ func _ready() -> void:
 	_rng.randomize()
 	brain = CreatureBrain.new()
 	brain.bind_profile("songbird", _rng.randi())
+	add_to_group("prey")
 	_build()
 	_alarm = HouseAudio.make_player(self, "alarm", false)
 	_wings = HouseAudio.make_player(self, "wingbeat", true)
