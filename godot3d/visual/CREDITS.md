@@ -39,3 +39,39 @@ Both cats' visible bodies are generated meshes.
 - `visual/cat_fidelity.gd` — shells, cornea, pupil, catchlight, whiskers.
 - Coat colours stay Daniel's ruled spec in `cat_kit/cat_species.json`.
 - No CC-BY assets are bundled, so there is no attribution line to add.
+
+## The house, 2026-10-26
+
+Floors, walls, and the hoarder props were generated on Daniel's Fal
+account. Normals and roughness are derived here. Source OBJs are not
+in the repo.
+
+- Five albedo photos from `fal-ai/flux/schnell` at square 1024.
+  Published price is $0.003 per megapixel, about $0.006 a picture,
+  about $0.03 for the set. Request ids: hardwood
+  `01a17649-19c9-72b3-9d55-936269a2cd9f`, linoleum
+  `01a17649-1a00-7b51-ba34-9cfcaffecb6b`, basement concrete
+  `01a17649-1a05-7d13-bf2a-4eccd56e276c`, attic boards
+  `01a17649-1a06-7ea1-9b73-b4afad8400a7`, wallpaper
+  `01a17649-1a07-75c3-9eaa-93540e00067b`.
+- `tools/make_surface_maps.py` builds the normal and roughness from
+  each albedo and writes `house/textures/*_lod0.jpg` (desktop) and
+  `*_lod2.jpg` (web, 512). The lod0 set is kept out of the web export.
+- Hoarder meshes from Hunyuan3D v3.1 Rapid text-to-3d
+  (`fal-ai/hunyuan-3d/v3.1/rapid/text-to-3d`). Published price is
+  $0.225 a generation. PBR was left off. `tools/fit_house_props.py`
+  stands the mesh up, decimates to about 8000 triangles (desktop) and
+  2500 (web), and writes `house/props/<name>_lod0.glb` and `_lod2.glb`.
+- Cardboard stacks, request `01a17649-1a0c-7e01-8ef8-5a31419e94b9`.
+- Recliner, request `01a1764d-6456-7332-b6b6-b834fcacdf11`. It replaces
+  the living-room sofa mesh. The seat collision is unchanged.
+- Newspaper bundle, request `01a17654-ad4a-7420-a3ec-8124bdd5325c`.
+- The lamp, jars, laundry pile, fridge, and TV did not come back.
+  Fifteen Rapid attempts returned HTTP 504 `downstream_service_unavailable`
+  with no mesh. Those rooms still use the flat fridge, television, and
+  the small shelf clutter. A further retry would have pushed the set
+  past the $5 cap if the failed attempts were billed, so it was stopped.
+- Spend: about $0.03 for the five photos, plus $0.675 for the three
+  meshes that landed. If Fal also billed the fifteen empty 504s, the
+  Rapid total is 18 × $0.225 = $4.05 and the house total is about
+  $4.08. Either way it stays under $5.

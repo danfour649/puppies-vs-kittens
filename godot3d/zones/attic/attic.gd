@@ -164,6 +164,8 @@ func _ready() -> void:
 	# Dawn clutter in the open parts of the floor. Keep-rects leave
 	# the hatch, the nest, the insulation and the speed-check walks.
 	HoarderDressing.build(self, HoarderGenerator.generate_floor(HouseSpec.ATTIC, 25502))
+	HouseSurfaces.dress(self, HouseSpec.ATTIC)
+	HouseProps.dress(self, HouseSpec.ATTIC)
 	FloorAmbience.attach(self, "attic")
 	_spawn_family()
 	# INTEGRATION: the zone-root contract (entry node + return

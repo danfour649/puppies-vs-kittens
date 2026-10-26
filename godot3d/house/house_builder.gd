@@ -217,6 +217,7 @@ static func build_ground_floor(k: Kit) -> Dictionary:
 			k.cyl(0.085, 0.014, Vector3(-8.15 + bx, 0.925, -1.5 + bz), Color(0.05, 0.05, 0.06), false)
 	var fridge := k.box(Vector3(0.95, 1.9, 0.85), Vector3(-7.85, 0.95, 1.4), Color(0.82, 0.84, 0.86), true)
 	fridge.name = "Fridge"
+	fridge.set_meta("house_prop", "fridge")
 	k.box(Vector3(0.05, 0.5, 0.05), Vector3(-7.32, 1.15, 1.05), Color(0.5, 0.52, 0.55), false)
 	# THE DRAWER — pulled open under the north counter, cat-sized.
 	# Aggie sits in it; its top panel is a sibling lounge spot.
@@ -239,24 +240,28 @@ static func build_ground_floor(k: Kit) -> Dictionary:
 	var sp := HouseSpec.SOFA_POS
 	var sofa := k.box(Vector3(2.3, 0.48, 1.0), Vector3(sp.x, 0.24, sp.z), fabric, false)
 	sofa.name = "Sofa"
+	sofa.set_meta("house_prop", "recliner")
 	# INTEGRATION: the sofa's collider is a seat slab whose front
 	# edge stops 0.2 short of the visual front — an occupant walking
 	# to the sit station at the cushion edge can arrive (their
 	# capsule meets the slab, not a full-depth block), while the
 	# seat top (y 0.60, the cushion tops) stays solid for the cats.
 	k.static_box(Vector3(2.3, 0.60, 0.80), Vector3(sp.x, 0.30, sp.z - 0.10))
-	k.box(Vector3(1.05, 0.12, 0.88), Vector3(sp.x - 0.55, 0.54, sp.z), fabric_lt, false)
-	k.box(Vector3(1.05, 0.12, 0.88), Vector3(sp.x + 0.55, 0.54, sp.z), fabric_lt, false)
-	k.box(Vector3(2.3, 0.85, 0.24), Vector3(sp.x, 0.68, sp.z - 0.42), fabric, true)
+	k.box(Vector3(1.05, 0.12, 0.88), Vector3(sp.x - 0.55, 0.54, sp.z), fabric_lt, false).set_meta("house_prop", "recliner")
+	k.box(Vector3(1.05, 0.12, 0.88), Vector3(sp.x + 0.55, 0.54, sp.z), fabric_lt, false).set_meta("house_prop", "recliner")
+	k.box(Vector3(2.3, 0.85, 0.24), Vector3(sp.x, 0.68, sp.z - 0.42), fabric, true).set_meta("house_prop", "recliner")
 	for sx: float in [-1.0, 1.0]:
-		k.box(Vector3(0.25, 0.38, 1.0), Vector3(sp.x + sx * 1.02, 0.67, sp.z), fabric, false)
+		k.box(Vector3(0.25, 0.38, 1.0), Vector3(sp.x + sx * 1.02, 0.67, sp.z), fabric, false).set_meta("house_prop", "recliner")
 	k.box(Vector3(3.2, 0.02, 2.2), Vector3(4.6, 0.012, -2.4), Color(0.45, 0.22, 0.25), false)
 	k.box(Vector3(1.2, 0.05, 0.6), Vector3(4.8, 0.32, -2.2), wood.darkened(0.15), false)
 	for sx: float in [-0.5, 0.5]:
 		for sz: float in [-0.22, 0.22]:
 			k.box(Vector3(0.05, 0.30, 0.05), Vector3(4.8 + sx, 0.15, -2.2 + sz), wood.darkened(0.25), false)
-	k.box(Vector3(1.8, 0.45, 0.45), Vector3(4.8, 0.225, -4.45), wood.darkened(0.2), true)
-	k.box(Vector3(1.6, 0.95, 0.06), Vector3(4.8, 1.08, -4.5), Color(0.10, 0.12, 0.16), false)
+	var tv_stand := k.box(Vector3(1.8, 0.45, 0.45), Vector3(4.8, 0.225, -4.45), wood.darkened(0.2), true)
+	tv_stand.set_meta("house_prop", "tv")
+	var tv := k.box(Vector3(1.6, 0.95, 0.06), Vector3(4.8, 1.08, -4.5), Color(0.10, 0.12, 0.16), false)
+	tv.name = "Television"
+	tv.set_meta("house_prop", "tv")
 	# Bookshelf with book strips, east wall.
 	k.box(Vector3(0.35, 1.8, 1.6), Vector3(8.25, 0.9, -1.5), wood.darkened(0.1), true)
 	var book_cols: Array = [Color(0.6, 0.25, 0.2), Color(0.2, 0.35, 0.55), Color(0.25, 0.5, 0.3), Color(0.65, 0.5, 0.2)]
@@ -288,27 +293,9 @@ static func build_ground_floor(k: Kit) -> Dictionary:
 	k.omni(Vector3(-5.0, 2.3, -1.0), Color(1.0, 0.9, 0.75), 0.85, 7.5)
 	k.omni(Vector3(4.5, 2.3, 0.5), Color(1.0, 0.92, 0.78), 0.85, 7.5)
 	k.omni(Vector3(2.5, 2.3, 3.6), Color(1.0, 0.95, 0.82), 0.5, 5.0)
-	# REALISM PASS 1 dressing: floor + wall texture variation — plank
-	# strips across the living room, a tile checker in the kitchen
-	# (kept clear of the stairwell hole), wainscot + picture frames
-	# on the living-room south wall. Visual only: no statics added,
-	# no HouseSpec geometry touched.
-	var plank_a := Color(0.60, 0.47, 0.33)
-	var plank_b := Color(0.55, 0.42, 0.29)
-	var lx := -1.55
-	var pi := 0
-	while lx < 8.3:
-		k.box(Vector3(0.58, 0.008, 9.2), Vector3(lx + 0.29, 0.004, 0.0), plank_a if pi % 2 == 0 else plank_b, false)
-		lx += 0.62
-		pi += 1
-	var tile_a := Color(0.78, 0.75, 0.68)
-	var tile_b := Color(0.68, 0.66, 0.60)
-	for tx in range(-8, -2):
-		for tz in range(-4, 4):
-			var c := Vector2(tx + 0.65, tz + 0.65)
-			if HouseSpec.STAIRWELL.grow(0.35).has_point(c):
-				continue
-			k.box(Vector3(1.24, 0.008, 1.24), Vector3(c.x, 0.004, c.y), tile_a if (tx + tz) % 2 == 0 else tile_b, false)
+	# Wainscot + picture frames on the living-room south wall.
+	# The floor and wallpaper are real textures (HouseSurfaces);
+	# the old plank strips and kitchen tile checker are gone.
 	k.box(Vector3(10.1, 0.5, 0.04), Vector3(3.35, 0.25, 4.70), Color(0.83, 0.78, 0.68), false)
 	for fx: float in [1.8, 6.9]:
 		k.box(Vector3(0.8, 1.0, 0.05), Vector3(fx, 1.7, 4.70), wood.darkened(0.1), false)

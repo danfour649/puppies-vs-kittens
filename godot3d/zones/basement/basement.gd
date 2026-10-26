@@ -236,6 +236,8 @@ func _ready() -> void:
 	_build_shelves()
 	_build_props()
 	_build_lights()
+	HouseSurfaces.dress(self, HouseSpec.BASEMENT)
+	HouseProps.dress(self, HouseSpec.BASEMENT)
 	FloorAmbience.attach(self, "basement")
 	_spawn_actors()
 	if not spawn_standalone_cat:
