@@ -5,7 +5,8 @@ extends CharacterBody3D
 ## box-built model idiom, but a real physics body so maze walls block
 ## it, and a pack brain instead of a flee brain:
 ##   idle/wander near its den -> chase the cat inside aggro_radius
-##   -> bite on contact (cooldown) -> flee when alone at low HP.
+##   -> a healthy rat ripostes (a short lunge) instead of giving
+##   ground -> bite -> flee when alone at low HP.
 ## The Alpha (is_alpha) is cat-sized, hits harder, and wears an HP bar.
 ##
 ## Combat contract (shared with the zone controller):
@@ -76,7 +77,7 @@ var _bar_fg: MeshInstance3D = null
 
 func _init() -> void:
 	_fsm = CreatureFSM.new()
-	for s: String in ["idle", "wander", "chase", "flee", "dead"]:
+	for s: String in ["idle", "wander", "chase", "riposte", "flee", "dead"]:
 		_fsm.add_state(s)
 	_fsm.change_to("idle")
 
@@ -334,8 +335,22 @@ func _physics_process(delta: float) -> void:
 		_drive(away, flee_speed, delta)
 		move_and_slide()
 		return
+	if CreatureBrain.rat_riposte(state, hp, dist, _packmates_nearby(), bite_range):
+		state = "riposte"
 
 	match state:
+		"riposte":
+			# She meets him. Same bite as a chase — the difference is
+			# she closes the last step instead of waiting to be reached.
+			var reach := bite_range * 1.45
+			if dist <= reach:
+				velocity.x = 0.0
+				velocity.z = 0.0
+				if _bite_cd <= 0.0 and target_cat != null:
+					_bite_cd = bite_cooldown * 0.75
+					bite.emit(target_cat, bite_damage)
+			elif to_cat.length() > 0.01:
+				_drive(to_cat.normalized(), chase_speed * 1.35, delta)
 		"chase":
 			if dist <= bite_range:
 				velocity.x = 0.0

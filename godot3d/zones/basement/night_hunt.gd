@@ -242,6 +242,7 @@ func _spawn_cast() -> void:
 		b.global_position = _window + Vector3(rng.randf_range(-0.8, 0.8), -0.9, rng.randf_range(-0.4, 0.5))
 		b.cat = cat
 		b.indoor = true
+		b.windows = [_window]
 		b.lights = [_window]
 		b.flock = birds
 		birds.append(b)
@@ -260,8 +261,10 @@ func _spawn_cast() -> void:
 			perch = pp
 	other.perches = perches
 	other.hour = 19.0
-	other.prey = cat
+	other.rival = cat
+	other.quarry = mice
 	other.territory = HoarderGenerator.cell_center(heart.x, heart.y)
+	other.territory_radius = 5.5
 	other._pos = Vector3(perch.x, perch.y, perch.z)
 	if other.body != null:
 		other.body.global_position = other._pos
@@ -498,7 +501,10 @@ func _update_hud() -> void:
 		_banner.text = "She is waiting."
 	else:
 		_goal.text = "Mice for Glenys: %d / %d" % [mini(caught, GOAL), GOAL]
-		_banner.text = "Stalk, and they only mind you if they see you. A sprint or a meow carries."
+		if other != null and other.boast != "":
+			_banner.text = other.boast
+		else:
+			_banner.text = "Stalk, and they only mind you if they see you. A sprint or a meow carries."
 
 
 func _clock() -> String:
