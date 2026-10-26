@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
+		<title>$GODOT_PROJECT_NAME</title>
+		<style>
+html, body, #canvas {
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+body {
+	color: #f6efe4;
+	background-color: #1a2438;
+	overflow: hidden;
+	touch-action: none;
+	font-family: Georgia, "Iowan Old Style", Palatino, serif;
+}
+
+#canvas {
+	display: block;
+}
+
+#canvas:focus {
+	outline: none;
+}
+
+#status {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	gap: 18px;
+	visibility: hidden;
+	background:
+		radial-gradient(ellipse at 50% 78%, rgba(232, 160, 90, 0.35), transparent 46%),
+		linear-gradient(#243454 0%, #6a4638 58%, #241910 100%);
+}
+
+#status-splash {
+	display: none;
+}
+
+.willie {
+	width: min(240px, 58vw);
+	height: auto;
+	filter: drop-shadow(0 18px 12px rgba(0, 0, 0, 0.35));
+}
+
+#status-title {
+	margin: 0;
+	font-size: 28px;
+	font-weight: normal;
+	letter-spacing: 0.04em;
+}
+
+#status-label {
+	margin: 0;
+	min-height: 1.2em;
+	font-family: "Noto Sans", "Droid Sans", Arial, sans-serif;
+	font-size: 14px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: rgba(246, 239, 228, 0.82);
+}
+
+#status-progress {
+	width: min(420px, 78vw);
+	height: 12px;
+	border: 0;
+	border-radius: 999px;
+	overflow: hidden;
+	background: rgba(255, 255, 255, 0.14);
+	appearance: none;
+	-webkit-appearance: none;
+}
+
+#status-progress::-webkit-progress-bar {
+	background: transparent;
+}
+
+#status-progress::-webkit-progress-value {
+	background: #f0b36a;
+	border-radius: 999px;
+}
+
+#status-progress::-moz-progress-bar {
+	background: #f0b36a;
+	border-radius: 999px;
+}
+
+#status-notice {
+	display: none;
+	background-color: #3a2428;
+	border-radius: 0.5rem;
+	border: 1px solid #9b3943;
+	color: #f6efe4;
+	font-family: "Noto Sans", "Droid Sans", Arial, sans-serif;
+	line-height: 1.3;
+	margin: 0 2rem;
+	max-width: 36rem;
+	overflow: hidden;
+	padding: 1rem;
+	text-align: center;
+	z-index: 1;
+}
+		</style>
+		$GODOT_HEAD_INCLUDE
+	</head>
+	<body>
+		<canvas id="canvas">
+			Your browser does not support the canvas tag.
+		</canvas>
+
+		<noscript>
+			Your browser does not support JavaScript.
+		</noscript>
+
+		<div id="status">
+			<svg class="willie" viewBox="0 0 240 170" role="img" aria-label="Willie">
+				<path fill="#140e0c" d="M168 118c28 2 46-22 40-42-4-14-18-18-24-8-4 6-2 16 2 20-10 2-18 10-18 22 0 4 0 6 0 8z"/>
+				<ellipse cx="118" cy="122" rx="62" ry="34"/>
+				<circle cx="64" cy="86" r="30"/>
+				<path d="M40 66l10-34 16 26z"/>
+				<path d="M62 60l14-36 16 32z"/>
+			</svg>
+			<p id="status-title">Willie and Aggie</p>
+			<progress id="status-progress" max="100"></progress>
+			<p id="status-label">Waking the house</p>
+			<img id="status-splash" class="$GODOT_SPLASH_CLASSES" src="$GODOT_SPLASH" alt="">
+			<div id="status-notice"></div>
+		</div>
+
+		<script src="$GODOT_URL"></script>
+		<script>
+const GODOT_CONFIG = $GODOT_CONFIG;
+const GODOT_THREADS_ENABLED = $GODOT_THREADS_ENABLED;
+const engine = new Engine(GODOT_CONFIG);
+
+(function () {
+	const statusOverlay = document.getElementById('status');
+	const statusProgress = document.getElementById('status-progress');
+	const statusNotice = document.getElementById('status-notice');
+	const statusLabel = document.getElementById('status-label');
+
+	let initializing = true;
+	let statusMode = '';
+
+	function setStatusMode(mode) {
+		if (statusMode === mode || !initializing) {
+			return;
+		}
+		if (mode === 'hidden') {
+			statusOverlay.remove();
+			initializing = false;
+			return;
+		}
+		statusOverlay.style.visibility = 'visible';
+		statusProgress.style.display = mode === 'progress' ? 'block' : 'none';
+		statusLabel.style.display = mode === 'progress' ? 'block' : 'none';
+		statusNotice.style.display = mode === 'notice' ? 'block' : 'none';
+		statusMode = mode;
+	}
+
+	function setStatusNotice(text) {
+		while (statusNotice.lastChild) {
+			statusNotice.removeChild(statusNotice.lastChild);
+		}
+		const lines = text.split('\n');
+		lines.forEach((line) => {
+			statusNotice.appendChild(document.createTextNode(line));
+			statusNotice.appendChild(document.createElement('br'));
+		});
+	}
+
+	function displayFailureNotice(err) {
+		console.error(err);
+		if (err instanceof Error) {
+			setStatusNotice(err.message);
+		} else if (typeof err === 'string') {
+			setStatusNotice(err);
+		} else {
+			setStatusNotice('An unknown error occurred.');
+		}
+		setStatusMode('notice');
+		initializing = false;
+	}
+
+	const missing = Engine.getMissingFeatures({
+		threads: GODOT_THREADS_ENABLED,
+	});
+
+	if (missing.length !== 0) {
+		if (GODOT_CONFIG['serviceWorker'] && GODOT_CONFIG['ensureCrossOriginIsolationHeaders'] && 'serviceWorker' in navigator) {
+			let serviceWorkerRegistrationPromise;
+			try {
+				serviceWorkerRegistrationPromise = navigator.serviceWorker.getRegistration();
+			} catch (err) {
+				serviceWorkerRegistrationPromise = Promise.reject(new Error('Service worker registration failed.'));
+			}
+			Promise.race([
+				serviceWorkerRegistrationPromise.then((registration) => {
+					if (registration != null) {
+						return Promise.reject(new Error('Service worker already exists.'));
+					}
+					return registration;
+				}).then(() => engine.installServiceWorker()),
+				new Promise((resolve) => {
+					setTimeout(() => resolve(), 2000);
+				}),
+			]).then(() => {
+				window.location.reload();
+			}).catch((err) => {
+				console.error('Error while registering service worker:', err);
+			});
+		} else {
+			const missingMsg = 'Error\nThe following features required to run Godot projects on the Web are missing:\n';
+			displayFailureNotice(missingMsg + missing.join('\n'));
+		}
+	} else {
+		setStatusMode('progress');
+		engine.startGame({
+			'onProgress': function (current, total) {
+				if (current > 0 && total > 0) {
+					statusProgress.value = current;
+					statusProgress.max = total;
+					var pct = Math.round(100 * current / total);
+					statusLabel.textContent = pct < 100 ? 'Willie is on his way  ' + pct + '%' : 'Almost there';
+				} else {
+					statusProgress.removeAttribute('value');
+					statusProgress.removeAttribute('max');
+					statusLabel.textContent = 'Waking the house';
+				}
+			},
+		}).then(() => {
+			setStatusMode('hidden');
+		}, displayFailureNotice);
+	}
+}());
+		</script>
+	</body>
+</html>
