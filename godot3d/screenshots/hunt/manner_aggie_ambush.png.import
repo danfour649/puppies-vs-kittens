@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c460ordi88cnt"
-path="res://.godot/imported/manner_ambush.png-76fb961a6b570a8f6f2315926e09347e.ctex"
+uid="uid://cdpxol7mtosbf"
+path="res://.godot/imported/manner_aggie_ambush.png-e76c98aefef6a070fe5c6437152b466b.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://screenshots/hunt/manner_ambush.png"
-dest_files=["res://.godot/imported/manner_ambush.png-76fb961a6b570a8f6f2315926e09347e.ctex"]
+source_file="res://screenshots/hunt/manner_aggie_ambush.png"
+dest_files=["res://.godot/imported/manner_aggie_ambush.png-e76c98aefef6a070fe5c6437152b466b.ctex"]
 
 [params]
 

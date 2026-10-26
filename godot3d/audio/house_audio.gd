@@ -79,5 +79,6 @@ static func make_player(parent: Node, kind: String, looping: bool = false) -> Au
 	player.unit_size = float(mix["unit"])
 	player.max_distance = float(mix["reach"])
 	player.max_polyphony = 1
+	player.add_to_group("creature_voice")
 	parent.add_child(player)
 	return player

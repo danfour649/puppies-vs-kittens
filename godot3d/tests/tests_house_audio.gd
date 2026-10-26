@@ -90,6 +90,16 @@ func _run() -> void:
 		CatMannerPose.apply(sk, live, "chatter", 1.0, 0.5)
 		var after := sk.get_bone_pose_rotation(jaw).get_angle() if jaw >= 0 else 0.0
 		check(jaw >= 0 and after > before + 0.05, "chatter moves the jaw (%.3f -> %.3f)" % [before, after])
+		sk.reset_bone_poses()
+		var spine := int(live.get("spine_b", -1))
+		var ear := int(live.get("ear_l", -1))
+		var still := sk.get_bone_pose_rotation(spine) if spine >= 0 else Quaternion.IDENTITY
+		var ear_still := sk.get_bone_pose_rotation(ear) if ear >= 0 else Quaternion.IDENTITY
+		CatMannerPose.apply_life(sk, live, 0.6, 1.0, 1.0, 0.4, 0.0, 0.3, -0.1)
+		var breathed := sk.get_bone_pose_rotation(spine) if spine >= 0 else Quaternion.IDENTITY
+		var ear_turned := sk.get_bone_pose_rotation(ear) if ear >= 0 else Quaternion.IDENTITY
+		check(spine >= 0 and still.angle_to(breathed) > 0.01, "idle breath moves the chest")
+		check(ear >= 0 and ear_still.angle_to(ear_turned) > 0.05, "a nearby sound turns an ear")
 		cat.manner = "wiggle"
 		cat.manner_k = 1.0
 		cat.manner_phase = 0.4
