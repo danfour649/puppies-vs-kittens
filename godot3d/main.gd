@@ -231,7 +231,17 @@ func _build_environment() -> void:
 	_static_box(statics, Vector3(26.4, 1.3, 0.6), Vector3(0, 0.65, 10.2))
 	_static_box(statics, Vector3(0.6, 1.3, 20.4), Vector3(13.2, 0.65, 0))
 	_static_box(statics, Vector3(0.6, 1.3, 20.4), Vector3(-13.2, 0.65, 0))
-	_static_box(statics, Vector3(6.4, 0.24, 2.6), Vector3(2.5, 0.12, -8.7))
+	# The deck used to be a solid block from the lawn up to 0.24 m.
+	# Willie hit that curb at z=-7.25 and could not reach the door.
+	# The slab is the deck surface; the ramp is the step in front of it.
+	_static_box(statics, Vector3(6.4, 0.1, 1.85), Vector3(2.5, 0.19, -9.08))
+	var ramp := CollisionShape3D.new()
+	var ramp_shape := BoxShape3D.new()
+	ramp_shape.size = Vector3(2.4, 0.08, 1.15)
+	ramp.shape = ramp_shape
+	ramp.position = Vector3(2.5, 0.12, -7.58)
+	ramp.rotation.x = atan2(0.24, 1.05)
+	statics.add_child(ramp)
 	_static_box(statics, Vector3(0.5, 2.6, 0.5), Vector3(-8.5, 1.3, -5.0))
 	_static_box(statics, Vector3(2.4, 1.5, 1.2), Vector3(9.9, 0.75, -6.05))
 	_static_box(statics, Vector3(0.7, 0.46, 0.7), CHAIR_SEAT + Vector3(0, -0.23, 0))

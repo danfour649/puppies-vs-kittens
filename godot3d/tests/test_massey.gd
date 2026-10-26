@@ -100,6 +100,23 @@ func _run() -> void:
 			conn_ok = false
 	check(conn_ok, "every live connector resolves to a real entry")
 
+	# --- travel: walk up to the door, don't teleport into it -------------------
+	# Camera yaw is PI, so move (0, -1) is north, toward the house.
+	_game.input_override = {"active": true, "move": Vector2(0, -1), "sprint": true, "stalk": false}
+	var walked := 0
+	while zones.current_zone == HouseSpec.OUTSIDE and walked < 420:
+		await frames(1)
+		walked += 1
+	_game.input_override = {"active": false, "move": Vector2.ZERO, "sprint": false, "stalk": false}
+	check(zones.current_zone == HouseSpec.GROUND_FLOOR,
+		"walking north from the yard enters the front door (at %s after %d frames)" % [cat.global_position, walked])
+	var settle := 0
+	while zones.travelling and settle < 60:
+		await frames(1)
+		settle += 1
+	zones.travel(HouseSpec.OUTSIDE, "EntryFrontDoor", true)
+	await frames(80) # arrival cooldown is 1.2 s; the warp below needs can_travel()
+
 	# --- travel: the real door trigger ----------------------------------------------
 	cat.global_position = Vector3(2.5, 0.95, -9.85) # inside the porch volume
 	cat.velocity = Vector3.ZERO
