@@ -1,6 +1,8 @@
 extends Node
-## Stills of the connected house, GL Compatibility:
-##   xvfb-run godot --path godot3d --rendering-method gl_compatibility res://tools/tools_circuit_shots.tscn
+## Stills of the connected night, GL Compatibility, dressed lod0:
+##   LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a godot --path godot3d \
+##     --rendering-method gl_compatibility --resolution 1280x720 \
+##     --audio-driver Dummy res://tools/tools_circuit_shots.tscn -- --quality high
 
 const MainScene := preload("res://main.tscn")
 
@@ -27,7 +29,12 @@ func _shot(name: String) -> void:
 		var dist: float = cam.global_position.distance_to(chest)
 		var eye: float = cam.global_position.y - _game.cat.global_position.y
 		var screen: Vector2 = cam.unproject_position(chest)
-		extra = " dist=%.2f eye=%.2f screen=%s" % [dist, eye, screen]
+		var feet: Vector3 = _game.cat.global_position
+		var crown: Vector3 = feet + Vector3(0, 0.46, 0)
+		var vp_h: float = get_viewport().get_visible_rect().size.y
+		var frac: float = absf(cam.unproject_position(crown).y - cam.unproject_position(feet).y) / maxf(1.0, vp_h)
+		var look: float = (-cam.global_basis.z).y
+		extra = " dist=%.2f eye=%.2f look=%.2f fill=%.0f%% screen=%s" % [dist, eye, look, frac * 100.0, screen]
 	print("SHOT ", name, " ", img.get_size(), extra)
 
 
@@ -36,25 +43,37 @@ func _look(yaw: float) -> void:
 	_game.snap_camera()
 
 
+func _label_world(lab: Label) -> Vector3:
+	var home: Vector3 = lab.get_meta("home")
+	var host: Node = lab
+	while host != null and not (host is HoarderDressing):
+		host = host.get_parent()
+	if host is Node3D:
+		return (host as Node3D).to_global(home)
+	return home
+
+
 ## Stand Willie in front of the long school-photograph name so the
-## wrapped label is in frame, then let the clamp settle for a frame.
+## small label is in frame, then let it settle for a frame.
 func _frame_keepsake() -> void:
-	var labs: Array = _game.find_children("*", "Label3D", true, false)
+	var labs: Array = _game.find_children("*", "Label", true, false)
 	for n: Node in labs:
-		var lab := n as Label3D
-		if lab == null or not lab.text.to_lower().contains("photograph"):
+		var lab := n as Label
+		if lab == null or not lab.has_meta("home"):
 			continue
-		var world := lab.global_position
-		_game.cat.global_position = world + Vector3(0.15, -0.15, 0.85)
+		if not lab.text.to_lower().contains("photograph"):
+			continue
+		var world := _label_world(lab)
+		_game.cat.global_position = world + Vector3(0.15, -0.15, 0.9)
 		_game.cat.velocity = Vector3.ZERO
 		_look(0.0)
 		await _wait(0.45)
 		var cam := get_viewport().get_camera_3d()
 		var vp := get_viewport().get_visible_rect().size
 		if cam != null:
-			var screen: Vector2 = cam.unproject_position(lab.global_position)
-			var behind: bool = cam.is_position_behind(lab.global_position)
-			print("LABEL ", lab.text.replace("\n", " | "), " screen=", screen, " behind=", behind, " vp=", vp, " px=", lab.pixel_size, " width=", lab.width)
+			var screen: Vector2 = cam.unproject_position(world)
+			var behind: bool = cam.is_position_behind(world)
+			print("LABEL ", lab.text.replace("\n", " | "), " screen=", screen, " behind=", behind, " vp=", vp, " font=", lab.get_theme_font_size("font_size"), " box=", lab.position, lab.size, " vis=", lab.visible)
 		await _shot("keepsake")
 		return
 	print("SHOT keepsake missing")
@@ -65,6 +84,16 @@ func _run() -> void:
 	_game = MainScene.instantiate()
 	add_child(_game)
 	await _wait(0.6)
+	var comp_vis := false
+	if _game.night != null and _game.night.compass() != null:
+		comp_vis = _game.night.compass().visible
+	var chip_vis := false
+	if _game._hud_layer != null:
+		chip_vis = _game._hud_layer.visible
+	var paw_vis := false
+	if _game._touch != null:
+		paw_vis = _game._touch.visible
+	print("PICKER paw=", paw_vis, " chip=", chip_vis, " compass=", comp_vis)
 	await _shot("picker")
 	_game.duo.choose("willie")
 	await _wait(0.3)
@@ -84,7 +113,7 @@ func _run() -> void:
 		await _wait(0.05)
 		guard += 1
 	_look(0.0)
-	_game.cat.global_position = HouseSpec.zone_origin(HouseSpec.GROUND_FLOOR) + Vector3(2.4, 0.2, 0.6)
+	_game.cat.global_position = HouseSpec.zone_origin(HouseSpec.GROUND_FLOOR) + Vector3(3.0, 0.2, -1.0)
 	_game.snap_camera()
 	await _wait(0.7)
 	await _shot("ground")

@@ -55,6 +55,11 @@ var _rng := RandomNumberGenerator.new()
 var heat_event := ""
 var _heat_target := Vector3.ZERO
 var _heat_hopped := false
+var _stuck_for := 0.0
+var _sidestep_for := 0.0
+var _side := 1.0
+var _prev_flat := Vector2.ZERO
+var _have_flat := false
 
 
 func _init() -> void:
@@ -340,7 +345,57 @@ func _drive(point: Vector3, frac: float, sprint: bool, chase := false, arrive :=
 		var d := away.length()
 		if d < 1.15 and d > 0.001:
 			dir = (dir + away.normalized() * (1.15 - d) * 1.8).normalized()
+	var step := get_physics_process_delta_time()
+	var flat := Vector2(cat.global_position.x, cat.global_position.z)
+	if _have_flat:
+		if flat.distance_to(_prev_flat) < 0.008:
+			_stuck_for += step
+		else:
+			_stuck_for = 0.0
+	_prev_flat = flat
+	_have_flat = true
+	var ahead := _way_blocked(dir, 0.7)
+	if _stuck_for > 0.22 or ahead:
+		if _sidestep_for <= 0.0:
+			_side = _clearer_side(dir)
+		_sidestep_for = 0.7
+		_stuck_for = 0.0
+	if _sidestep_for > 0.0:
+		_sidestep_for = maxf(0.0, _sidestep_for - step)
+		var side := Vector3(-dir.z, 0.0, dir.x) * _side
+		dir = (dir * 0.2 + side).normalized()
 	cat.set_move_input(dir * frac, sprint, false)
+	return false
+
+
+func _clearer_side(dir: Vector3) -> float:
+	var left := Vector3(-dir.z, 0.0, dir.x)
+	if left.length() < 0.001:
+		return _side
+	var lhit := _way_blocked(left, 0.8)
+	var rhit := _way_blocked(-left, 0.8)
+	if lhit and not rhit:
+		return -1.0
+	if rhit and not lhit:
+		return 1.0
+	return -_side
+
+
+func _way_blocked(dir: Vector3, reach: float) -> bool:
+	if cat == null or cat.get_world_3d() == null or dir.length() < 0.001:
+		return false
+	var space := cat.get_world_3d().direct_space_state
+	var skip: Array[RID] = [cat.get_rid()]
+	if player_cat != null and is_instance_valid(player_cat):
+		skip.append(player_cat.get_rid())
+	var ahead := dir.normalized()
+	for height: float in [0.2, 0.38]:
+		var from := cat.global_position + Vector3(0.0, height, 0.0)
+		var q := PhysicsRayQueryParameters3D.create(from, from + ahead * reach)
+		q.collision_mask = 1
+		q.exclude = skip
+		if not space.intersect_ray(q).is_empty():
+			return true
 	return false
 
 
