@@ -5,7 +5,7 @@ render_mode cull_back, diffuse_burley, specular_schlick_ggx, depth_draw_opaque;
 // just off the skin to the tip. Strands are a stable hash so the
 // coat thins toward the tip instead of looking like stacked balloons.
 // Self-made for this project. No textures are sampled except the
-// coat albedo the cat already baked (Willie's ginger, Aggie's calico).
+// coat albedo the cat already baked (Willie's ginger, Aggie's tortoiseshell).
 
 uniform vec4 fur_color : source_color = vec4(1.0);
 uniform float layer = 0.5;

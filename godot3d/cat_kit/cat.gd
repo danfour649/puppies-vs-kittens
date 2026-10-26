@@ -12,7 +12,7 @@ extends CharacterBody3D
 ## Colouring is each cat's own, per Daniel's ruled spec (2026-10-25;
 ## see cat_kit/README.md): Willie is white with #E8AF54 ginger tabby
 ## patches (cap, big saddle, white tail with a ginger underside,
-## faint darker striping) and dark eyes; Aggie is a dark calico —
+## faint darker striping) and dark eyes; Aggie is a dark tortoiseshell —
 ## orange/cream mottling baked into her coat texture over a warm
 ## black-brown base (pass 3: pure texture, no scatter shells).
 ##
@@ -98,7 +98,7 @@ var is_held := false ## GLENYS: caught — no movement, no strikes, no harm
 
 # --- structure verification handles (smoke test) ------------------------------
 ## PASS 3: Aggie's mottle lives in her baked coat texture; this is the
-## texture's pattern coverage in permille (see _bake_calico_texture).
+## texture's pattern coverage in permille (see _bake_tortie_texture).
 var mottle_count := 0
 var stripe_count := 0
 
@@ -266,7 +266,7 @@ var _coat_mat: Material = null
 var _coat_part_mats: Dictionary = {}
 var _saddle_mat: Material = null
 
-## Baked calico fields, shared by every cat of the same seed in this
+## Baked tortie fields, shared by every cat of the same seed in this
 ## process: "seed:part offset:size" -> [ImageTexture, coverage in
 ## permille]. Same seed, same coat — sharing the field IS the
 ## determinism contract, and it keeps a second Aggie from rebaking.
@@ -292,7 +292,7 @@ func _coat_material(part := "body") -> Material:
 func _make_coat_material(seed_off: int, size: int) -> StandardMaterial3D:
 	var key := "%d:%d:%d" % [int(mottle_cfg.get("seed", 1)), seed_off, size]
 	if not _coat_bake_cache.has(key):
-		_coat_bake_cache[key] = _bake_calico_texture(coat, [mottle_orange, mottle_cream, coat.lightened(0.16), coat.darkened(0.25)], seed_off, size)
+		_coat_bake_cache[key] = _bake_tortie_texture(coat, [mottle_orange, mottle_cream, coat.lightened(0.16), coat.darkened(0.25)], seed_off, size)
 	var baked: Array = _coat_bake_cache[key]
 	var m := StandardMaterial3D.new()
 	m.albedo_color = coat
@@ -345,7 +345,7 @@ func _bake_coat_texture(base: Color, tones: Array, seed_off: int, blobs := 90) -
 	return ImageTexture.create_from_image(img)
 
 
-# --- baked calico texture (REALISM PASS 3) ----------------------------------
+# --- baked tortie texture (REALISM PASS 3) -----------------------------------
 # Pass 2 baked three layers into a multiplier field stored in an
 # 8-bit image — and 8 bits CLAMP at 1.0, so against Aggie's dark
 # base (#241C17) every multiplier above 1.0 was thrown away: the
@@ -399,16 +399,16 @@ func _splat_tone(img: Image, cx: int, cy: int, rad: int, tone: Color, strength: 
 			img.set_pixel(xx, yy, img.get_pixel(xx, yy).lerp(tone, fall))
 
 
-## Compose Aggie's calico; returns [multiplier texture, coverage].
+## Compose Aggie's tortoiseshell; returns [multiplier texture, coverage].
 ## Coverage is the permille of the field that ends up mottle rather
 ## than base — the pass-3 mottle_count contract (see smoke).
-func _bake_calico_texture(base: Color, tones: Array, seed_off: int, size: int) -> Array:
+func _bake_tortie_texture(base: Color, tones: Array, seed_off: int, size: int) -> Array:
 	var k := float(size) / 256.0
 	var img := Image.create(size, size, false, Image.FORMAT_RGBA8)
 	img.fill(base)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(mottle_cfg.get("seed", 1)) + 2707 + seed_off
-	# Layer A: broad blotches, weighted to the true calico tones.
+	# Layer A: broad blotches, weighted to the true tortoiseshell tones.
 	# QA round 2026-10-25: count/radius/strength raised after in-game
 	# captures showed the pass-3 field landing invisibly on the torso
 	# flanks (Aggie read solid black at gameplay distance, coverage
@@ -432,7 +432,7 @@ func _bake_calico_texture(base: Color, tones: Array, seed_off: int, size: int) -
 		for ox: int in [-size, 0, size]:
 			_splat_ellipse_tone(img, cx + ox, cy, rx, ry, rot, tone, strength, size)
 		# Satellites: two smaller splats hugging the blotch break its
-		# clean elliptical outline (calico patches cluster).
+		# clean elliptical outline (tortoiseshell patches cluster).
 		for s in 2:
 			var ang := rng.randf() * TAU
 			var dist := rx * rng.randf_range(0.35, 0.7)

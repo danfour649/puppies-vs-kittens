@@ -105,12 +105,13 @@ rings); **dark eyes**; pink nose.
   Aggie's attack trigger (below). Behaviour lands in the later GTA
   slices; this kit carries the definition.
 
-### Aggie — the wiry calico (NPC, scale 0.25)
+### Aggie — the wiry tortoiseshell (NPC, scale 0.25)
 
 Willie's much smaller sister — "chill but vicious". A **dark
-calico** (Daniel's recorded word for her coat; photos in
-`reference/reference-aggie-drawer.jpg` and
-`reference/reference-aggie-plant.jpg`): warm black-brown base with
+tortoiseshell** (tortie). Daniel confirmed this on 2026-10-26;
+the 2026-10-25 note that called her a dark calico is corrected.
+Photos in `reference/reference-aggie-drawer.jpg` and
+`reference/reference-aggie-plant.jpg`: warm black-brown base with
 irregular orange and cream mottling everywhere, a mostly dark
 face with orange mottling and a cream/orange throat and chest, a
 dark tail with orange running through it, green-gold eyes (hers
@@ -118,7 +119,7 @@ stay green-gold — the dark-eye ruling is Willie's).
 
 - Palette: base `#241C17` (photo median); mottle orange `#B06E2C`;
   mottle cream `#BFA87A`; eyes `#8A9A3B`; nose near-black brown.
-- Calico technique (pass 3): the mottling is **baked into her
+- Tortoiseshell technique (pass 3): the mottling is **baked into her
   coat texture** — broad blotches, marbling and speckle composed
   in the texture over the dark base, worn by the torso, head,
   legs and tail (each part its own seed offset from

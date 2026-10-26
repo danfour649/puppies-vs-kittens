@@ -21,7 +21,7 @@ static var last_choice := ""
 ## porch door, Aggie by DuoSystem on the garden chair — and the
 ## minimap marks exactly these, so the screen never lies.
 const WILLIE_LINE := "Big. Loud. Knocks your drink over."
-const AGGIE_LINE := "Small calico. Wins every fight."
+const AGGIE_LINE := "Small tortie. Wins every fight."
 const WILLIE_START_NAME := "The Front Porch"
 const WILLIE_START_POS := Vector3(2.5, 0.1, -6.2) # main.gd's spawn literal
 const AGGIE_START_NAME := "The Garden Chair"
@@ -112,14 +112,14 @@ static func _willie_from_flat(d: Dictionary) -> Dictionary:
 
 
 static func _aggie_default() -> Dictionary:
-	# Daniel's calico girl, from her photos: a warm black-brown
+	# Daniel's tortoiseshell girl, from her photos: a warm black-brown
 	# coat with orange mottling, green-gold eyes. Half Willie's size.
 	return {
 		"id": "aggie",
 		"name": "Aggie",
 		"scale": 0.25,
-		"coat": Color(0.141, 0.110, 0.090), # #241C17 warm calico black-brown
-		"patch": Color(0.690, 0.431, 0.173), # #B06E2C calico orange
+		"coat": Color(0.141, 0.110, 0.090), # #241C17 warm tortoiseshell black-brown
+		"patch": Color(0.690, 0.431, 0.173), # #B06E2C tortoiseshell orange
 		"nose": Color(0.30, 0.20, 0.18),
 		"eye": Color(0.45, 0.52, 0.20), # green-gold
 		"walk_speed": 3.0,

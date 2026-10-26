@@ -478,7 +478,9 @@ mapping asserts live in `tests/test_module.gd`.
 - **Appearance data superseded (Daniel's ruling, 2026-10-25).**
   Willie's canonical appearance is his recorded spec: ginger
   **#E8AF54**, **dark eyes**, tail **white with ginger
-  rear/underside**; Aggie is a **calico**. The photo-tuned
+  rear/underside**; Aggie is a **tortoiseshell** (tortie;
+  Daniel confirmed the coat name on 2026-10-26, correcting the
+  calico word in this 2026-10-25 note). The photo-tuned
   values previously carried in `cat_kit/cat_species.json`
   (#C97020 / #975417, green-gold eyes, ringed tail) are
   **superseded** and are being reverted in `cat_kit` — the
