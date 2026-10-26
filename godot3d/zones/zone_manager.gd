@@ -69,10 +69,15 @@ func travel(zone_id: String, entry_name: String, instant := false) -> void:
 		_do_move(zone_id, entry)
 		return
 	travelling = true
+	# A short dip through the destination's own light — dusk, night
+	# or dawn — rather than a hard black cut. The move happens while
+	# the rect is opaque, so the camera never shows the teleport.
+	var tint := LightMood.fade_tint(zone_id)
+	_fade_rect.color = Color(tint.r, tint.g, tint.b, _fade_rect.color.a)
 	var tw := create_tween()
-	tw.tween_property(_fade_rect, "color:a", 1.0, 0.16)
+	tw.tween_property(_fade_rect, "color:a", 1.0, 0.12)
 	tw.tween_callback(_do_move.bind(zone_id, entry))
-	tw.tween_property(_fade_rect, "color:a", 0.0, 0.22)
+	tw.tween_property(_fade_rect, "color:a", 0.0, 0.18)
 	tw.tween_callback(func() -> void: travelling = false)
 
 

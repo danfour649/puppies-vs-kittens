@@ -12,3 +12,6 @@ func _init() -> void:
 func _build() -> void:
 	var k := HouseBuilder.kit(self)
 	HouseBuilder.build_ground_floor(k)
+	# Seeded keepsakes. The spine stays open between the door, the
+	# stairs and the hatch; see HoarderDressing keep-rects.
+	HoarderDressing.build(self, HoarderGenerator.generate_floor(HouseSpec.GROUND_FLOOR, 25501))

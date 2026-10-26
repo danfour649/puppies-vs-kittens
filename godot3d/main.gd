@@ -237,6 +237,10 @@ func _build_environment() -> void:
 	_static_box(statics, Vector3(0.7, 0.46, 0.7), CHAIR_SEAT + Vector3(0, -0.23, 0))
 	_build_front_roses(env)
 	_dress_yard(env)
+	var yard_life := YardLife.new()
+	yard_life.name = "YardLife"
+	env.add_child(yard_life)
+	yard_life.build()
 
 
 ## REALISM PASS 1 dressing: grass tufts + flower dots, a hedge line
