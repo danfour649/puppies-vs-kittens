@@ -1,28 +1,31 @@
 class_name TouchControls3D
 extends CanvasLayer
 ## Touch UI for the 3D edition. The left side is a paw-print
-## joystick. The right half is gestures: a tap pounces, a swipe
-## paws in that direction, a still hold stalks.
-## Desktop: left click pounces, right click paws, right-drag or
-## middle-drag looks. Keyboard bindings stay where they are.
+## joystick. The right half is gestures: a tap meows, a swipe
+## paws in that direction, a still hold stalks. Two fingers held
+## still restart. Desktop: left click pounces, right click paws,
+## right-drag or middle-drag looks. Keyboard bindings stay.
 
 signal strike_pressed
 signal pounce_pressed
+signal meow_pressed
+signal restart_pressed
 signal look_dragged(relative: Vector2)
 
 const TAP_PX := 26.0
 const HOLD_SEC := 0.32
+const RESTART_HOLD := 0.7
 
 var joystick: PvKJoystick3D
 ## Screen-space swipe, y down. Zero means "use the way he is facing".
 var swipe_dir := Vector2.ZERO
 var stalk_held := false
 
-var _touch_id := -2
-var _touch_from := Vector2.ZERO
-var _touch_last := Vector2.ZERO
-var _touch_msec := 0
-var _touch_moved := 0.0
+## Controls (the compass) that a touch should not also meow on.
+var pass_controls: Array = []
+
+var _fingers := {}
+var _restart_sent := false
 
 var _mouse_btn := 0
 var _mouse_from := Vector2.ZERO
@@ -60,11 +63,21 @@ static func yaw_to_face(dir: Vector3) -> float:
 
 
 func _process(_delta: float) -> void:
-	if _touch_id < 0:
-		stalk_held = false
-		return
-	var held := float(Time.get_ticks_msec() - _touch_msec) / 1000.0
-	stalk_held = _touch_moved < TAP_PX and held >= HOLD_SEC
+	stalk_held = false
+	if _fingers.size() == 1:
+		var only: Dictionary = _fingers[_fingers.keys()[0]]
+		var held := float(Time.get_ticks_msec() - int(only["msec"])) / 1000.0
+		stalk_held = float(only["moved"]) < TAP_PX and held >= HOLD_SEC
+	if _fingers.size() >= 2 and not _restart_sent:
+		var ready := true
+		for index: Variant in _fingers.keys():
+			var f: Dictionary = _fingers[index]
+			var held := float(Time.get_ticks_msec() - int(f["msec"])) / 1000.0
+			if float(f["moved"]) >= TAP_PX or held < RESTART_HOLD:
+				ready = false
+		if ready:
+			_restart_sent = true
+			restart_pressed.emit()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -87,46 +100,70 @@ func _over_stick(pos: Vector2) -> bool:
 	return joystick != null and joystick.get_global_rect().has_point(pos)
 
 
+func _blocked(pos: Vector2) -> bool:
+	for c: Variant in pass_controls:
+		if c is Control and is_instance_valid(c):
+			var ctrl := c as Control
+			if ctrl.visible and ctrl.get_global_rect().has_point(pos):
+				return true
+	return false
+
+
 func _on_screen_touch(t: InputEventScreenTouch) -> void:
 	if t.pressed:
-		if _touch_id != -2 or _over_stick(t.position) or not _right_half(t.position):
+		if _blocked(t.position) or _over_stick(t.position):
 			return
-		_touch_id = t.index
-		_touch_from = t.position
-		_touch_last = t.position
-		_touch_msec = Time.get_ticks_msec()
-		_touch_moved = 0.0
+		if _fingers.is_empty() and not _right_half(t.position):
+			return
+		if _fingers.size() >= 2:
+			return
+		_fingers[t.index] = {
+			"from": t.position,
+			"msec": Time.get_ticks_msec(),
+			"moved": 0.0,
+		}
 		get_viewport().set_input_as_handled()
-	elif t.index == _touch_id:
-		_finish_touch(t.position)
+	elif _fingers.has(t.index):
+		_release_finger(t.index, t.position)
 		get_viewport().set_input_as_handled()
 
 
 func _on_screen_drag(d: InputEventScreenDrag) -> void:
-	if d.index != _touch_id:
+	if not _fingers.has(d.index):
 		return
-	_touch_last = d.position
-	_touch_moved = maxf(_touch_moved, _touch_from.distance_to(d.position))
+	var f: Dictionary = _fingers[d.index]
+	var from: Vector2 = f["from"]
+	f["moved"] = maxf(float(f["moved"]), from.distance_to(d.position))
 	get_viewport().set_input_as_handled()
 
 
-func _finish_touch(pos: Vector2) -> void:
-	_touch_last = pos
-	_touch_moved = maxf(_touch_moved, _touch_from.distance_to(pos))
-	var held := float(Time.get_ticks_msec() - _touch_msec) / 1000.0
-	var kind := classify(_touch_moved, held)
-	swipe_dir = _touch_last - _touch_from
-	_touch_id = -2
+func _release_finger(index: int, pos: Vector2) -> void:
+	var f: Dictionary = _fingers[index]
+	var from: Vector2 = f["from"]
+	var moved := maxf(float(f["moved"]), from.distance_to(pos))
+	var held := float(Time.get_ticks_msec() - int(f["msec"])) / 1000.0
+	var others := _fingers.size() - 1
+	_fingers.erase(index)
 	stalk_held = false
+	if _restart_sent:
+		if _fingers.is_empty():
+			_restart_sent = false
+		return
+	if others > 0:
+		return
+	var kind := classify(moved, held)
+	swipe_dir = pos - from
 	if kind == "swipe":
 		strike_pressed.emit()
 	elif kind == "tap":
 		swipe_dir = Vector2.ZERO
-		pounce_pressed.emit()
+		meow_pressed.emit()
 
 
 func _on_mouse_button(b: InputEventMouseButton) -> void:
 	if b.button_index != MOUSE_BUTTON_LEFT and b.button_index != MOUSE_BUTTON_RIGHT and b.button_index != MOUSE_BUTTON_MIDDLE:
+		return
+	if _blocked(b.position):
 		return
 	if _over_stick(b.position) and b.button_index == MOUSE_BUTTON_LEFT:
 		return

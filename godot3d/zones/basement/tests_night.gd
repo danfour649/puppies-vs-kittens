@@ -107,23 +107,37 @@ func _gestures() -> void:
 	var origin := Vector2(vp.x * 0.72, vp.y * 0.45)
 	var strikes := [0]
 	var pounces := [0]
+	var meows := [0]
+	var restarts := [0]
 	touch.strike_pressed.connect(func() -> void: strikes[0] += 1)
 	touch.pounce_pressed.connect(func() -> void: pounces[0] += 1)
+	touch.meow_pressed.connect(func() -> void: meows[0] += 1)
+	touch.restart_pressed.connect(func() -> void: restarts[0] += 1)
 	_screen_touch(touch, origin, true, 0)
 	_screen_touch(touch, origin, false, 0)
-	check(pounces[0] == 1 and strikes[0] == 0, "a tap on the right half pounces")
+	check(meows[0] == 1 and pounces[0] == 0 and strikes[0] == 0, "a tap on the right half meows")
 	_screen_touch(touch, origin, true, 1)
 	_screen_drag(touch, origin + Vector2(90, -12), 1)
 	_screen_touch(touch, origin + Vector2(90, -12), false, 1)
 	check(strikes[0] == 1, "a swipe on the right half is a paw")
 	check(touch.swipe_dir.length() > 40.0, "the paw swipe keeps its direction (%.0f)" % touch.swipe_dir.length())
 	_screen_touch(touch, origin, true, 2)
-	touch._touch_msec = Time.get_ticks_msec() - 500
+	touch._fingers[2]["msec"] = Time.get_ticks_msec() - 500
 	touch._process(0.1)
 	check(touch.stalk_held, "holding still on the right half stalks")
 	_screen_touch(touch, origin + Vector2(4, 2), false, 2)
 	check(not touch.stalk_held, "letting go ends the stalk")
-	check(pounces[0] == 1, "a stalk hold does not also pounce")
+	check(meows[0] == 1, "a stalk hold does not also meow")
+	_screen_touch(touch, origin, true, 4)
+	_screen_touch(touch, origin + Vector2(36, 4), true, 5)
+	touch._fingers[4]["msec"] = Time.get_ticks_msec() - 900
+	touch._fingers[5]["msec"] = Time.get_ticks_msec() - 900
+	touch._process(0.1)
+	check(restarts[0] == 1, "two fingers held still ask to restart")
+	var meows_before := int(meows[0])
+	_screen_touch(touch, origin, false, 4)
+	_screen_touch(touch, origin + Vector2(36, 4), false, 5)
+	check(meows[0] == meows_before, "the restart does not also meow")
 	var p0 := int(pounces[0])
 	var s0 := int(strikes[0])
 	_mouse(touch, origin, MOUSE_BUTTON_LEFT, true)

@@ -29,7 +29,7 @@ const AGGIE_START_POS := Vector3(4.5, 0.52, 4.5) # DuoSystem's chair spawn
 
 const WILLIE_TRAITS := [
 	"Big & plush — the handsome boy",
-	"Meows CONSTANTLY (M key / MEOW button)",
+	"Meows CONSTANTLY (M key, or a tap on the right)",
 	"Standard paw strike",
 ]
 const AGGIE_TRAITS := [

@@ -131,6 +131,7 @@ func _begin() -> void:
 		add_child(_touch)
 		_touch.strike_pressed.connect(_on_touch_strike)
 		_touch.pounce_pressed.connect(_on_touch_pounce)
+		_touch.meow_pressed.connect(_on_touch_meow)
 		_touch.look_dragged.connect(_on_look_drag)
 		_show_gesture_hint()
 
@@ -510,6 +511,13 @@ func _on_touch_strike() -> void:
 	_face_swipe()
 	cat.strike()
 	_dismiss_gesture_hint()
+
+
+func _on_touch_meow() -> void:
+	# The shared right-half tap meows in the house. Down here the
+	# same tap still pounces, and he meows while he does it.
+	_meow = true
+	_on_touch_pounce()
 
 
 func _on_touch_pounce() -> void:

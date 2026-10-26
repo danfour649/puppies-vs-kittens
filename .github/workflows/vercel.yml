@@ -1,0 +1,54 @@
+name: Vercel
+
+# Production deploys are batched. A push to main waits, then ships
+# only if this commit is still the tip, and a newer push cancels
+# the one already waiting. That is one production build for a
+# burst of merges. GitHub Pages still publishes from web.yml on
+# every merge to main. With no VERCEL_TOKEN the job records the
+# skip and does not spend a build.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: vercel-production
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Let a burst of merges settle
+        run: sleep 90
+      - name: Skip unless this commit is still main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tip="$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha)"
+          echo "tip=$tip this=$GITHUB_SHA"
+          if [ "$tip" != "$GITHUB_SHA" ]; then
+            echo "A newer commit is on main. Leaving this build for that one."
+            echo "SKIP=1" >> "$GITHUB_ENV"
+          fi
+      - name: Deploy production
+        if: env.SKIP != '1'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VERCEL_TOKEN}" ]; then
+            echo "No VERCEL_TOKEN. Production stays a manual batch so merges do not each spend a build."
+            exit 0
+          fi
+          npm install --global vercel@48
+          vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
+          vercel build --prod --token "$VERCEL_TOKEN"
+          vercel deploy --prebuilt --prod --token "$VERCEL_TOKEN"
