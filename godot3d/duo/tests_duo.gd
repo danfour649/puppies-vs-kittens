@@ -89,6 +89,23 @@ func _run() -> void:
 	check(duo != null, "duo system present")
 	check(duo.select_ui.option_count() == 2, "character select builds two options (got %d)" % duo.select_ui.option_count())
 	check(duo.select_visible(), "character select shows at game start")
+	check(game._touch != null and not game._touch.visible, "the paw hides while the select is up")
+	duo.select_ui.apply_layout(Vector2(390, 844))
+	var cell0: Control = duo.select_ui._cells[0]
+	var cell1: Control = duo.select_ui._cells[1]
+	var span := cell0.custom_minimum_size.x + cell1.custom_minimum_size.x + 12.0
+	check(span < 390.0, "roster cells fit a 390-wide phone (span %.0f)" % span)
+	check(duo.select_ui._name_l.offset_right <= 390.0, "the name stays inside a phone width")
+	check(duo.select_ui._name_l.offset_left < 40.0, "the name starts at the left on a phone")
+	check(
+		duo.select_ui._name_l.autowrap_mode == TextServer.AUTOWRAP_WORD_SMART,
+		"phone copy wraps instead of running off the edge"
+	)
+	duo.select_ui.apply_layout(Vector2(1152, 2493))
+	check(duo.select_ui._name_l.anchor_left == 0.0, "a tall window stacks the name under the stage")
+	check(duo.select_ui._stage_box.offset_right <= 1152.0, "the stage stays inside a tall window")
+	duo.select_ui.apply_layout(Vector2(1152, 648))
+	check(duo.select_ui._name_l.anchor_left > 0.5, "a wide window keeps the name beside the stage")
 	# MK-pattern select (2026-10-25): the highlight starts on the
 	# first cat, moves WITHOUT picking, and confirm() picks the
 	# highlighted cat through the real chosen signal.
@@ -105,6 +122,7 @@ func _run() -> void:
 	duo.select_ui.confirm()
 	await frames(5)
 	check(not duo.select_visible(), "confirm picks the highlighted cat and closes the select")
+	check(game._touch.visible, "the paw comes back once a cat is picked")
 	var willie = duo.willie_cat
 	var aggie = duo.aggie_cat
 	check(willie != null and aggie != null and willie != aggie, "two distinct cat instances")

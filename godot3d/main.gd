@@ -796,6 +796,8 @@ func mice_left() -> int:
 # --- input + loop ------------------------------------------------------------
 
 func _physics_process(_delta: float) -> void:
+	if _touch != null:
+		_touch.set_blocked(duo != null and duo.input_locked())
 	var dir := Vector3.ZERO
 	var sprint := false
 	var stalk := false

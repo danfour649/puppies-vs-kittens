@@ -31,17 +31,54 @@ var _mouse_btn := 0
 var _mouse_from := Vector2.ZERO
 var _mouse_moved := 0.0
 var _mouse_look := false
+var _blocked := false
 
 
 func _ready() -> void:
 	layer = 12
 	joystick = PvKJoystick3D.new()
 	joystick.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	joystick.offset_left = 24
-	joystick.offset_top = -286
-	joystick.offset_right = 254
-	joystick.offset_bottom = -18
 	add_child(joystick)
+	if not get_viewport().size_changed.is_connected(_fit_stick):
+		get_viewport().size_changed.connect(_fit_stick)
+	_fit_stick()
+
+
+## The paw stays in the left portion of the screen, so a tap on the
+## right half is still a gesture on a phone-width viewport.
+static func stick_size(vp: Vector2) -> Vector2:
+	var cap := minf(220.0, maxf(vp.x * 0.46 - 12.0, 96.0))
+	return Vector2(
+		clampf(vp.x * 0.42, minf(140.0, cap), cap),
+		clampf(vp.y * 0.38, 160.0, 250.0)
+	)
+
+
+## Hide the paw while the character select is up, so a tap lands
+## on a roster cell instead of the stick.
+func set_blocked(blocked: bool) -> void:
+	if blocked == _blocked:
+		return
+	_blocked = blocked
+	visible = not blocked
+	if blocked:
+		_touch_id = -2
+		stalk_held = false
+		swipe_dir = Vector2.ZERO
+		_mouse_btn = 0
+		if joystick != null:
+			joystick.release_pointer()
+
+
+func _fit_stick() -> void:
+	if joystick == null:
+		return
+	var box := stick_size(get_viewport().get_visible_rect().size)
+	joystick.offset_left = 12
+	joystick.offset_top = -12 - box.y
+	joystick.offset_right = 12 + box.x
+	joystick.offset_bottom = -12
+	joystick.custom_minimum_size = box
 
 
 func move_vector() -> Vector2:
@@ -81,6 +118,8 @@ func _process(_delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _blocked or not visible:
+		return
 	if event is InputEventScreenTouch:
 		_on_screen_touch(event as InputEventScreenTouch)
 	elif event is InputEventScreenDrag:
