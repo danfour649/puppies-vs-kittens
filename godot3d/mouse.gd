@@ -105,6 +105,18 @@ func get_caught() -> void:
 		return
 	state = "caught"
 	was_caught.emit(self)
+	_vanish()
+
+
+## Aggie reached it first. It is not Willie's gift — no score signal.
+func taken_by_rival() -> void:
+	if state == "caught":
+		return
+	state = "caught"
+	_vanish()
+
+
+func _vanish() -> void:
 	var tw := create_tween()
 	tw.tween_property(_model, "scale", Vector3.ONE * MODEL_SCALE * 1.3, 0.07)
 	tw.tween_property(_model, "scale", Vector3.ONE * 0.001, 0.16)

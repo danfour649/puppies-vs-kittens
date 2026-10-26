@@ -12,6 +12,8 @@ var state := "forage"
 var indoor := true
 var cat: Node3D = null
 var lights: Array = []
+## Windows beat lamps. Indoors, panic flies at these first.
+var windows: Array = []
 var flock: Array = []
 var sounds: Array = []
 var sound_sink: Array = []
@@ -47,6 +49,7 @@ func _process(delta: float) -> void:
 		"cat_pos": cat.global_position if has_cat else global_position,
 		"indoor": indoor,
 		"lights": lights,
+		"windows": windows,
 		"flock": others,
 		"sounds": sounds,
 		"hour": hour,

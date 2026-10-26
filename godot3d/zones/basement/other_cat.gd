@@ -13,9 +13,19 @@ var prey: Node3D = null
 var perches: Array = []
 var hour := 19.0
 var territory := Vector3.ZERO
+var territory_radius := 5.5
+## Willie, when he is the rival and not the prey node.
+var rival: Node3D = null
+## Mice she will try to reach before he does.
+var quarry: Array = []
+var steals := 0
+var steal_cap := 1
+var boast := ""
 var bapped := false
 
 var _pos := Vector3.ZERO
+var _watch_t := 0.0
+const WATCH_BEFORE_HUNT := 2.5
 
 
 func _ready() -> void:
@@ -33,16 +43,33 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if brain == null or body == null:
 		return
-	var has_prey := prey != null and is_instance_valid(prey)
-	var prey_pos := prey.global_position if has_prey else _pos
+	_watch_t += delta
+	var options: Array = []
+	var live: Array = []
+	if _watch_t >= WATCH_BEFORE_HUNT and steals < steal_cap:
+		for q: Variant in quarry:
+			if not is_instance_valid(q):
+				continue
+			if String(q.get("state")) == "caught":
+				continue
+			options.append((q as Node3D).global_position)
+			live.append(q)
+	var has_rival := rival != null and is_instance_valid(rival)
+	var legacy := options.is_empty() and prey != null and is_instance_valid(prey)
+	var prey_pos := prey.global_position if legacy else _pos
 	var intent: Dictionary = brain.step(delta, {
 		"pos": _pos,
 		"forward": body.forward_dir(),
 		"hour": hour,
-		"has_prey": has_prey,
+		"has_prey": legacy,
 		"prey_pos": prey_pos,
 		"perches": perches,
 		"patrol": territory if territory != Vector3.ZERO else _pos,
+		"territory": territory,
+		"territory_radius": territory_radius,
+		"has_rival": has_rival,
+		"rival_pos": rival.global_position if has_rival else _pos,
+		"prey_options": options,
 	})
 	var prev := state
 	state = String(intent.get("state", state))
@@ -71,16 +98,36 @@ func _process(delta: float) -> void:
 	var moving := flat.length() > 0.08 and speed > 0.05 and absf(_pos.y - want_y) < 0.3
 	var dir := flat.normalized() if moving else Vector3.ZERO
 	body.set_move_input(dir, state == "pounce", state == "stalk" or state == "crouch")
+	var strike: Node3D = null
+	if not live.is_empty():
+		var aim: Vector3 = intent.get("target", _pos)
+		var best_d := 1.3
+		for q: Variant in live:
+			var qp: Vector3 = (q as Node3D).global_position
+			var qd := Vector2(qp.x - aim.x, qp.z - aim.z).length()
+			if qd < best_d:
+				best_d = qd
+				strike = q
+	elif has_rival and options.is_empty():
+		strike = rival
+	elif legacy:
+		strike = prey
 	if state == "pounce" and prev != "pounce":
 		bapped = false
-	if state == "pounce" and has_prey and not bapped:
-		var d := Vector2(_pos.x - prey_pos.x, _pos.z - prey_pos.z).length()
-		if d < 0.55 and absf(_pos.y - prey.global_position.y) < 0.6:
+	if state == "pounce" and strike != null and not bapped:
+		var sp: Vector3 = strike.global_position
+		var d := Vector2(_pos.x - sp.x, _pos.z - sp.z).length()
+		if d < 0.55 and absf(_pos.y - sp.y) < 0.8:
 			bapped = true
-			var away := prey.global_position - _pos
-			away.y = 0.0
-			if away.length() > 0.01 and prey is PvKCat:
-				(prey as PvKCat).velocity += away.normalized() * 2.4 + Vector3(0, 1.2, 0)
+			if strike.has_method("taken_by_rival") and steals < steal_cap:
+				steals += 1
+				boast = "Aggie got there first. She looks terribly pleased."
+				strike.taken_by_rival()
+			elif strike is PvKCat:
+				var away := sp - _pos
+				away.y = 0.0
+				if away.length() > 0.01:
+					(strike as PvKCat).velocity += away.normalized() * 2.4 + Vector3(0, 1.2, 0)
 
 
 func _highest() -> Vector3:

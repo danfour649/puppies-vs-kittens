@@ -161,6 +161,20 @@ static func decide_rat(state: String, hp: int, dist: float, packmates: int, aggr
 	}
 
 
+## A healthy rat does not give ground. Inside a short lunge of the
+## cat she commits — faster than the chase, still her own bite.
+## Alone at 1 HP, decide_rat already has her leaving; this never
+## overrides that.
+static func rat_riposte(state: String, hp: int, dist: float, packmates: int, bite_range: float) -> bool:
+	if state == "flee" or state == "dead":
+		return false
+	if hp <= 1 and packmates <= 0:
+		return false
+	if hp <= 1:
+		return false
+	return dist <= bite_range * 2.4 and dist < 1000.0
+
+
 # --- mouse -----------------------------------------------------------------
 
 func forget_alert() -> void:
@@ -421,8 +435,10 @@ func _step_bird(delta: float, ctx: Dictionary) -> Dictionary:
 	var alarm_heard := String(heard.get("kind", "")) == "alarm" and float(heard.get("loudness", 0.0)) > 0.15
 	if (sees or alarm_heard) and indoor:
 		_alarm_on = true
-		var light := _nearest_light(pos, lights)
-		return _intent("panic_light", float(profile.get("panic_speed", 4.2)), light, true, false, "window")
+		var windows: Array = ctx.get("windows", [])
+		var toward_window := not windows.is_empty()
+		var light := _nearest_light(pos, windows if toward_window else lights)
+		return _intent("panic_light", float(profile.get("panic_speed", 4.2)), light, true, false, "window" if toward_window else "light")
 	if sees and not indoor:
 		# First look is the alarm call. The next look, the flock mobs.
 		if _alarm_on:
@@ -474,6 +490,29 @@ func _step_cat(delta: float, ctx: Dictionary) -> Dictionary:
 	var perch := _highest_perch(pos, perches)
 	var has_prey := bool(ctx.get("has_prey", ctx.get("has_cat", false)))
 	var prey: Vector3 = ctx.get("prey_pos", ctx.get("cat_pos", pos))
+	var contest := false
+	var options: Array = ctx.get("prey_options", [])
+	if not options.is_empty():
+		var rival_pos: Vector3 = ctx.get("rival_pos", pos)
+		var terr: Vector3 = ctx.get("territory", Vector3.ZERO)
+		var rad := float(ctx.get("territory_radius", 6.0))
+		var pick := contested_prey(pos, rival_pos, options, terr, rad)
+		if not pick.is_empty():
+			has_prey = true
+			prey = pick["pos"]
+			contest = bool(pick.get("contest", false))
+	elif bool(ctx.get("has_rival", false)) and not has_prey:
+		var rival_pos: Vector3 = ctx.get("rival_pos", pos)
+		var terr: Vector3 = ctx.get("territory", pos)
+		var rad := float(ctx.get("territory_radius", 4.5))
+		var to_rival := Vector3(rival_pos.x - terr.x, 0.0, rival_pos.z - terr.z)
+		var inside := to_rival.length() <= rad
+		if inside:
+			has_prey = true
+			prey = rival_pos
+		elif to_rival.length() > 0.05:
+			# She holds the edge of her ground. She does not chase him across the house.
+			ctx["patrol"] = terr + to_rival.normalized() * rad * 0.85
 	var dist := INF
 	var sees := false
 	if has_prey:
@@ -518,7 +557,33 @@ func _step_cat(delta: float, ctx: Dictionary) -> Dictionary:
 		return _intent("crouch", 0.0, pos, false, false, "crouch")
 	_hunt = "stalk"
 	_crouch_t = 0.0
-	return _intent("stalk", float(profile.get("stalk_speed", 0.85)), prey, false, false, "stalk")
+	var stalk_speed := float(profile.get("stalk_speed", 0.85))
+	if contest:
+		stalk_speed *= 1.6
+	return _intent("stalk", stalk_speed, prey, false, false, "contest" if contest else "stalk")
+
+
+## The mouse Willie is closing on, if it sits in her territory.
+## Otherwise the nearest one that does. Empty when none qualify.
+## `contest` means he is closer to it than she is — she hurries.
+static func contested_prey(self_pos: Vector3, rival_pos: Vector3, options: Array, territory: Vector3, radius: float) -> Dictionary:
+	var best := {}
+	var best_score := INF
+	for item: Variant in options:
+		if typeof(item) != TYPE_VECTOR3:
+			continue
+		var pp: Vector3 = item
+		if radius > 0.0:
+			var from_home := Vector2(pp.x - territory.x, pp.z - territory.z).length()
+			if from_home > radius:
+				continue
+		var mine := Vector2(pp.x - self_pos.x, pp.z - self_pos.z).length()
+		var his := Vector2(pp.x - rival_pos.x, pp.z - rival_pos.z).length()
+		var score := his * 0.65 + mine * 0.35
+		if score < best_score:
+			best_score = score
+			best = {"pos": pp, "mine": mine, "his": his, "contest": his + 0.15 < mine}
+	return best
 
 
 func _highest_perch(pos: Vector3, perches: Array) -> Vector3:

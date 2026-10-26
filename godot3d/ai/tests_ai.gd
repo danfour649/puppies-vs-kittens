@@ -253,6 +253,10 @@ func _rat() -> void:
 		"home": Vector3.ZERO,
 	}))
 	check(String(avoid["state"]) == "avoid", "rat wander names the avoidance")
+	check(CreatureBrain.rat_riposte("chase", 3, 0.4, 0, 0.32), "a healthy rat lunges when the cat is in reach")
+	check(not CreatureBrain.rat_riposte("chase", 1, 0.4, 0, 0.32), "alone at 1 HP she does not riposte")
+	check(not CreatureBrain.rat_riposte("flee", 3, 0.2, 2, 0.32), "a rat already fleeing does not turn back into a lunge")
+	check(not CreatureBrain.rat_riposte("chase", 3, 3.0, 0, 0.32), "she does not lunge from across the den")
 
 
 func _bird() -> void:
@@ -288,6 +292,19 @@ func _bird() -> void:
 	}))
 	check(String(flock["state"]) == "flock", "a bird far from its flock closes the gap")
 	check(flock["target"].x > 5.0, "flocking steers toward the others")
+	var to_glass := CreatureBrain.new()
+	to_glass.bind_profile("songbird", 1)
+	var glass: Dictionary = to_glass.step(0.1, _ctx({
+		"has_cat": true,
+		"cat_pos": Vector3(0, 0, -2),
+		"indoor": true,
+		"lights": [Vector3(0.3, 1.2, 0)],
+		"windows": [Vector3(6.0, 1.6, 1.0)],
+		"flock": [],
+	}))
+	check(String(glass["state"]) == "panic_light" and String(glass["note"]) == "window", "indoors the panic is toward a window")
+	var glass_at: Vector3 = glass["target"]
+	check(glass_at.distance_to(Vector3(6.0, 1.6, 1.0)) < 0.05, "a far window beats a nearer lamp")
 
 
 func _cat() -> void:
@@ -325,3 +342,50 @@ func _cat() -> void:
 		"perches": [Vector3(0, 1.5, 0)],
 	}))
 	check(String(pounce["state"]) == "pounce" and float(pounce["speed"]) > 3.0, "after the crouch, the pounce")
+
+	var picked := CreatureBrain.contested_prey(
+		Vector3.ZERO,
+		Vector3(0, 0, -3.2),
+		[Vector3(0, 0, -4), Vector3(9, 0, 0)],
+		Vector3.ZERO,
+		5.0
+	)
+	check(not picked.is_empty() and (picked["pos"] as Vector3).z == -4.0, "she ignores a mouse outside her territory")
+	check(bool(picked["contest"]), "when Willie is closer to the mouse, it is a contest")
+	var hurry := CreatureBrain.new()
+	hurry.bind_profile("other_cat", 1)
+	var race: Dictionary = hurry.step(0.1, _ctx({
+		"hour": 19.0,
+		"prey_options": [Vector3(0, 0, -4)],
+		"has_rival": true,
+		"rival_pos": Vector3(0, 0, -3.2),
+		"territory": Vector3.ZERO,
+		"territory_radius": 6.0,
+		"perches": [Vector3(0, 1.5, 0)],
+	}))
+	check(String(race["state"]) == "stalk" and String(race["note"]) == "contest", "she stalks the mouse he is closing on")
+	check(float(race["speed"]) > 1.2, "a contest is faster than her ordinary stalk (%.2f)" % float(race["speed"]))
+	var edge := CreatureBrain.new()
+	edge.bind_profile("other_cat", 1)
+	var hold: Dictionary = edge.step(0.1, _ctx({
+		"hour": 19.0,
+		"has_rival": true,
+		"has_prey": false,
+		"rival_pos": Vector3(10, 0, 0),
+		"territory": Vector3.ZERO,
+		"territory_radius": 4.0,
+		"perches": [Vector3(0, 1.5, 0)],
+	}))
+	var hold_at: Vector3 = hold["target"]
+	check(String(hold["state"]) == "patrol" and hold_at.x < 4.0 and hold_at.x > 3.0, "Willie outside her ground, she holds the edge (x %.2f)" % hold_at.x)
+	var noon_rival := CreatureBrain.new()
+	noon_rival.bind_profile("other_cat", 1)
+	var nap: Dictionary = noon_rival.step(0.2, _ctx({
+		"hour": 12.0,
+		"has_rival": true,
+		"rival_pos": Vector3(1, 0, 0),
+		"territory": Vector3.ZERO,
+		"territory_radius": 4.0,
+		"perches": [Vector3(0, 1.6, 0)],
+	}))
+	check(String(nap["state"]) == "perch", "at noon she stays on the box even if Willie walks in")
