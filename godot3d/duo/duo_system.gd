@@ -183,6 +183,8 @@ func player_meow() -> void:
 ## One meow, from any cat: sound + bubble + Aggie hears it.
 func emit_meow(cat: PvKCat) -> void:
 	meow_count += 1
+	if cat != null and cat.has_method("play_meow"):
+		cat.play_meow()
 	var kind := "willie" if cat == willie_cat else "aggie"
 	var voice := _voices.get(cat) as AudioStreamPlayer3D
 	if voice != null:

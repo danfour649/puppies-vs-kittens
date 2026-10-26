@@ -146,10 +146,17 @@ stay green-gold — the dark-eye ruling is Willie's).
 
 ## Fidelity pass
 
-`visual/cat_fidelity.gd` dresses the finished mesh: shell fur (the
-palette albedo stays on the original `StandardMaterial3D`, which the
-smoke test reads), a clear cornea and a dilating pupil, catchlights,
-subsurface inner ears, and whiskers. Aggie gets the same pass.
+`tools/build_cat.py` builds the skinned body (original geometry, see
+`visual/CREDITS.md`). The ellipsoid nodes stay in the tree as the
+palette and pose handles the tests read; the mesh you see is the
+sculpt. `visual/cat_fidelity.gd` dresses that mesh with shell fur.
+The palette albedo stays on the original `StandardMaterial3D`, which
+the smoke test reads. The dress also adds a clear cornea, a dilating
+pupil, catchlights, subsurface inner ears, and thin whiskers seated
+on the sculpted muzzle with the eyes and the nose. Aggie gets
+the same body with her own coat. Clips play through an `AnimationTree`
+blend (walk, trot, sprint, stalk, sit, lounge, swipe, pounce, land,
+meow) while the pose nodes the tests step stay in place.
 `visual/quality.gd` picks six shells on Forward+ and three on
 GL Compatibility / web. Credits: `visual/CREDITS.md` — original
 geometry and a shader, no downloaded model.

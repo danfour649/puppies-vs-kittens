@@ -25,10 +25,17 @@ static func dress(cat: Node) -> void:
 			# moving the silhouette under GL Compatibility.
 			# Short coat. The body spheres are radius 0.5, so 0.05 is a
 			# plush edge rather than a second, spikier cat.
-			shell.mesh = _extrude(mi.mesh, lerpf(0.018, 0.055, t))
+			var sculpted := not (mi.mesh is PrimitiveMesh)
+			# Sculpt shells sit just clear of the skin. Closer than this
+			# z-fights in GL; much further reads as a second skin.
+			var amount := lerpf(0.006, 0.016, t) if sculpted else lerpf(0.018, 0.055, t)
+			shell.mesh = _extrude(mi.mesh, amount)
 			shell.transform = mi.transform
 			shell.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			shell.material_override = _fur_material(src, t)
+			if mi.skin != null:
+				shell.skin = mi.skin
+				shell.skeleton = mi.skeleton
 			mi.get_parent().add_child(shell)
 			shells += 1
 	cat.set("fur_shells", shells)
@@ -38,10 +45,10 @@ static func dress(cat: Node) -> void:
 
 
 static func _is_fur_host(mi: MeshInstance3D) -> bool:
-	if mi == null or not (mi.material_override is StandardMaterial3D):
+	if mi == null or not mi.visible or not (mi.material_override is StandardMaterial3D):
 		return false
 	var n := str(mi.name)
-	if n == "FurShell" or n.begins_with("Whisker") or n.begins_with("Pupil") or n.begins_with("Cornea") or n.begins_with("Catchlight"):
+	if n == "FurShell" or n == "NoseLeather" or n.begins_with("Whisker") or n.begins_with("Pupil") or n.begins_with("Cornea") or n.begins_with("Catchlight"):
 		return false
 	if mi.mesh is CylinderMesh:
 		var cyl := mi.mesh as CylinderMesh
@@ -54,16 +61,21 @@ static var _extruded: Dictionary = {}
 
 
 static func _extrude(mesh: Mesh, amount: float) -> Mesh:
-	var key := "%s:%.3f" % [mesh.get_instance_id(), amount]
+	var key := "%s:%.4f" % [mesh.get_instance_id(), amount]
 	if _extruded.has(key):
 		return _extruded[key]
-	var arrays: Array = (mesh as PrimitiveMesh).get_mesh_arrays()
+	var arrays: Array = mesh.surface_get_arrays(0) if not (mesh is PrimitiveMesh) else (mesh as PrimitiveMesh).get_mesh_arrays()
 	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 	var norms: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
 	var moved := PackedVector3Array()
 	moved.resize(verts.size())
 	for i in verts.size():
-		moved[i] = verts[i] + norms[i] * amount
+		var n := norms[i]
+		if n.length_squared() < 0.0001:
+			n = Vector3.UP
+		else:
+			n = n.normalized()
+		moved[i] = verts[i] + n * amount
 	arrays[Mesh.ARRAY_VERTEX] = moved
 	var out := ArrayMesh.new()
 	out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)

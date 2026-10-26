@@ -27,8 +27,29 @@ func _run() -> void:
 	check(VisualQuality.shell_count_for("low") >= 2, "low tier still has a coat (%d)" % VisualQuality.shell_count_for("low"))
 	var cat = CatScript.new()
 	add_child(cat)
-	check(cat.fur_shells >= 20, "willie wears fur shells (%d)" % cat.fur_shells)
+	check(cat.fur_shells >= VisualQuality.fur_shells(), "willie wears a fur shell per layer (%d)" % cat.fur_shells)
+	var sculpt = cat.get("_sculpt")
+	check(sculpt != null and sculpt.body != null and sculpt.body.mesh is ArrayMesh, "willie wears the sculpted mesh")
+	if sculpt != null and sculpt.body != null and sculpt.body.mesh != null:
+		var verts: PackedVector3Array = sculpt.body.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+		check(verts.size() > 1500, "sculpted cage is a real mesh (%d verts)" % verts.size())
+		check(sculpt.skeleton != null and sculpt.skeleton.get_bone_count() >= 20, "skeleton has a spine, legs and tail (%d)" % sculpt.skeleton.get_bone_count())
+		check(sculpt.tree != null, "animation blend tree is wired")
 	check(cat.whisker_count >= 12, "willie has whiskers (%d)" % cat.whisker_count)
+	var whiskers := cat.find_children("Whisker*", "MeshInstance3D", true, false)
+	var longest := 0.0
+	var on_head := true
+	if sculpt != null and sculpt.skeleton != null:
+		var sk: Skeleton3D = sculpt.skeleton
+		var head_p: Vector3 = sk.to_global(sk.get_bone_global_rest(sk.find_bone("head")).origin)
+		var tail_p: Vector3 = sk.to_global(sk.get_bone_global_rest(sk.find_bone("tail04")).origin)
+		for w in whiskers:
+			var mi := w as MeshInstance3D
+			longest = maxf(longest, mi.get_aabb().size.length())
+			if mi.global_position.distance_to(head_p) > mi.global_position.distance_to(tail_p):
+				on_head = false
+	check(longest > 0.05 and longest < 0.28, "whiskers are short strands (%.3f)" % longest)
+	check(on_head, "whiskers sit on the head rather than the back")
 	check(cat._pupils.size() == 2, "both eyes have a pupil")
 	var corneas := 0
 	for eye in cat._eyes:
@@ -60,7 +81,8 @@ func _run() -> void:
 	var aggie = CatScript.new()
 	aggie.set_character("aggie")
 	add_child(aggie)
-	check(aggie.fur_shells >= 10, "aggie wears the same fur pass (%d)" % aggie.fur_shells)
+	check(aggie.fur_shells >= VisualQuality.fur_shells(), "aggie wears the same fur pass (%d)" % aggie.fur_shells)
+	check(aggie.get("_sculpt") != null, "aggie wears the sculpted body")
 	check(aggie.whisker_count == cat.whisker_count, "aggie has whiskers too")
 	print("FIDELITY DONE: %d passed, %d failed" % [_pass, _fail])
 	get_tree().quit(0 if _fail == 0 else 1)

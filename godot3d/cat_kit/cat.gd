@@ -27,6 +27,7 @@ signal hissed(cat: PvKCat)
 signal poisoned(cat: PvKCat, source: String)
 
 const DATA_PATH := "res://cat_kit/cat_species.json"
+const SculptLib := preload("res://cat_kit/cat_sculpt.gd")
 const LEG_H := 0.35 # unit-space leg anchor height (GTA stray_cat leg_h)
 const HISS_TIME := 1.5 # the startle lock (basement ghosts force this)
 const INVULN_TIME := 0.8 # brief mercy window after any landed hit
@@ -110,6 +111,9 @@ var gait_trot := 0.0
 var gait_bound := 0.0
 var land_amount := 0.0
 var pounce_amount := 0.0
+## Jaw clip blend. play_meow() sets it; the sculpt tree eases it back.
+var meow_k := 0.0
+var _sculpt = null
 var _tail_base: Array = [] # rest position per tail segment — realism pass
 var _stripes: Array = []
 
@@ -561,7 +565,11 @@ func _build_model() -> void:
 	_build_head()
 	_build_legs()
 	_build_tail()
+	SculptLib.attach(self)
+	_sculpt = get("_sculpt")
 	CatFidelity.dress(self)
+	if _sculpt != null:
+		_sculpt.adopt_whiskers(self)
 
 
 ## Willie's markings: a LARGE ginger saddle over the whole back and
@@ -713,6 +721,11 @@ func strike() -> bool:
 
 func set_lounge(on: bool) -> void:
 	is_lounging = on
+
+
+## Opens the jaw clip. Gameplay meows (M, and Aggie's chirp) call this.
+func play_meow() -> void:
+	meow_k = 1.0
 
 
 ## HEAT: blend the courtship pose in or out.
@@ -1155,6 +1168,8 @@ func _update_pose(delta: float) -> void:
 	_update_ears(delta, sf)
 	_update_legs(land_dip, w_walk, w_trot, w_bound, moving)
 	_update_pupils()
+	if _sculpt != null:
+		_sculpt.apply_state(self, delta)
 
 
 ## The tail as a lagged follow-through chain: each segment's rest
