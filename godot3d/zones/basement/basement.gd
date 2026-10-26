@@ -367,6 +367,10 @@ func _build_environment() -> void:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.36, 0.30, 0.23)
 	env.ambient_light_energy = 0.55
+	env.fog_enabled = true
+	env.fog_light_color = Color(0.42, 0.34, 0.22)
+	env.fog_density = 0.03
+	VisualQuality.apply_environment(env, "basement")
 	we.environment = env
 	add_child(we)
 
@@ -663,9 +667,15 @@ func _build_lights() -> void:
 		omni.light_color = Color(1.0, 0.78, 0.50)
 		omni.light_energy = 1.25
 		omni.omni_range = 7.5
-		omni.shadow_enabled = false
+		omni.shadow_enabled = i == 0 and VisualQuality.is_high()
+		if VisualQuality.is_high():
+			omni.light_volumetric_fog_energy = 0.8
 		pivot.add_child(omni)
 		_bulbs.append([pivot, float(i) * 1.93])
+	# Dust in the bulb light. One shaft is enough; more would wash the maze.
+	if BULB_SPOTS.size() > 0:
+		var spot: Vector3 = BULB_SPOTS[0]
+		VisualQuality.add_dust_shaft(self, Vector3(spot.x, CEILING_H - 0.15, spot.z), -75.0, 15.0)
 
 
 # --- actors --------------------------------------------------------------------------------

@@ -96,7 +96,7 @@ is `docs/massey-zones.md` — read it before touching a zone.
 ## One night in the basement
 
 A complete night, separate from the yard: `zones/basement/night_hunt.tscn`.
-The HTML5 build opens here. Desktop play of the full house is unchanged.
+The HTML5 build opens the **full house** (yard, ground floor, basement, attic, the same zone doors as desktop). This scene is the one-night slice on its own.
 
 Willie, one seed-built basement (the years Glenys kept — notes, the
 teapot, a folded jumper — stacked into narrow paths, tall piles and
@@ -125,9 +125,11 @@ Open `godot3d/` in Godot 4.7, or headless:
     godot --headless --path godot3d --import
     godot --path godot3d
 
-Web (primary target; build output is git-ignored):
+Web (primary target; build output is git-ignored). The project renderer is Forward+; the Web preset forces GL Compatibility and leaves screenshots and reference photos out of the pack:
 
     godot --headless --path godot3d --export-release "Web" build/web/index.html
+
+`--quality high` or `--quality low` overrides the auto tier (Forward+ → six fur shells, SSAO, volumetric dust; GL Compatibility / web → three shells and a visible dust cone). Credits for the fur and the eye meshes are in `visual/CREDITS.md`. They are original; nothing in that pass is a downloaded model.
 
 An Android preset is defined (arm64, unsigned build not produced here).
 

@@ -87,12 +87,8 @@ var _meshes := {}
 
 
 func _ready() -> void:
-	# The HTML5 build is the one-night basement. Desktop, the editor
-	# and the suites keep the full house — web is the only feature
-	# that takes this branch, and headless tests do not set it.
-	if OS.has_feature("web"):
-		call_deferred("_boot_web_slice")
-		return
+	# Web and desktop both boot the full house. The renderer picks
+	# the quality tier (Forward+ here, GL Compatibility in the browser).
 	_rng.randomize()
 	_build_environment()
 	_build_lights()
@@ -176,10 +172,6 @@ func _static_box(parent: StaticBody3D, size: Vector3, pos: Vector3) -> void:
 
 
 # --- world -------------------------------------------------------------------
-
-func _boot_web_slice() -> void:
-	get_tree().change_scene_to_file("res://zones/basement/night_hunt.tscn")
-
 
 func _build_environment() -> void:
 	var env := Node3D.new()
@@ -420,6 +412,7 @@ func _build_lights() -> void:
 	sun.light_energy = 1.05
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 60.0
+	VisualQuality.dress_sun(sun)
 	add_child(sun)
 	var we := WorldEnvironment.new()
 	var e := Environment.new()
@@ -438,6 +431,7 @@ func _build_lights() -> void:
 	e.fog_enabled = true
 	e.fog_light_color = Color(0.78, 0.84, 0.9)
 	e.fog_density = 0.012
+	VisualQuality.apply_environment(e, "yard")
 	we.environment = e
 	add_child(we)
 

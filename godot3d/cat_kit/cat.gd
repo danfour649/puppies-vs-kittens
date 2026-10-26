@@ -100,6 +100,16 @@ var _torso: MeshInstance3D
 var _saddle_patch: MeshInstance3D
 var _eyes: Array = []
 var _ears: Array = [] # [MeshInstance3D, side, base_rotation] — realism pass
+var _inner_ears: Array = []
+var _pupils: Array = []
+var fur_shells := 0
+var whisker_count := 0
+## Blend-tree weights the pose layer already mixes. walk+trot+bound = 1 while moving.
+var gait_walk := 1.0
+var gait_trot := 0.0
+var gait_bound := 0.0
+var land_amount := 0.0
+var pounce_amount := 0.0
 var _tail_base: Array = [] # rest position per tail segment — realism pass
 var _stripes: Array = []
 
@@ -484,8 +494,9 @@ func _ell_m(parent: Node3D, pos: Vector3, dia: Vector3, mat: Material, rot := Ve
 		_sphere = SphereMesh.new()
 		_sphere.radius = 0.5
 		_sphere.height = 1.0
-		_sphere.radial_segments = 32
-		_sphere.rings = 16
+		var hi := VisualQuality.is_high()
+		_sphere.radial_segments = 48 if hi else 24
+		_sphere.rings = 24 if hi else 12
 	var mi := MeshInstance3D.new()
 	mi.mesh = _sphere
 	mi.material_override = mat
@@ -550,6 +561,7 @@ func _build_model() -> void:
 	_build_head()
 	_build_legs()
 	_build_tail()
+	CatFidelity.dress(self)
 
 
 ## Willie's markings: a LARGE ginger saddle over the whole back and
@@ -618,7 +630,8 @@ func _build_head() -> void:
 		var ear := _ell(_head, Vector3(sx * 0.088, 0.155, -0.01), Vector3(0.085, 0.15, 0.05), ear_col, Vector3(0.06, 0, -sx * 0.14))
 		ear.scale.z = 0.05
 		_ears.append([ear, sx, ear.rotation])
-		_ell(_head, Vector3(sx * 0.088, 0.15, -0.032), Vector3(0.05, 0.09, 0.02), inner_ear_color)
+		var inner := _ell(_head, Vector3(sx * 0.088, 0.15, -0.032), Vector3(0.05, 0.09, 0.02), inner_ear_color)
+		_inner_ears.append(inner)
 	# Eyes: per-character from the data — Willie's dark (ruled spec, 2026-10-25), Aggie's green-gold.
 	for sx: float in [-1.0, 1.0]:
 		_eyes.append(_ell(_head, Vector3(sx * 0.067, 0.045, -0.178), Vector3(0.034, 0.034, 0.034), eye_color, Vector3.ZERO, 0.25))
@@ -988,6 +1001,10 @@ func _update_pose(delta: float) -> void:
 		w_walk = 1.0
 		w_trot = 0.0
 		w_bound = 0.0
+	gait_walk = w_walk
+	gait_trot = w_trot
+	gait_bound = w_bound
+	pounce_amount = 1.0 if (not is_on_floor() and is_pouncing()) else 0.0
 	if moving:
 		var freq := lerpf(1.7, 3.9, clampf(sf, 0.0, 1.0))
 		if anim_state == "stalk":
@@ -1009,6 +1026,7 @@ func _update_pose(delta: float) -> void:
 	var land_dip := 0.0
 	if _land_t >= 0.0:
 		land_dip = sin(PI * clampf(_land_t / 0.24, 0.0, 1.0))
+	land_amount = land_dip
 
 	# --- idle repertoire: stand, then sit, with groom pulses ----------
 	var idling := anim_state == "idle" and not is_lounging and not is_fainted and _hiss_t < 0.0 and _strike_t < 0.0
@@ -1136,6 +1154,7 @@ func _update_pose(delta: float) -> void:
 	_update_tail(delta, sf, moving)
 	_update_ears(delta, sf)
 	_update_legs(land_dip, w_walk, w_trot, w_bound, moving)
+	_update_pupils()
 
 
 ## The tail as a lagged follow-through chain: each segment's rest
@@ -1178,9 +1197,26 @@ func _update_ears(delta: float, sf: float) -> void:
 		var r: Vector3 = e[2]
 		r.z += sin(_anim_t * 1.3 + sx * 1.7) * 0.035
 		r.x -= clampf(sf, 0.0, 1.0) * 0.30 + _hiss_k * 0.45
+		if anim_state == "stalk":
+			r.x += 0.28 # ears forward, listening
+		elif anim_state == "sprint":
+			r.x -= 0.12 # pinned by the run
 		if sx == _ear_flick_side:
 			r.x += sin(_ear_flick * PI) * 0.5
 		mi.rotation = r
+
+
+func _update_pupils() -> void:
+	var k := 0.58
+	if anim_state == "idle" or anim_state == "lounge":
+		k = 0.78
+	elif anim_state == "stalk" or anim_state == "hiss":
+		k = 0.4
+	elif anim_state == "sprint":
+		k = 0.46
+	k += sin(_time * 0.85) * 0.025
+	for p in _pupils:
+		(p as MeshInstance3D).scale = Vector3(k, k * 1.15, 0.3)
 
 
 ## Legs: the three gaits blended by their weights, with the special

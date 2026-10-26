@@ -1,9 +1,9 @@
 name: Web
 
-# Builds the HTML5 night and keeps it as an artifact. On a push to
-# main it also publishes GitHub Pages, if Pages is enabled for the
-# repo. The export is single-threaded GL Compatibility, which is
-# what Godot's web template can run without cross-origin isolation.
+# Builds the HTML5 game (the full house) and keeps it as an artifact.
+# On a push to main it also publishes GitHub Pages, if Pages is
+# enabled for the repo. The export is single-threaded GL Compatibility,
+# which is what Godot's web template can run without cross-origin isolation.
 on:
   push:
     branches: [main, "cursor/**"]

@@ -119,6 +119,7 @@ func _build_world() -> void:
 	e.fog_enabled = true
 	e.fog_light_color = Color(0.12, 0.1, 0.09)
 	e.fog_density = 0.04
+	VisualQuality.apply_environment(e, "basement")
 	env.environment = e
 	add_child(env)
 	var moon := DirectionalLight3D.new()
@@ -127,6 +128,7 @@ func _build_world() -> void:
 	moon.light_energy = 0.15
 	moon.shadow_enabled = false
 	add_child(moon)
+	VisualQuality.add_dust_shaft(self, Vector3(0.2, 2.4, 4.6), -62.0, 8.0)
 	# The whole floor, then the things Glenys kept, stacked into walls.
 	_solid(Vector3(18, 0.4, 14), Vector3(0, -0.2, 0), Color(0.28, 0.26, 0.24))
 	_border()

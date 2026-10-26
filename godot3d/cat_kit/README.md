@@ -144,6 +144,16 @@ stay green-gold — the dark-eye ruling is Willie's).
   is `provocation_trigger: "willie_meowing"` — his constant
   meowing is literally what sets her off.
 
+## Fidelity pass
+
+`visual/cat_fidelity.gd` dresses the finished mesh: shell fur (the
+palette albedo stays on the original `StandardMaterial3D`, which the
+smoke test reads), a clear cornea and a dilating pupil, catchlights,
+subsurface inner ears, and whiskers. Aggie gets the same pass.
+`visual/quality.gd` picks six shells on Forward+ and three on
+GL Compatibility / web. Credits: `visual/CREDITS.md` — original
+geometry and a shader, no downloaded model.
+
 ## Animation states (all in code, poses are functions of state+time)
 
 - `idle` — breathing (body scale-y ±2.5%), slow look-around, tail sway
