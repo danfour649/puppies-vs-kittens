@@ -140,8 +140,14 @@ static func entries(id: String) -> Dictionary:
 static func connectors(id: String) -> Array:
 	match id:
 		OUTSIDE:
+			# The house wall's collision face is z=-9.7. Willie's
+			# capsule stops around z=-9.55, so a volume centred in
+			# the doorway (z=-9.85) never overlaps him and the door
+			# never trips. This one sits on the porch where he
+			# actually stands, and stays clear of EntryFrontDoor
+			# at z=-8.45 so arriving home does not bounce him back in.
 			return [{
-				"at": Vector3(2.5, 0.9, -9.85), "size": Vector3(1.7, 1.8, 1.2),
+				"at": Vector3(2.5, 0.85, -9.40), "size": Vector3(1.7, 1.5, 0.7),
 				"target_zone": GROUND_FLOOR, "target_entry": "EntryFrontDoor",
 			}]
 		GROUND_FLOOR:

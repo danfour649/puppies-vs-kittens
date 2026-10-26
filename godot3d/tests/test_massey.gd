@@ -118,7 +118,7 @@ func _run() -> void:
 	await frames(80) # arrival cooldown is 1.2 s; the warp below needs can_travel()
 
 	# --- travel: the real door trigger ----------------------------------------------
-	cat.global_position = Vector3(2.5, 0.95, -9.85) # inside the porch volume
+	cat.global_position = Vector3(2.5, 0.5, -9.45) # on the porch, inside the door volume
 	cat.velocity = Vector3.ZERO
 	var t := 0
 	while zones.current_zone != HouseSpec.GROUND_FLOOR and t < 120:
