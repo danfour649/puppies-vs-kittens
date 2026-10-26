@@ -186,8 +186,8 @@ static func _fill_clutter(root: Node3D, meshes: Array, key: String, kinds: Array
 		inst.global_position = Vector3(cx + jx, y, cz + jz)
 		inst.rotation.y = rng.randf() * TAU
 		if rng.randf() < 0.42:
-			inst.rotation.x = rng.randf_range(-0.06, 0.06)
-			inst.rotation.z = rng.randf_range(-0.1, 0.1)
+			inst.rotation.x = rng.randf_range(-0.09, 0.09)
+			inst.rotation.z = rng.randf_range(-0.16, 0.16)
 		inst.scale = Vector3(sx, sy, sz)
 		_tint(inst, rng, id)
 		if not side:
@@ -372,7 +372,7 @@ static func _tint_mesh(mi: MeshInstance3D, tint: Color, rough: float, shade: boo
 		sm.set_shader_parameter("albedo_tex", tex)
 		sm.set_shader_parameter("tint", Vector3(tint.r, tint.g, tint.b))
 		sm.set_shader_parameter("rough", rough)
-		sm.set_shader_parameter("edge", 0.2)
+		sm.set_shader_parameter("edge", 0.32)
 		mi.material_override = sm
 		return
 	var m := src.duplicate() as StandardMaterial3D if src != null else StandardMaterial3D.new()
