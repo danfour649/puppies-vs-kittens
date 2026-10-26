@@ -113,7 +113,7 @@ func _run() -> void:
 		await _wait(0.05)
 		guard += 1
 	_look(0.0)
-	_game.cat.global_position = HouseSpec.zone_origin(HouseSpec.GROUND_FLOOR) + Vector3(3.0, 0.2, -1.0)
+	_game.cat.global_position = HouseSpec.zone_origin(HouseSpec.GROUND_FLOOR) + Vector3(5.0, 0.2, -2.0)
 	_game.snap_camera()
 	await _wait(0.7)
 	await _shot("ground")

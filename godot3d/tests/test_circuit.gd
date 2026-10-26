@@ -60,10 +60,10 @@ func _run() -> void:
 	check(_game._arm.collision_mask == 1, "the spring arm collides with the house")
 	_check_dressed(zones)
 	cat.velocity = Vector3.ZERO
-	cat.global_position = HouseSpec.zone_origin(HouseSpec.GROUND_FLOOR) + Vector3(3.0, 0.2, -1.0)
+	cat.global_position = HouseSpec.zone_origin(HouseSpec.GROUND_FLOOR) + Vector3(5.0, 0.2, -2.0)
 	_game.cam_yaw = 0.0
 	_game.snap_camera()
-	await frames(10)
+	await frames(30)
 	cam = _game.get_viewport().get_camera_3d()
 	var shoulder: float = cam.global_position.distance_to(cat.global_position)
 	var eye: float = cam.global_position.y - cat.global_position.y
