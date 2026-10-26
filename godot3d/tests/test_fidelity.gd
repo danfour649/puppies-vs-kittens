@@ -8,6 +8,11 @@ var _pass := 0
 var _fail := 0
 
 
+func sculpt_baked(cat: Node) -> bool:
+	var sculpt = cat.get("_sculpt")
+	return sculpt != null and sculpt.body != null and bool(sculpt.body.get_meta("baked_coat", false))
+
+
 func check(cond: bool, label: String) -> void:
 	if cond:
 		_pass += 1
@@ -27,7 +32,9 @@ func _run() -> void:
 	check(VisualQuality.shell_count_for("low") >= 2, "low tier still has a coat (%d)" % VisualQuality.shell_count_for("low"))
 	var cat = CatScript.new()
 	add_child(cat)
-	check(cat.fur_shells >= VisualQuality.fur_shells(), "willie wears a fur shell per layer (%d)" % cat.fur_shells)
+	var baked := sculpt_baked(cat)
+	check(baked, "willie wears the generated coat")
+	check(baked or cat.fur_shells >= VisualQuality.fur_shells(), "willie keeps a coat (%d shells)" % cat.fur_shells)
 	var sculpt = cat.get("_sculpt")
 	check(sculpt != null and sculpt.body != null and sculpt.body.mesh is ArrayMesh, "willie wears the sculpted mesh")
 	if sculpt != null and sculpt.body != null and sculpt.body.mesh != null:

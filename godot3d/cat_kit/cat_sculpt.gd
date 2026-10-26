@@ -8,6 +8,8 @@ const PoseMod := preload("res://cat_kit/cat_pose_modifier.gd")
 ## The AnimationTree is the blend the clips actually play through.
 
 const MESH_SCENE := "res://cat_kit/meshes/cat.glb"
+const WILLIE_HIGH := "res://cat_kit/meshes/willie_lod0.glb"
+const WILLIE_LOW := "res://cat_kit/meshes/willie_lod2.glb"
 const WILLIE_ALBEDO := "res://cat_kit/meshes/willie_albedo.png"
 const AGGIE_ALBEDO := "res://cat_kit/meshes/aggie_albedo.png"
 const NORMAL_MAP := "res://cat_kit/meshes/cat_normal.png"
@@ -34,8 +36,15 @@ static func attach(cat: Node) -> void:
 	cat.set("_sculpt", sculpt)
 
 
+func _mesh_path(cat: Node) -> String:
+	if str(cat.get("character_id")) == "aggie":
+		return MESH_SCENE
+	return WILLIE_HIGH if VisualQuality.is_high() else WILLIE_LOW
+
+
 func _build(cat: Node) -> bool:
-	var packed := load(MESH_SCENE) as PackedScene
+	var willie := str(cat.get("character_id")) != "aggie"
+	var packed := load(_mesh_path(cat)) as PackedScene
 	if packed == null:
 		push_error("cat mesh missing")
 		return false
@@ -74,7 +83,13 @@ func _build(cat: Node) -> bool:
 			mi.visible = false
 	body = chosen
 	body.name = "SculptBody"
-	body.material_override = _coat_material(str(cat.get("character_id")) == "aggie")
+	if willie:
+		# The Hunyuan albedo is already on the mesh. A flat roughness
+		# beats the procedural normal, which was drawn for the other UV.
+		body.material_override = _baked_material(body)
+		body.set_meta("baked_coat", true)
+	else:
+		body.material_override = _coat_material(true)
 	body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	_hide_primitives(cat)
 	_loops(player)
@@ -136,6 +151,19 @@ func _under_sculpt(node: Node) -> bool:
 			return true
 		p = p.get_parent()
 	return false
+
+
+func _baked_material(mi: MeshInstance3D) -> StandardMaterial3D:
+	var src := mi.get_active_material(0) as StandardMaterial3D
+	if src == null and mi.mesh != null and mi.mesh.get_surface_count() > 0:
+		src = mi.mesh.surface_get_material(0) as StandardMaterial3D
+	var mat := StandardMaterial3D.new()
+	if src != null:
+		mat = src.duplicate() as StandardMaterial3D
+	mat.roughness = 0.72
+	mat.roughness_texture = null
+	mat.normal_enabled = false
+	return mat
 
 
 func _coat_material(aggie: bool) -> StandardMaterial3D:
@@ -247,6 +275,16 @@ func _prepare_face(cat: Node) -> void:
 	_measure_face()
 	_seat_eyes(cat)
 	_seat_nose(cat)
+	if body != null and body.get_meta("baked_coat", false):
+		# The generation already has eyes and a nose. The ellipsoid
+		# stand-ins stay in the tree for the pupil tests.
+		for eye in cat.get("_eyes"):
+			var mi := eye as Node3D
+			if mi != null:
+				mi.visible = false
+		var leather := skeleton.get_node_or_null("HeadSocket/NoseLeather") as Node3D
+		if leather != null:
+			leather.visible = false
 
 
 func _orient_nose_forward() -> void:
@@ -290,13 +328,19 @@ func _measure_face() -> void:
 	if _right.length_squared() < 0.0001:
 		_right = Vector3.RIGHT
 	_up = _away.cross(_right).normalized()
+	var baked: bool = bool(body.get_meta("baked_coat", false))
 	var best := head_o
 	var best_d := -1e9
 	for v in verts:
 		var p: Vector3 = to_skel * v
 		var along := _away.dot(p - head_o)
-		if along > best_d:
-			best_d = along
+		# Ears on the generated mesh reach past the nose. Keep the
+		# muzzle point down at the skull instead of on an ear tip.
+		var score := along
+		if baked:
+			score = along - maxf(0.0, p.y - head_o.y - 0.02) * 2.5
+		if score > best_d:
+			best_d = score
 			best = p
 	_nose = best
 	print("FACE nose ", _nose, " away ", _away, " head ", head_o)
