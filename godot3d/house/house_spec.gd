@@ -104,28 +104,14 @@ static func entries(id: String) -> Dictionary:
 				"EntryHatchBottom": Transform3D(Basis(Vector3.UP, PI), Vector3(6.5, 0.0, -1.7)),
 			}
 		BASEMENT:
-			# STAIR PAIRING — INTENTIONAL (coordinator ruling
-			# 2026-10-25 under Daniel's burn-down order; the
-			# PR #13 escalation is CLOSED): the two stair
-			# DRESSINGS do not share world geometry, by design.
-			# The ground-floor shaft is the STAIRWELL (NW,
-			# centre (-6.5, -3.0), EntryStairsTop above); the
-			# built labyrinth's flight climbs its SOUTH wall
-			# (stair foot ENTRY_POS (4.35, 5.35)); this landing
-			# stands on the fully open south row west of the
-			# stair foot — clear of the return volume, with
-			# open floor around it (things hunt you down here).
-			# Floor travel is a FADE through the connectors,
-			# so the two dressings are never on screen together:
-			# the pairing is by connector/entry, not by aligned
-			# geometry. Aligning them was ruled out — the
-			# basement stair foot (z 5.35) lies OUTSIDE the
-			# ground-floor footprint (z ±4.8), an east-side
-			# shaft would collide with the attic hatch and the
-			# sofa, and moving the basement entry would mean
-			# redesigning the maze and Daniel's litter corner.
-			# Both staircases stay exactly as played.
-			return {"EntryStairs": Transform3D(Basis(), Vector3(2.85, 0.0, 4.5))}
+			# STAIR PAIRING stays a fade: the ground-floor shaft
+			# is still the NW stairwell, and this flight still
+			# climbs the south wall. The south row and the stair
+			# foot now sit inside the shell (inner face z 4.5).
+			# The landing is on open floor, north of the return
+			# volume, so arriving downstairs does not bounce
+			# straight back up.
+			return {"EntryStairs": Transform3D(Basis(), Vector3(2.85, 0.0, 4.05))}
 		ATTIC:
 			# INTEGRATION: the built attic's hatch is its +x/-z floor
 			# corner (HATCH_POS (5.05, -3.55)); the landing stands on
@@ -160,8 +146,10 @@ static func connectors(id: String) -> Array:
 					"target_zone": ATTIC, "target_entry": "EntryHatch"},
 			]
 		BASEMENT:
+			# Southeast corner, on the stair flight, clear of the
+			# landing at z 3.55 and of the open corridor to the west.
 			return [{
-				"at": Vector3(4.35, 0.7, 5.35), "size": Vector3(2.3, 1.4, 2.5),
+				"at": Vector3(6.7, 0.7, 4.22), "size": Vector3(1.7, 1.4, 0.7),
 				"target_zone": GROUND_FLOOR, "target_entry": "EntryStairsTop",
 			}]
 		ATTIC:
@@ -286,7 +274,7 @@ const ANCHORS := {
 	"water_bowl": {"u": 0.362, "v": 0.781, "floor": GROUND_FLOOR},
 	"sofa": {"u": 0.782, "v": 0.099, "floor": GROUND_FLOOR}, # the lap seat
 	"scratch_post": {"u": 0.965, "v": 0.594, "floor": GROUND_FLOOR},
-	"basement_entry": {"u": 0.668, "v": 0.969, "floor": BASEMENT}, # built entry (2.85, 4.5)
+	"basement_entry": {"u": 0.668, "v": 0.922, "floor": BASEMENT}, # built entry (2.85, 4.05)
 	"attic_entry": {"u": 0.729, "v": 0.094, "floor": ATTIC}, # built entry (3.9, -3.9)
 	"attic_perch": {"u": 0.812, "v": 0.500, "floor": ATTIC}, # built perch (5.30, 0.0)
 }

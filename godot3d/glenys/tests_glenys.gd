@@ -178,7 +178,7 @@ func _run() -> void:
 	sys.set("_follow_left", 0.05)
 	await frames(14)
 	check(sys.her_zone == HouseSpec.BASEMENT, "she arrives in the cat's new zone")
-	var entry_world := HouseSpec.zone_origin(HouseSpec.BASEMENT) + Vector3(2.85, 0, 4.5)
+	var entry_world := HouseSpec.zone_origin(HouseSpec.BASEMENT) + Vector3(2.85, 0, 4.05)
 	check(flat(actor.global_position, entry_world) < 1.6, "she comes through the basement entry (at %s)" % actor.global_position)
 	check(sys.state == "pursue" or sys.state == "grab", "and the pursuit resumes downstairs (state %s)" % sys.state)
 	if sys.state == "grab":

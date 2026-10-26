@@ -67,5 +67,10 @@ func _run() -> void:
 	_game.snap_camera()
 	await _wait(0.7)
 	await _shot("attic")
+	if _game.pause_menu != null:
+		_game.pause_menu.show_menu()
+		await _wait(0.25)
+		await _shot("pause")
+		_game.pause_menu.close()
 	print("CIRCUIT SHOTS DONE")
 	get_tree().quit(0)

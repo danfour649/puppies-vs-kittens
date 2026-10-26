@@ -54,6 +54,7 @@ func _run() -> void:
 	check(bool(report["ok"]), "the night's basement is a playable level%s" % ("" if why == "" else " — " + why))
 	check(hunt.cat.is_on_floor(), "Willie is standing on the floor")
 	check(hunt.gesture_hint_visible(), "the first night says tap to pounce, swipe to paw")
+	check(_no_begin_button(hunt), "the title starts from a tap, not a Begin button")
 	check(hunt._hint.text == NightHunt.HINT_TEXT, "the hint is the one we promised")
 	_framing(hunt)
 	await _labels(hunt)
@@ -157,7 +158,29 @@ func _gestures() -> void:
 	_screen_touch(touch, left, true, 3)
 	_screen_touch(touch, left, false, 3)
 	check(pounces[0] == p1, "the left half stays the stick, not a pounce")
+	var pauses := [0]
+	touch.pause_pressed.connect(func() -> void: pauses[0] += 1)
+	var meows_pause := int(meows[0])
+	var restarts_before := int(restarts[0])
+	_screen_touch(touch, origin, true, 7)
+	_screen_touch(touch, origin + Vector2(30, 8), true, 8)
+	_screen_touch(touch, origin + Vector2(-24, 18), true, 9)
+	check(pauses[0] == 1, "three fingers together pause")
+	check(restarts[0] == restarts_before, "three fingers do not also restart")
+	_screen_touch(touch, origin, false, 7)
+	_screen_touch(touch, origin + Vector2(30, 8), false, 8)
+	_screen_touch(touch, origin + Vector2(-24, 18), false, 9)
+	check(meows[0] == meows_pause, "the pause tap does not also meow")
 	touch.queue_free()
+
+
+func _no_begin_button(node: Node) -> bool:
+	if node is Button and String((node as Button).text).begins_with("Begin"):
+		return false
+	for c: Node in node.get_children():
+		if not _no_begin_button(c):
+			return false
+	return true
 
 
 func _no_paw_buttons(node: Node) -> bool:

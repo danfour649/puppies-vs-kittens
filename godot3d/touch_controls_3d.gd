@@ -3,13 +3,14 @@ extends CanvasLayer
 ## Touch UI for the 3D edition. The left side is a paw-print
 ## joystick. The right half is gestures: a tap meows, a swipe
 ## paws in that direction, a still hold stalks. Two fingers held
-## still restart. Desktop: left click pounces, right click paws,
+## still restart. Three fingers together pause. Desktop: left click pounces, right click paws,
 ## right-drag or middle-drag looks. Keyboard bindings stay.
 
 signal strike_pressed
 signal pounce_pressed
 signal meow_pressed
 signal restart_pressed
+signal pause_pressed
 signal look_dragged(relative: Vector2)
 
 const TAP_PX := 26.0
@@ -26,6 +27,7 @@ var pass_controls: Array = []
 
 var _fingers := {}
 var _restart_sent := false
+var _pause_sent := false
 
 var _mouse_btn := 0
 var _mouse_from := Vector2.ZERO
@@ -106,7 +108,7 @@ func _process(_delta: float) -> void:
 		var only: Dictionary = _fingers[_fingers.keys()[0]]
 		var held := float(Time.get_ticks_msec() - int(only["msec"])) / 1000.0
 		stalk_held = float(only["moved"]) < TAP_PX and held >= HOLD_SEC
-	if _fingers.size() >= 2 and not _restart_sent:
+	if _fingers.size() == 2 and not _restart_sent and not _pause_sent:
 		var ready := true
 		for index: Variant in _fingers.keys():
 			var f: Dictionary = _fingers[index]
@@ -129,6 +131,17 @@ func _unhandled_input(event: InputEvent) -> void:
 		_on_mouse_button(event as InputEventMouseButton)
 	elif event is InputEventMouseMotion and _mouse_btn != 0:
 		_on_mouse_motion(event as InputEventMouseMotion)
+
+
+func _maybe_pause() -> void:
+	if _pause_sent:
+		return
+	for index: Variant in _fingers.keys():
+		var f: Dictionary = _fingers[index]
+		if float(f["moved"]) >= TAP_PX:
+			return
+	_pause_sent = true
+	pause_pressed.emit()
 
 
 func _right_half(pos: Vector2) -> bool:
@@ -154,14 +167,25 @@ func _on_screen_touch(t: InputEventScreenTouch) -> void:
 		if _blocked(t.position) or _over_stick(t.position):
 			return
 		if _fingers.is_empty() and not _right_half(t.position):
+			# A lone finger on the left stays with the stick. Extra
+			# fingers still count, so three together can pause.
+			_fingers[t.index] = {
+				"from": t.position,
+				"msec": Time.get_ticks_msec(),
+				"moved": 0.0,
+				"live": false,
+			}
+		elif _fingers.size() < 3:
+			_fingers[t.index] = {
+				"from": t.position,
+				"msec": Time.get_ticks_msec(),
+				"moved": 0.0,
+				"live": true,
+			}
+		else:
 			return
-		if _fingers.size() >= 2:
-			return
-		_fingers[t.index] = {
-			"from": t.position,
-			"msec": Time.get_ticks_msec(),
-			"moved": 0.0,
-		}
+		if _fingers.size() == 3:
+			_maybe_pause()
 		get_viewport().set_input_as_handled()
 	elif _fingers.has(t.index):
 		_release_finger(t.index, t.position)
@@ -182,14 +206,16 @@ func _release_finger(index: int, pos: Vector2) -> void:
 	var from: Vector2 = f["from"]
 	var moved := maxf(float(f["moved"]), from.distance_to(pos))
 	var held := float(Time.get_ticks_msec() - int(f["msec"])) / 1000.0
+	var live := bool(f.get("live", true))
 	var others := _fingers.size() - 1
 	_fingers.erase(index)
 	stalk_held = false
-	if _restart_sent:
+	if _restart_sent or _pause_sent:
 		if _fingers.is_empty():
 			_restart_sent = false
+			_pause_sent = false
 		return
-	if others > 0:
+	if others > 0 or not live:
 		return
 	var kind := classify(moved, held)
 	swipe_dir = pos - from

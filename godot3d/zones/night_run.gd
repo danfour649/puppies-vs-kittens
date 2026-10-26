@@ -561,6 +561,103 @@ func _tell(line: String) -> void:
 		glenys.tell(line)
 
 
+func snapshot() -> Dictionary:
+	var goals: Array = []
+	var obj := _obj()
+	if obj != null:
+		for it: Variant in obj.items:
+			var d: Dictionary = it
+			var id := String(d.get("id", ""))
+			if not id.begins_with("night:"):
+				continue
+			goals.append({
+				"id": id,
+				"count": int(d.get("count", 0)),
+				"done": bool(d.get("done", false)),
+			})
+	var cat: Node3D = _game.get("cat") if _game != null else null
+	var zones := _zones()
+	var glenys: Node = _game.get("glenys") if _game != null else null
+	var gpos := Vector3.ZERO
+	var gzone := ""
+	var gstate := ""
+	if glenys != null:
+		gzone = String(glenys.get("her_zone"))
+		gstate = String(glenys.get("state"))
+		var actor: Node3D = glenys.get("actor")
+		if actor != null:
+			gpos = actor.global_position
+	var cpos := Vector3.ZERO
+	var cyaw := 0.0
+	if cat != null:
+		cpos = cat.global_position
+		cyaw = cat.rotation.y
+	return {
+		"zone": zones.current_zone if zones != null else "",
+		"cat": [cpos.x, cpos.y, cpos.z, cyaw],
+		"phase": phase,
+		"seconds_left": seconds_left,
+		"fail_reason": fail_reason,
+		"visited_outside": _visited_outside,
+		"held_t": _held_t,
+		"goals": goals,
+		"glenys_zone": gzone,
+		"glenys_state": gstate,
+		"glenys_pos": [gpos.x, gpos.y, gpos.z],
+	}
+
+
+func restore(data: Dictionary) -> void:
+	phase = String(data.get("phase", phase))
+	seconds_left = float(data.get("seconds_left", seconds_left))
+	fail_reason = String(data.get("fail_reason", ""))
+	_visited_outside = bool(data.get("visited_outside", _visited_outside))
+	_held_t = float(data.get("held_t", 0.0))
+	var obj := _obj()
+	if obj != null:
+		for g: Variant in data.get("goals", []):
+			var d: Dictionary = g
+			var id := String(d.get("id", ""))
+			var count := int(d.get("count", 0))
+			var item: Variant = obj.get_item(id)
+			if item != null and bool(d.get("done", false)):
+				count = maxi(count, int((item as Dictionary).get("target", 1)))
+			obj.set_progress(id, count)
+	var zones := _zones()
+	var zone := String(data.get("zone", ""))
+	if zones != null and zone != "":
+		var entry := "EntryFrontDoor"
+		if zone == HouseSpec.BASEMENT:
+			entry = "EntryStairs"
+		elif zone == HouseSpec.ATTIC:
+			entry = "EntryHatch"
+		zones.travel(zone, entry, true)
+	var cat: Node3D = _game.get("cat") if _game != null else null
+	var nums: Array = data.get("cat", [])
+	if cat != null and nums.size() >= 4:
+		cat.global_position = Vector3(float(nums[0]), float(nums[1]), float(nums[2]))
+		cat.velocity = Vector3.ZERO
+		cat.rotation.y = float(nums[3])
+	var glenys: Node = _game.get("glenys") if _game != null else null
+	if glenys != null:
+		var gz := String(data.get("glenys_zone", ""))
+		if gz != "":
+			glenys.set("her_zone", gz)
+		var st := String(data.get("glenys_state", ""))
+		if st != "":
+			glenys.set("state", st)
+		var gp: Array = data.get("glenys_pos", [])
+		var actor: Node3D = glenys.get("actor")
+		if actor != null and gp.size() >= 3:
+			actor.global_position = Vector3(float(gp[0]), float(gp[1]), float(gp[2]))
+	if _card != null:
+		_card.visible = phase == "briefing"
+	if phase == "won" or phase == "failed":
+		if _banner != null:
+			_banner.visible = true
+	_refresh_compass()
+
+
 func _zones() -> ZoneManager:
 	if _game == null:
 		return null

@@ -86,6 +86,15 @@ func _run() -> void:
 		if (n as OmniLight3D).shadow_enabled:
 			shadowed = true
 	check(lights >= 1 and not shadowed, "dressing lights are unshadowed (%d)" % lights)
+	var wrapped := false
+	var long_name := false
+	for n: Node in dressed.find_children("*", "Label3D", true, false):
+		var lab := n as Label3D
+		if lab.text.find("photograph") >= 0 or lab.text.length() > 28:
+			long_name = true
+		if lab.autowrap_mode != TextServer.AUTOWRAP_OFF and lab.width > 0.0:
+			wrapped = true
+	check(wrapped and long_name, "keepsake names wrap instead of running off the frame")
 	check(dressed.find_children("*", "DustShaft", true, false).size() >= 1 or dressed.get_node_or_null("DustShaft") != null, "a dust shaft comes in with the window")
 
 	var dusk: Color = LightMood.fade_tint("ground_floor")

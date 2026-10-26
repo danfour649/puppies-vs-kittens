@@ -32,6 +32,7 @@ func _run() -> void:
 	await _dawn()
 	await _caught()
 	await _gathered()
+	await _pause()
 	print("NIGHT RUN TESTS DONE: %d passed, %d failed" % [_pass, _fail])
 	get_tree().quit(0 if _fail == 0 else 1)
 
@@ -162,6 +163,51 @@ func _gathered() -> void:
 	check(night._banner.text.contains("glad"), "that ending is glad, not a scolding")
 	game.queue_free()
 	await frames(2)
+
+
+func _pause() -> void:
+	var game = await _boot()
+	var menu: PauseMenu = game.pause_menu
+	check(menu != null, "the night has a pause menu")
+	check(not _has_text(game, "START"), "the cat picker has no START control")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(PauseMenu.NIGHT_PATH))
+	game.zones.travel(HouseSpec.GROUND_FLOOR, "EntryFrontDoor", true)
+	await frames(3)
+	var saved_at: Vector3 = HouseSpec.zone_origin(HouseSpec.GROUND_FLOOR) + Vector3(1.2, 0.2, 0.4)
+	game.cat.global_position = saved_at
+	game.night.seconds_left = 222.0
+	menu.show_menu()
+	check(get_tree().paused and menu.open, "the menu pauses the night")
+	menu._save_night()
+	game.night.seconds_left = 10.0
+	game.zones.travel(HouseSpec.OUTSIDE, "EntryFrontDoor", true)
+	menu._resume_night()
+	check(not get_tree().paused, "resuming closes the menu")
+	check(is_equal_approx(game.night.seconds_left, 222.0), "resume puts the clock back (%.0f)" % game.night.seconds_left)
+	check(game.zones.current_zone == HouseSpec.GROUND_FLOOR, "resume returns to the saved floor")
+	check(game.cat.global_position.distance_to(saved_at) < 0.4, "resume puts Willie back where he was")
+	game.look_sens = 1.6
+	game.look_invert = true
+	menu._sens_value = 1.6
+	menu._invert_value = true
+	menu._save_settings()
+	check(FileAccess.file_exists(PauseMenu.SETTINGS_PATH), "the look settings are kept")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(PauseMenu.NIGHT_PATH))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(PauseMenu.SETTINGS_PATH))
+	get_tree().paused = false
+	game.queue_free()
+	await frames(2)
+
+
+func _has_text(node: Node, text: String) -> bool:
+	if node is Label and String((node as Label).text) == text:
+		return true
+	if node is Button and String((node as Button).text) == text:
+		return true
+	for c: Node in node.get_children():
+		if _has_text(c, text):
+			return true
+	return false
 
 
 func _named_buttons(node: Node) -> PackedStringArray:
