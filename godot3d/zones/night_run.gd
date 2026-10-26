@@ -26,6 +26,7 @@ var _brief_t := 0.0
 var _held_t := 0.0
 var _visited_outside := false
 var _card: PanelContainer
+var _compass: PanelContainer
 var _card_label: Label
 var _banner: Label
 var _clock: Label
@@ -97,7 +98,8 @@ func _process(delta: float) -> void:
 	if _game == null:
 		return
 	if phase == "briefing":
-		_brief_t += delta
+		# A long first frame (the web pack waking up) must not skip the card.
+		_brief_t += minf(delta, 0.25)
 		if _brief_t >= BRIEFING or _enter_pressed():
 			seconds_left = LENGTH
 			start_playing()
@@ -114,6 +116,20 @@ func _process(delta: float) -> void:
 
 func _enter_pressed() -> bool:
 	return Input.is_physical_key_pressed(KEY_ENTER) or Input.is_physical_key_pressed(KEY_E)
+
+
+func _input(event: InputEvent) -> void:
+	if phase != "briefing":
+		return
+	var tap := false
+	if event is InputEventScreenTouch:
+		tap = (event as InputEventScreenTouch).pressed
+	elif event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		tap = mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT
+	if tap:
+		start_playing()
+		get_viewport().set_input_as_handled()
 
 
 func _on_zone(id: String) -> void:
@@ -266,7 +282,9 @@ func _connector_world(zone_id: String, index: int) -> Vector3:
 func _refresh_compass() -> void:
 	if _clock == null or _game == null:
 		return
-	var show := phase != "wait"
+	var show := phase == "playing"
+	if _compass != null:
+		_compass.visible = show
 	_clock.visible = show
 	_floors.visible = show
 	_hint.visible = show
@@ -345,7 +363,7 @@ func _build_ui() -> void:
 	_card_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_card_label.add_theme_font_size_override("font_size", 20)
 	_card_label.add_theme_color_override("font_color", Color(0.97, 0.94, 0.88))
-	_card_label.text = "The house is settling in for the night.\n\nCome in from the yard. See the basement. Look in on the attic. Then find Glenys. She will say where she is.\n\nYou have until dawn. Tap the compass for the list.\n\nPress Enter."
+	_card_label.text = "The house is settling in for the night.\n\nCome in from the yard. See the basement. Look in on the attic. Then find Glenys. She will say where she is.\n\nYou have until dawn. Tap the compass for the list.\n\nTap to begin, or press Enter."
 	_card.add_child(_card_label)
 	_card.visible = false
 	layer.add_child(_card)
@@ -367,6 +385,9 @@ func _build_ui() -> void:
 	var compass := PanelContainer.new()
 	_compass = compass
 	compass.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	# Hidden until the night starts, so it does not cover the roster.
+	# Once it is up it stays a button: a tap opens the list.
+	compass.visible = false
 	compass.offset_left = -250
 	compass.offset_right = 250
 	compass.offset_top = -132

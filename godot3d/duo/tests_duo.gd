@@ -122,7 +122,10 @@ func _run() -> void:
 	duo.select_ui.confirm()
 	await frames(5)
 	check(not duo.select_visible(), "confirm picks the highlighted cat and closes the select")
-	check(game._touch.visible, "the paw comes back once a cat is picked")
+	check(not game._touch.visible, "the paw stays hidden through the night briefing")
+	game.night.start_playing()
+	await frames(2)
+	check(game._touch.visible, "the paw comes back once the night starts")
 	var willie = duo.willie_cat
 	var aggie = duo.aggie_cat
 	check(willie != null and aggie != null and willie != aggie, "two distinct cat instances")

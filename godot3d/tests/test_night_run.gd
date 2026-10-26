@@ -41,7 +41,11 @@ func _boot():
 	await frames(12)
 	game.duo.choose("willie")
 	await frames(4)
+	check(not game.night._compass.visible, "the compass stays off the roster until the night starts")
+	check(game.night._compass.mouse_filter == Control.MOUSE_FILTER_IGNORE, "the compass does not take taps")
 	game.night.start_playing()
+	await frames(2)
+	check(game.night._compass.visible, "the compass shows once the night is underway")
 	return game
 
 

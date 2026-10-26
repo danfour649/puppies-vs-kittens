@@ -797,7 +797,10 @@ func mice_left() -> int:
 
 func _physics_process(_delta: float) -> void:
 	if _touch != null:
-		_touch.set_blocked(duo != null and duo.input_locked())
+		# The roster and the night card sit under the paw's layer.
+		# Keep the paw off the screen until the player can actually walk.
+		var briefing := night != null and night.blocks_move()
+		_touch.set_blocked((duo != null and duo.input_locked()) or briefing)
 	var dir := Vector3.ZERO
 	var sprint := false
 	var stalk := false
