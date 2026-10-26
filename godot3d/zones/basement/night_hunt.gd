@@ -114,6 +114,30 @@ func _ready() -> void:
 var _built := false
 
 
+func _listen_for_begin(panel: Control) -> void:
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.gui_input.connect(_on_title_gesture)
+	for c: Node in panel.get_children():
+		if c is Control:
+			(c as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+
+func _on_title_gesture(event: InputEvent) -> void:
+	if phase != "title":
+		return
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed:
+			_begin()
+	elif event is InputEventScreenTouch:
+		var t := event as InputEventScreenTouch
+		if not t.pressed:
+			_begin()
+	elif event is InputEventScreenDrag:
+		if (event as InputEventScreenDrag).relative.length() > 36.0:
+			_begin()
+
+
 func _begin() -> void:
 	if _built:
 		return
@@ -441,11 +465,20 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseButton:
 		var b := event as InputEventMouseButton
 		if phase == "title":
+			if b.button_index == MOUSE_BUTTON_LEFT and not b.pressed:
+				_begin()
 			return
 		if b.pressed and b.button_index == MOUSE_BUTTON_WHEEL_UP:
 			cam_dist = clampf(cam_dist - 0.25, 1.05, 8.0)
 		elif b.pressed and b.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			cam_dist = clampf(cam_dist + 0.25, 1.05, 8.0)
+	elif phase == "title" and event is InputEventScreenTouch:
+		var t := event as InputEventScreenTouch
+		if not t.pressed:
+			_begin()
+	elif phase == "title" and event is InputEventScreenDrag:
+		if (event as InputEventScreenDrag).relative.length() > 36.0:
+			_begin()
 
 
 func debug_force_gift() -> void:
@@ -637,12 +670,11 @@ func _build_ui() -> void:
 	how.position = Vector2(48, 340)
 	how.size = Vector2(664, 56)
 	how.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var begin := Button.new()
-	begin.text = "Begin the night"
-	begin.position = Vector2(270, 420)
-	begin.size = Vector2(220, 48)
-	begin.pressed.connect(_begin)
-	_title.add_child(begin)
+	var tap := _label(_title, "Tap the card, or swipe, and the night begins.", 18)
+	tap.position = Vector2(48, 420)
+	tap.size = Vector2(664, 40)
+	tap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_listen_for_begin(_title)
 	_hud = _label(_ui, "", 20)
 	_hud.position = Vector2(16, 12)
 	_goal = _label(_ui, "", 18)

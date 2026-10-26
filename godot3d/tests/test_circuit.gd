@@ -56,12 +56,17 @@ func _run() -> void:
 	var local: Vector3 = cam.global_position - HouseSpec.zone_origin(HouseSpec.GROUND_FLOOR)
 	check(not CameraFeel.outside_footprint(local, HouseSpec.ceil_h(HouseSpec.GROUND_FLOOR)),
 		"the ground-floor camera stays inside the room (%s)" % local)
+	var shoulder: float = cam.global_position.distance_to(cat.global_position)
+	var eye: float = cam.global_position.y - cat.global_position.y
+	check(shoulder > 0.7 and shoulder < 2.35, "indoors the camera sits at Willie's shoulder (%.2f m)" % shoulder)
+	check(eye > 0.02 and eye < 0.95, "the indoor camera is near cat-eye height (%.2f)" % eye)
+	check(is_equal_approx(_game.cam_dist, 4.6), "the yard's camera distance is kept for the door back out")
 	check(_game._arm.collision_mask == 1, "the spring arm collides with the house")
 	await _settle(zones)
 
 	await _walk_into(cat, zones, Vector3(-6.5, 0.35, -201.05), Vector3(-6.5, 0.2, -203.2),
 		HouseSpec.BASEMENT, "walking into the stairwell drops to the basement")
-	await _walk_into(cat, zones, Vector3(2.9, -2.35, -196.2), Vector3(4.6, -2.4, -195.2),
+	await _walk_into(cat, zones, Vector3(3.4, -2.35, -195.85), Vector3(6.5, -2.4, -195.78),
 		HouseSpec.GROUND_FLOOR, "walking to the cellar stairs returns upstairs")
 	await _walk_into(cat, zones, Vector3(6.5, 0.35, -201.4), Vector3(6.5, 0.2, -203.2),
 		HouseSpec.ATTIC, "walking into the hatch climbs to the attic")

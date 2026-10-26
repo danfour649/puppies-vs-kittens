@@ -47,7 +47,10 @@ const ATTIC_KEEP: Array[Rect2] = [
 
 
 var _motes: Array[MeshInstance3D] = []
+var _labels: Array[Label3D] = []
 var _t := 0.0
+
+const LABEL_MARGIN := 16.0
 
 
 static func build(parent: Node3D, level: Dictionary) -> HoarderDressing:
@@ -319,17 +322,7 @@ func _prop(spec: Variant) -> void:
 		_:
 			_mesh(Vector3(0.18, 0.1, 0.14), pos, col, false)
 	if bool(pd.get("label", false)):
-		var lab := Label3D.new()
-		lab.text = String(pd["name"])
-		lab.font_size = 28
-		lab.pixel_size = 0.0032
-		lab.position = pos + Vector3(0, 0.22, 0)
-		lab.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		lab.modulate = Color(0.97, 0.94, 0.88)
-		lab.outline_size = 6
-		lab.outline_modulate = Color(0.1, 0.07, 0.05, 0.8)
-		lab.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		add_child(lab)
+		_name_label(String(pd["name"]), pos + Vector3(0, 0.22, 0), 28, 0.0032)
 
 
 func _nest(pos: Vector3, labelled: bool) -> void:
@@ -337,16 +330,7 @@ func _nest(pos: Vector3, labelled: bool) -> void:
 	_mesh(Vector3(0.08, 0.02, 0.05), pos + Vector3(0.04, 0.02, 0.02), Color(0.75, 0.7, 0.62), false)
 	_mesh(Vector3(0.05, 0.015, 0.07), pos + Vector3(-0.05, 0.018, -0.02), Color(0.82, 0.78, 0.7), false)
 	if labelled:
-		var lab := Label3D.new()
-		lab.text = "a nest, lined with a scrap of wool"
-		lab.font_size = 26
-		lab.pixel_size = 0.003
-		lab.position = pos + Vector3(0, 0.16, 0)
-		lab.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		lab.modulate = Color(0.96, 0.93, 0.86)
-		lab.outline_size = 6
-		lab.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		add_child(lab)
+		_name_label("a nest, lined with a scrap of wool", pos + Vector3(0, 0.16, 0), 26, 0.003)
 
 
 func _motes_for(origin: Vector3, col: Color) -> void:
@@ -372,12 +356,119 @@ func _motes_for(origin: Vector3, col: Color) -> void:
 		_motes.append(mote)
 
 
+func _name_label(text: String, pos: Vector3, size: int, px: float) -> void:
+	var lab := Label3D.new()
+	lab.text = text
+	lab.font_size = size
+	lab.pixel_size = px
+	lab.width = 200.0
+	lab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lab.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lab.position = pos
+	lab.set_meta("home", pos)
+	lab.set_meta("px", px)
+	lab.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	lab.modulate = Color(0.97, 0.94, 0.88)
+	lab.outline_size = 6
+	lab.outline_modulate = Color(0.1, 0.07, 0.05, 0.8)
+	lab.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(lab)
+	_labels.append(lab)
+
+
 func _process(delta: float) -> void:
 	_t += delta
 	for i in _motes.size():
 		var m := _motes[i]
 		m.position.y += sin(_t * 0.7 + float(i)) * delta * 0.04
 		m.position.x += cos(_t * 0.4 + float(i) * 1.4) * delta * 0.02
+	_clamp_names()
+
+
+## Long keepsake names wrap, then the whole block is kept on screen.
+func _clamp_names() -> void:
+	if _labels.is_empty():
+		return
+	var cam := get_viewport().get_camera_3d()
+	if cam == null:
+		return
+	var vp := get_viewport().get_visible_rect().size
+	if vp.x < 2.0 or vp.y < 2.0:
+		return
+	for lab: Label3D in _labels:
+		if not is_instance_valid(lab):
+			continue
+		var home: Vector3 = lab.get_meta("home")
+		var base_px := float(lab.get_meta("px"))
+		lab.position = home
+		lab.pixel_size = base_px
+		var world := lab.global_position
+		if cam.is_position_behind(world):
+			continue
+		if cam.global_position.distance_to(world) > 9.0:
+			continue
+		var depth := _view_depth(cam, world)
+		if depth <= cam.near:
+			continue
+		var screen := cam.unproject_position(world)
+		if screen.x < -vp.x or screen.x > vp.x * 2.0 or screen.y < -vp.y or screen.y > vp.y * 2.0:
+			continue
+		var half := _screen_half(lab, cam, depth, vp)
+		var avail := vp - Vector2(LABEL_MARGIN, LABEL_MARGIN) * 2.0
+		var fit := 1.0
+		if half.x * 2.0 > avail.x and half.x > 0.0:
+			fit = minf(fit, avail.x / (half.x * 2.0))
+		if half.y * 2.0 > avail.y and half.y > 0.0:
+			fit = minf(fit, avail.y / (half.y * 2.0))
+		if fit < 0.999:
+			lab.pixel_size = base_px * fit
+			half *= fit
+		var clamped := _clamp_screen(screen, half, vp, LABEL_MARGIN)
+		if clamped.distance_squared_to(screen) > 0.25:
+			lab.global_position = cam.project_position(clamped, depth)
+
+
+func _view_depth(cam: Camera3D, world: Vector3) -> float:
+	var local: Vector3 = cam.global_transform.affine_inverse() * world
+	return -local.z
+
+
+func _screen_half(lab: Label3D, cam: Camera3D, depth: float, vp: Vector2) -> Vector2:
+	var font_px := _font_px(lab.text, lab.width, lab.font_size, lab.outline_size)
+	var world := font_px * lab.pixel_size
+	var center := cam.project_position(vp * 0.5, depth)
+	var edge := center + cam.global_transform.basis.x.normalized() * world.x * 0.5
+	edge += cam.global_transform.basis.y.normalized() * world.y * 0.5
+	if cam.is_position_behind(center) or cam.is_position_behind(edge):
+		var ppm := vp.y / maxf(0.05, 2.0 * depth * tan(deg_to_rad(cam.fov) * 0.5))
+		return world * 0.5 * ppm
+	return (cam.unproject_position(edge) - cam.unproject_position(center)).abs()
+
+
+func _font_px(text: String, width: float, font_size: int, outline: int) -> Vector2:
+	var measured := Vector2(minf(width, maxf(1.0, text.length()) * font_size * 0.55), font_size * 1.4)
+	var font := ThemeDB.fallback_font
+	if font != null and text.length() > 0:
+		var size := font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, width, font_size, -1, TextServer.BREAK_WORD_BOUND | TextServer.BREAK_ADAPTIVE)
+		if size.x > 1.0 and size.y > 1.0:
+			measured = size
+	measured += Vector2(outline, outline) * 2.0
+	return measured * 1.08
+
+
+func _clamp_screen(point: Vector2, half: Vector2, vp: Vector2, margin: float) -> Vector2:
+	var lo := Vector2(margin + half.x, margin + half.y)
+	var hi := Vector2(vp.x - margin - half.x, vp.y - margin - half.y)
+	if lo.x > hi.x:
+		point.x = vp.x * 0.5
+	else:
+		point.x = clampf(point.x, lo.x, hi.x)
+	if lo.y > hi.y:
+		point.y = vp.y * 0.5
+	else:
+		point.y = clampf(point.y, lo.y, hi.y)
+	return point
 
 
 func _mesh(size: Vector3, pos: Vector3, color: Color, solid: bool) -> MeshInstance3D:

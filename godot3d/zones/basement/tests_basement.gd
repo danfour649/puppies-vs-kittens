@@ -111,6 +111,11 @@ func _run() -> void:
 	check(not ZoneScript.bfs_path(entry_cell, heart_cell, true).is_empty(), "grid: entry reaches the heart (Willie route)")
 	check(ZoneScript.bfs_path(entry_cell, feather_cell, true).is_empty(), "grid: alcove unreachable when the gap is shut")
 	check(not ZoneScript.bfs_path(entry_cell, feather_cell, false).is_empty(), "grid: alcove reachable through the gap (Aggie route)")
+	var inner := HouseSpec.FOOTPRINT_D * 0.5 - HouseSpec.WALL_T
+	var south_z := ZoneScript.cell_center(0, 9).z
+	check(south_z < inner - 0.2, "the south row sits inside the house shell (z %.2f, wall %.2f)" % [south_z, inner])
+	check(ZoneScript.ENTRY_POS.z < inner - 0.15, "the stair foot is inside the shell")
+	check(ZoneScript.ROOM_MAX.y <= inner + 0.02, "the basement south wall meets the shell")
 
 	_freeze_dangers()
 	_park_ghosts()
@@ -243,8 +248,8 @@ func _run() -> void:
 	# frozen in front of the cat, then send it home.
 	var pr = _zone.rats[3]
 	pr.active = false
-	pr.global_position = Vector3(0.75, 0.05, 4.5)
-	_cat.global_position = Vector3(0.2, 0.05, 4.5)
+	pr.global_position = Vector3(0.75, 0.05, ZoneScript.SOUTH_ROW_Z)
+	_cat.global_position = Vector3(0.2, 0.05, ZoneScript.SOUTH_ROW_Z)
 	_cat.velocity = Vector3.ZERO
 	_cat.rotation.y = -PI * 0.5
 	await frames(3)
@@ -255,14 +260,14 @@ func _run() -> void:
 	pr.active = true
 
 	var rat = RatScript.new()
-	rat.position = Vector3(2.6, 0.05, 4.5)
+	rat.position = Vector3(2.6, 0.05, ZoneScript.SOUTH_ROW_Z)
 	add_child(rat)
 	rat.den = rat.position
 	rat.target_cat = _cat
 	var bites := [0]
 	rat.bite.connect(func(_t, _d): bites[0] += 1)
 	rat.bite.connect(_zone._on_enemy_bite)
-	_cat.global_position = Vector3(0.2, 0.05, 4.5)
+	_cat.global_position = Vector3(0.2, 0.05, ZoneScript.SOUTH_ROW_Z)
 	_cat.velocity = Vector3.ZERO
 	_cat.set_move_input(Vector3.ZERO, false, false)
 	var hp_pre_rat: int = _zone.cat_hp

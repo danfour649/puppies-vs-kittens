@@ -65,6 +65,11 @@ var _mouse_seq := 0
 var cam_yaw := PI
 var cam_pitch := -0.48
 var cam_dist := 4.6
+## Indoors the lens sits at the shoulder. The yard keeps cam_dist.
+var indoor_zoom := 1.48
+var look_invert := false
+var look_sens := 1.0
+var pause_menu: PauseMenu = null
 
 ## Smoke-test seam: when active, physics input comes from here.
 var input_override := {"active": false, "move": Vector2.ZERO, "sprint": false, "stalk": false}
@@ -136,6 +141,13 @@ func _ready() -> void:
 	night.setup(self)
 	if _touch != null and night.compass() != null:
 		_touch.pass_controls.append(night.compass())
+	pause_menu = PauseMenu.new()
+	pause_menu.name = "PauseMenu"
+	add_child(pause_menu)
+	pause_menu.bind(self)
+	if _touch != null:
+		_touch.pause_pressed.connect(pause_menu.toggle)
+		_touch.process_mode = Node.PROCESS_MODE_ALWAYS
 	# OUTSIDE: trees + squirrels, feeder birds + ambush, the street
 	# frontage (hostile traffic, the Corolla island, the fish
 	# treat) and pedestrians walking dogs.
@@ -667,8 +679,9 @@ func _aim_nearest_mouse() -> void:
 
 
 func _on_look_drag(relative: Vector2) -> void:
-	cam_yaw -= relative.x * 0.005
-	cam_pitch = clampf(cam_pitch - relative.y * 0.004, -1.15, -0.08)
+	var y_sign := 1.0 if look_invert else -1.0
+	cam_yaw -= relative.x * 0.005 * look_sens
+	cam_pitch = clampf(cam_pitch + y_sign * relative.y * 0.004 * look_sens, -1.15, -0.08)
 
 
 func _on_paw_swiped() -> void:
@@ -765,9 +778,43 @@ func _on_cat_poisoned(c: PvKCat, source: String) -> void:
 
 
 
+func _indoors() -> bool:
+	return zones != null and zones.current_zone != "" and zones.current_zone != HouseSpec.OUTSIDE
+
+
+## Over the shoulder, about at his eyes, when the room is the frame.
+## The stored yard pitch and distance stay put for the door back out.
+func _camera_target() -> Vector3:
+	if cam_anchor != null:
+		return cam_anchor.global_position
+	var pivot := 0.38 if _indoors() else 0.30
+	var shoulder := Vector3.ZERO
+	if _indoors() and _rig != null:
+		var right := _rig.global_transform.basis.x
+		right.y = 0.0
+		if right.length() > 0.001:
+			shoulder = right.normalized() * 0.24
+	return cat.global_position + Vector3(0, pivot, 0) + shoulder + duo_shake
+
+
+func _arm_pitch() -> float:
+	if _indoors():
+		return clampf(cam_pitch + 0.32, -0.62, -0.06)
+	return cam_pitch
+
+
+func _arm_length() -> float:
+	if _indoors():
+		return clampf(indoor_zoom, 1.05, 2.15)
+	return cam_dist
+
+
 func snap_camera() -> void:
-	if _rig != null and cat != null:
-		_rig.global_position = cat.global_position + Vector3(0, 0.3, 0)
+	if _rig == null or _arm == null or cat == null:
+		return
+	_rig.global_position = _camera_target()
+	_arm.rotation.x = _arm_pitch()
+	_arm.spring_length = _arm_length()
 
 
 func on_zone_changed(zone_id: String) -> void:
@@ -878,23 +925,28 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseButton:
 		var b := event as InputEventMouseButton
 		if b.pressed and b.button_index == MOUSE_BUTTON_WHEEL_UP:
-			cam_dist = clampf(cam_dist - 0.5, 2.2, 9.0)
+			if _indoors():
+				indoor_zoom = clampf(indoor_zoom - 0.18, 1.05, 2.15)
+			else:
+				cam_dist = clampf(cam_dist - 0.5, 2.2, 9.0)
 		elif b.pressed and b.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			cam_dist = clampf(cam_dist + 0.5, 2.2, 9.0)
+			if _indoors():
+				indoor_zoom = clampf(indoor_zoom + 0.18, 1.05, 2.15)
+			else:
+				cam_dist = clampf(cam_dist + 0.5, 2.2, 9.0)
 
 
 func _process(delta: float) -> void:
 	if not won and not run_over:
 		elapsed += delta
-	var target := cat.global_position + Vector3(0, 0.3, 0) + duo_shake # DUO shake
-	if cam_anchor != null:
-		target = cam_anchor.global_position
+	var target := _camera_target()
 	_rig.global_position = _rig.global_position.lerp(target, 1.0 - exp(-8.0 * delta))
 	_rig.rotation.y = cam_yaw
-	_arm.rotation.x = cam_pitch
-	_arm.spring_length = cam_dist
+	var length := _arm_length()
+	_arm.rotation.x = _arm_pitch()
+	_arm.spring_length = length
 	if _feel != null:
-		_feel.apply(cam_dist)
+		_feel.apply(length)
 	if _restart_left > 0.0:
 		_restart_left = maxf(0.0, _restart_left - delta)
 		if _restart_left <= 0.0 and _confirm != null:

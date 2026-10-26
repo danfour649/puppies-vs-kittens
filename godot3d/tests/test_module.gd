@@ -74,8 +74,8 @@ func _audit_mapping() -> void:
 	_audit_row("attic perch", Vector2(PvKAttic.PERCH_POS.x, PvKAttic.PERCH_POS.z), Vector2(0.812, 0.500), Vector2(3.37, 0.00))
 	_audit_row("attic hatch", Vector2(PvKAttic.HATCH_POS.x, PvKAttic.HATCH_POS.z), Vector2(0.797, 0.130), Vector2(3.21, -5.40))
 	_audit_row("attic entry landing", _entry_xz(HouseSpec.ATTIC, "EntryHatch"), Vector2(0.729, 0.094), Vector2(2.48, -5.93))
-	_audit_row("basement entry landing", _entry_xz(HouseSpec.BASEMENT, "EntryStairs"), Vector2(0.668, 0.969), Vector2(1.81, 6.85))
-	_audit_row("basement stair foot", Vector2(PvKBasement.ENTRY_POS.x, PvKBasement.ENTRY_POS.z), Vector2(0.756, 1.057), Vector2(2.77, 8.13))
+	_audit_row("basement entry landing", _entry_xz(HouseSpec.BASEMENT, "EntryStairs"), Vector2(0.668, 0.922), Vector2(1.81, 6.16))
+	_audit_row("basement stair foot", Vector2(PvKBasement.ENTRY_POS.x, PvKBasement.ENTRY_POS.z), Vector2(0.756, 0.932), Vector2(2.76, 6.31))
 	_audit_row("basement heart", Vector2(PvKBasement.HEART_POS.x, PvKBasement.HEART_POS.z), Vector2(0.559, 0.292), Vector2(0.64, -3.04))
 	_audit_row("basement litter box", Vector2(PvKBasement.LITTER_POS.x, PvKBasement.LITTER_POS.z), Vector2(0.068, 0.094), Vector2(-4.67, -5.93))
 	# AMENDED row (2026-10-25): built gap centre is cell (11, 2).

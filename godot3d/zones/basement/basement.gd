@@ -29,7 +29,8 @@ extends Node3D
 
 # --- room ---------------------------------------------------------------------
 const ROOM_MIN := Vector2(-8, -6)
-const ROOM_MAX := Vector2(8, 6)
+## South face meets the house shell (inner z 4.5). The old room ran to z 6.
+const ROOM_MAX := Vector2(8, 4.5)
 const FLOOR_Y := 0.0
 const CEILING_H := 2.3
 const WALL_H := 1.9 ## maze box-stack collision height
@@ -38,6 +39,9 @@ const WALL_H := 1.9 ## maze box-stack collision height
 const GRID_MIN := Vector2(-7, -5)
 const GRID_COLS := 14
 const GRID_ROWS := 10
+## Row 9 stays the open south corridor, pulled north so it sits
+## inside the shell instead of through the south wall.
+const SOUTH_ROW_Z := 4.15
 ## Legend: '.' open  '#' box stack  'T' tunnel (low ceiling)
 ##         'G' the Aggie gap   'H' heart chamber floor   'A' alcove floor
 const MAP: Array[String] = [
@@ -62,7 +66,7 @@ const GAP_W := 0.115
 const GAP_LINTEL_Y := 0.55 ## slot clear height
 
 # --- key places -------------------------------------------------------------------
-const ENTRY_POS := Vector3(4.35, 0.05, 5.35) ## stair foot, facing north
+const ENTRY_POS := Vector3(4.35, 0.05, 4.15) ## stair foot, on the south row, inside the shell
 const HEART_POS := Vector3(1.0, 0, -2.0) ## maze centre: the rat den
 const LITTER_POS := Vector3(-7.35, 0, -3.9) ## NW corner
 const GIFT_POS := Vector3(-6.76, 0, -3.76) ## beside the litter box. Not in it.
@@ -71,7 +75,7 @@ const GIFT_POS := Vector3(-6.76, 0, -3.76) ## beside the litter box. Not in it.
 ## entry->heart path and every other route. Visible and labelled;
 ## lethal ONLY on contact with the bait itself (the cat must get
 ## INTO it): eat_poison, the run-ender. Walking past is safe.
-const POISON_POS := Vector3(-7.45, 0, 5.45) ## SW corner, perimeter strip
+const POISON_POS := Vector3(-7.45, 0, 4.05) ## SW corner, inside the shell, off the corridors
 const POISON_RADIUS := 0.32 ## the bait tray's own footprint, nothing more
 const SHELF_UNITS: Array = [ ## [position, rot_y] — boards face local +z
 	[Vector3(-5.0, 0, -5.45), 0.0],
@@ -101,7 +105,7 @@ const CHOKE_POINTS: Array = [ ## ghost haunts: passages and tunnel mouths
 	Vector3(-3.5, 0, -0.5), Vector3(1.5, 0, -0.5), Vector3(3.5, 0, -2.5),
 	Vector3(-1.5, 0, 1.5), Vector3(-4.5, 0, -1.5),
 ]
-const BULB_SPOTS: Array = [Vector3(4.4, 0, 4.6), Vector3(1.0, 0, -2.0), Vector3(-4.5, 0, 0.2)]
+const BULB_SPOTS: Array = [Vector3(4.4, 0, 4.15), Vector3(1.0, 0, -2.0), Vector3(-4.5, 0, 0.2)]
 
 # --- tuning -----------------------------------------------------------------------
 const CAT_MAX_HP := 9
@@ -154,7 +158,10 @@ const GhostScript := preload("res://zones/basement/ghost.gd")
 # --- grid helpers (the maze as data — tests use these too) ------------------------
 
 static func cell_center(c: int, r: int) -> Vector3:
-	return Vector3(GRID_MIN.x + c + 0.5, 0, GRID_MIN.y + r + 0.5)
+	var z := GRID_MIN.y + r + 0.5
+	if r == GRID_ROWS - 1:
+		z = SOUTH_ROW_Z
+	return Vector3(GRID_MIN.x + c + 0.5, 0, z)
 
 
 static func cell_char(c: int, r: int) -> String:
@@ -414,7 +421,14 @@ func _build_maze() -> void:
 			match ch:
 				"#":
 					_box_stack(ctr, c * 73 + r * 149)
-					_solid(Vector3(1.0, WALL_H, 1.0), Vector3(ctr.x, WALL_H * 0.5, ctr.z))
+					var solid_z := ctr.z
+					var solid_d := 1.0
+					# The row just north of the south corridor gives that
+					# lane a little air, so Willie is not squeezed into the wall.
+					if r == GRID_ROWS - 2:
+						solid_d = 0.82
+						solid_z -= 0.09
+					_solid(Vector3(1.0, WALL_H, solid_d), Vector3(ctr.x, WALL_H * 0.5, solid_z))
 				"T":
 					# The tunnel: a slab at TUNNEL_H with boxes above it.
 					_vis_box(self, Vector3(1.0, 0.1, 1.0), Vector3(ctr.x, TUNNEL_H + 0.05, ctr.z), _cardboard(c * 31 + r * 7))
@@ -489,15 +503,15 @@ func _build_shelves() -> void:
 
 func _build_props() -> void:
 	var wood := Color(0.40, 0.29, 0.16)
-	# Entry stairs: five steps up the south wall to a door (east end).
-	for i in 5:
-		var h := (i + 1) * 0.26
-		var pos := Vector3(4.9 + i * 0.44, h * 0.5, 5.5)
-		_vis_box(self, Vector3(0.44, h, 0.95), pos, wood)
-		_solid(Vector3(0.44, h, 0.95), pos)
-	_vis_box(self, Vector3(0.08, 1.0, 0.95), Vector3(7.55, 1.8, 5.5), Color(0.16, 0.12, 0.09)) # door slab, east wall
-	_vis_box(self, Vector3(0.85, 0.08, 1.0), Vector3(7.35, 1.32, 5.5), wood.darkened(0.15)) # landing
-	_solid(Vector3(0.85, 0.08, 1.0), Vector3(7.35, 1.32, 5.5))
+	# Entry stairs: up the south wall, in the southeast corner, inside the shell.
+	for i in 4:
+		var h := (i + 1) * 0.30
+		var pos := Vector3(6.2 + i * 0.36, h * 0.5, 4.32)
+		_vis_box(self, Vector3(0.36, h, 0.32), pos, wood)
+		_solid(Vector3(0.36, h, 0.32), pos)
+	_vis_box(self, Vector3(0.08, 1.0, 0.7), Vector3(7.55, 1.6, 4.28), Color(0.16, 0.12, 0.09)) # door slab
+	_vis_box(self, Vector3(0.7, 0.08, 0.55), Vector3(7.15, 1.2, 4.28), wood.darkened(0.15)) # landing
+	_solid(Vector3(0.7, 0.08, 0.55), Vector3(7.15, 1.2, 4.28))
 	# Furnace + water heater against the east wall.
 	var metal := Color(0.45, 0.47, 0.50)
 	_vis_cyl(self, Vector3(7.35, 0.75, -1.2), 0.52, 1.5, metal, Vector3.ZERO, 0.55)
@@ -634,9 +648,9 @@ func _build_dressing() -> void:
 	add_child(hose)
 	dressing_count += 1
 	# Cardboard pile on the south strip, west of the entry stairs.
-	_vis_box(self, Vector3(0.8, 0.4, 0.7), Vector3(0.4, 0.2, 5.6), _cardboard(31))
-	_vis_box(self, Vector3(0.65, 0.35, 0.6), Vector3(0.45, 0.57, 5.58), _cardboard(32), 0.3)
-	_vis_box(self, Vector3(0.5, 0.3, 0.5), Vector3(-0.35, 0.15, 5.62), _cardboard(33), -0.2)
+	_vis_box(self, Vector3(0.8, 0.4, 0.45), Vector3(0.4, 0.2, 4.32), _cardboard(31))
+	_vis_box(self, Vector3(0.65, 0.35, 0.4), Vector3(0.45, 0.57, 4.30), _cardboard(32), 0.3)
+	_vis_box(self, Vector3(0.5, 0.3, 0.36), Vector3(-0.35, 0.15, 4.34), _cardboard(33), -0.2)
 	dressing_count += 3
 
 
@@ -762,13 +776,13 @@ func get_entry(entry_name: String) -> Node3D:
 ## sibling can always amble to one through the corridors.
 func get_lounge_spots() -> Array:
 	var out: Array = []
-	for p: Vector3 in [Vector3(4.35, 0.02, 4.5), Vector3(-6.5, 0.02, 2.5), Vector3(6.5, 0.02, 0.5)]:
+	for p: Vector3 in [Vector3(2.2, 0.02, SOUTH_ROW_Z), Vector3(-6.5, 0.02, 2.5), Vector3(6.5, 0.02, 0.5)]:
 		out.append(to_global(p))
 	return out
 
 
 func get_wander_rect() -> Rect2:
-	var r := Rect2(-7.6, -5.6, 15.2, 11.2)
+	var r := Rect2(-7.6, -5.6, 15.2, 9.85)
 	return Rect2(r.position + Vector2(global_position.x, global_position.z), r.size)
 
 
