@@ -236,6 +236,7 @@ func _ready() -> void:
 	_build_shelves()
 	_build_props()
 	_build_lights()
+	FloorAmbience.attach(self, "basement")
 	_spawn_actors()
 	if not spawn_standalone_cat:
 		# INTEGRATION (hub mode): the foundation hub owns the cats,
@@ -893,7 +894,8 @@ func _on_hiss_triggered(ghost: PvKGhost, cat: Node3D) -> void:
 		cat.hiss()
 	_input_lock_t = 1.5 # zone-side lock for cats without their own
 	cat_hissed.emit(cat)
-	if _voice != null:
+	var voiced := cat != null and cat.get_node_or_null("CatVoice") != null
+	if _voice != null and not voiced:
 		_voice.global_position = cat.global_position if cat != null else _voice.global_position
 		_voice.play()
 	# The hiss is LOUD: spiders bolt up their threads, rats freeze.

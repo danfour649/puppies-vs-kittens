@@ -44,6 +44,10 @@ var _body: Node3D
 var _rng := RandomNumberGenerator.new()
 var _mats := {}
 var _meshes := {}
+var _squeak: AudioStreamPlayer3D
+var _scurry: AudioStreamPlayer3D
+var _squeak_cd := 0.0
+var _heard_state := ""
 
 
 func _ready() -> void:
@@ -54,6 +58,8 @@ func _ready() -> void:
 	_brain = CreatureBrain.new()
 	_brain.bind_profile("mouse", _rng.randi())
 	_build_model()
+	_squeak = HouseAudio.make_player(self, "squeak", false)
+	_scurry = HouseAudio.make_player(self, "scurry", true)
 
 
 func _mat(c: Color) -> StandardMaterial3D:
@@ -216,7 +222,9 @@ func _process(delta: float) -> void:
 	if state == "caught" or _body == null:
 		return
 	_time += delta
+	_squeak_cd = maxf(0.0, _squeak_cd - delta)
 	var intent := _brain_intent(delta)
+	_voice_for(float(intent.get("speed", 0.0)))
 	var speed := float(intent.get("speed", 0.0))
 	_target = intent.get("target", global_position)
 	var p := global_position
@@ -234,3 +242,19 @@ func _process(delta: float) -> void:
 			_body.position.y = 0.0
 	else:
 		_body.position.y = 0.0
+
+
+func _voice_for(speed: float) -> void:
+	if _squeak != null and _squeak.stream != null and _squeak_cd <= 0.0:
+		if state == "flee" or state == "freeze":
+			if _heard_state != state:
+				_squeak.play()
+				_squeak_cd = 0.55
+	_heard_state = state
+	if _scurry == null or _scurry.stream == null:
+		return
+	var patter := speed > 0.35 and state != "freeze" and state != "caught"
+	if patter and not _scurry.playing:
+		_scurry.play()
+	elif not patter and _scurry.playing:
+		_scurry.stop()
