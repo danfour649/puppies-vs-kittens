@@ -16,7 +16,14 @@ const ROUGH_MAP := "res://cat_kit/meshes/cat_roughness.png"
 var tree: AnimationTree
 var body: MeshInstance3D
 var skeleton: Skeleton3D
+var rig: Node3D
 var _blends: Dictionary = {}
+var _head_idx := -1
+var _nose := Vector3.ZERO
+var _away := Vector3(0, 0, -1)
+var _right := Vector3.RIGHT
+var _up := Vector3.UP
+var _hit_normal := Vector3(0, 0, -1)
 
 
 static func attach(cat: Node) -> void:
@@ -33,6 +40,7 @@ func _build(cat: Node) -> bool:
 		return false
 	var root := packed.instantiate()
 	root.name = "Sculpt"
+	rig = root
 	var model := cat.get("_model") as Node3D
 	var body_node := cat.get("_body") as Node3D
 	# Under the body so stalk, sit, lounge and the hiss still move
@@ -70,7 +78,7 @@ func _build(cat: Node) -> bool:
 	_hide_primitives(cat)
 	_loops(player)
 	tree = _make_tree(player, root)
-	_seat_eyes(cat)
+	_prepare_face(cat)
 	var mod: SkeletonModifier3D = PoseMod.new()
 	mod.name = "PoseModifier"
 	mod.host = cat
@@ -139,7 +147,7 @@ func _coat_material(aggie: bool) -> StandardMaterial3D:
 	if normal != null:
 		mat.normal_enabled = true
 		mat.normal_texture = normal
-		mat.normal_scale = 0.35
+		mat.normal_scale = 0.12
 	return mat
 
 
@@ -233,31 +241,161 @@ func _make_tree(player: AnimationPlayer, root: Node) -> AnimationTree:
 	return at
 
 
-func _seat_eyes(cat: Node) -> void:
-	var idx := skeleton.find_bone("head")
-	if idx < 0:
+func _prepare_face(cat: Node) -> void:
+	_orient_nose_forward()
+	_measure_face()
+	_seat_eyes(cat)
+	_seat_nose(cat)
+
+
+func _orient_nose_forward() -> void:
+	# Gameplay forward is -Z. Turn the rig so the head sits in front of
+	# the tail on that axis. Yaw only, so the feet stay on the ground.
+	if rig == null or skeleton == null:
 		return
+	var head_i := skeleton.find_bone("head")
+	var tail_i := skeleton.find_bone("tail04")
+	if head_i < 0 or tail_i < 0:
+		return
+	var head_p := skeleton.to_global(skeleton.get_bone_global_rest(head_i).origin)
+	var tail_p := skeleton.to_global(skeleton.get_bone_global_rest(tail_i).origin)
+	var flat := Vector3(head_p.x - tail_p.x, 0.0, head_p.z - tail_p.z)
+	if flat.length() < 0.0001:
+		return
+	rig.rotate_y(PI - atan2(flat.x, flat.z))
+
+
+func _measure_face() -> void:
+	_head_idx = skeleton.find_bone("head")
+	if _head_idx < 0 or body == null or body.mesh == null:
+		return
+	var arrays: Array = body.mesh.surface_get_arrays(0)
+	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	if verts.is_empty():
+		return
+	var to_skel := skeleton.global_transform.affine_inverse() * body.global_transform
+	var head_o: Vector3 = skeleton.get_bone_global_rest(_head_idx).origin
+	var tail_i := skeleton.find_bone("tail04")
+	var tail_o := skeleton.get_bone_global_rest(tail_i).origin if tail_i >= 0 else head_o + Vector3(0, 0, 1)
+	_away = (head_o - tail_o)
+	_away.y = 0.0
+	if _away.length_squared() < 0.0001:
+		_away = Vector3(0, 0, -1)
+	else:
+		_away = _away.normalized()
+	_up = Vector3.UP
+	_right = _up.cross(_away).normalized()
+	if _right.length_squared() < 0.0001:
+		_right = Vector3.RIGHT
+	_up = _away.cross(_right).normalized()
+	var best := head_o
+	var best_d := -1e9
+	for v in verts:
+		var p: Vector3 = to_skel * v
+		var along := _away.dot(p - head_o)
+		if along > best_d:
+			best_d = along
+			best = p
+	_nose = best
+	print("FACE nose ", _nose, " away ", _away, " head ", head_o)
+
+
+func _bone_point(skel_point: Vector3) -> Vector3:
+	return skeleton.get_bone_global_rest(_head_idx).affine_inverse() * skel_point
+
+
+func _bone_basis(skel_basis: Basis) -> Basis:
+	return skeleton.get_bone_global_rest(_head_idx).basis.inverse() * skel_basis
+
+
+func _head_socket() -> BoneAttachment3D:
+	var existing := skeleton.get_node_or_null("HeadSocket") as BoneAttachment3D
+	if existing != null:
+		return existing
 	var att := BoneAttachment3D.new()
 	att.name = "HeadSocket"
 	att.bone_name = "head"
 	skeleton.add_child(att)
-	# Head bone points from the neck toward the nose. The sockets sit
-	# a little in front of and below the bone tail, one each side.
+	return att
+
+
+func _nearest(target: Vector3) -> Vector3:
+	var arrays: Array = body.mesh.surface_get_arrays(0)
+	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	var to_skel := skeleton.global_transform.affine_inverse() * body.global_transform
+	var best := target
+	var best_n := _away
+	var best_d := 1e9
+	for i in verts.size():
+		var p: Vector3 = to_skel * verts[i]
+		var d := p.distance_squared_to(target)
+		if d < best_d:
+			best_d = d
+			best = p
+			if i < normals.size():
+				best_n = (to_skel.basis * normals[i]).normalized()
+	if best_n.dot(_away) < 0.0:
+		best_n = -best_n
+	_hit_normal = best_n
+	return best + best_n * 0.01
+
+
+func _basis_facing(outward: Vector3) -> Basis:
+	# The pupil sits on the eye's local -Z, so local Z points inward.
+	var z := -outward.normalized()
+	var up := _up
+	if absf(z.dot(up)) > 0.95:
+		up = _right
+	var x := up.cross(z).normalized()
+	var y := z.cross(x).normalized()
+	return Basis(x, y, z)
+
+
+func _seat_eyes(cat: Node) -> void:
+	if _head_idx < 0:
+		return
+	var att := _head_socket()
 	var eyes: Array = cat.get("_eyes")
 	var side := -1.0
 	for eye in eyes:
 		var mi := eye as MeshInstance3D
 		if mi == null:
 			continue
-		var keep_pos := mi.position
 		mi.get_parent().remove_child(mi)
 		att.add_child(mi)
-		mi.position = Vector3(side * 0.055, 0.02, -0.04)
-		mi.rotation = Vector3.ZERO
+		var target := _nose - _away * 0.105 + _up * 0.02 + _right * side * 0.05
+		var center := _nearest(target)
+		var outward := _hit_normal
+		if outward.dot(_away) < 0.2:
+			outward = (_away + _right * side * 0.25 + _up * 0.12).normalized()
+		mi.transform = Transform3D(_bone_basis(_basis_facing(outward)).orthonormalized(), _bone_point(center))
+		mi.scale = Vector3(0.052, 0.048, 0.04)
 		mi.visible = true
 		side = 1.0
-		if keep_pos == Vector3.ZERO:
-			pass
+
+
+func _seat_nose(cat: Node) -> void:
+	if _head_idx < 0:
+		return
+	var att := _head_socket()
+	var nose := MeshInstance3D.new()
+	nose.name = "NoseLeather"
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.5
+	sphere.height = 1.0
+	sphere.radial_segments = 12
+	sphere.rings = 6
+	nose.mesh = sphere
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = cat.get("nose_color")
+	mat.roughness = 0.42
+	nose.material_override = mat
+	nose.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	att.add_child(nose)
+	var tip := _nose + _away * 0.012 + _up * -0.006
+	nose.position = _bone_point(tip)
+	nose.scale = Vector3(0.032, 0.022, 0.026)
 
 
 func apply_state(cat: Node, delta: float) -> void:
@@ -289,20 +427,97 @@ func _set_blend(key: String, value: float) -> void:
 
 func adopt_whiskers(cat: Node) -> void:
 	var head := cat.get("_head") as Node3D
-	if head == null or skeleton == null:
+	if head == null or skeleton == null or _head_idx < 0:
 		return
-	var att := skeleton.get_node_or_null("HeadSocket") as Node3D
-	if att == null:
-		return
+	var att := _head_socket()
+	var found: Array[MeshInstance3D] = []
 	for child in head.get_children():
-		if not str(child.name).begins_with("Whisker"):
-			continue
-		var mi := child as MeshInstance3D
-		var rot := mi.rotation
+		if str(child.name).begins_with("Whisker"):
+			found.append(child as MeshInstance3D)
+	if found.is_empty():
+		return
+	var mesh := _whisker_mesh()
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.78, 0.74, 0.66)
+	mat.roughness = 0.55
+	mat.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
+	mat.metallic_specular = 0.08
+	var per_side := maxi(found.size() / 2, 1)
+	for i in found.size():
+		var mi := found[i]
 		head.remove_child(mi)
 		att.add_child(mi)
-		# The old whiskers were posed on the ellipsoid muzzle.
-		# Sit them on the sculpted muzzle instead.
-		var side := -1.0 if mi.position.x < 0.0 else 1.0
-		mi.position = Vector3(side * 0.045, -0.01, -0.07)
-		mi.rotation = rot
+		var side := -1.0 if i < per_side else 1.0
+		var k := i % per_side
+		var t := float(k) / float(maxi(per_side - 1, 1))
+		var fan := lerpf(-0.28, 0.34, t)
+		var dir := (_right * side * 0.9 + _away * 0.32 + _up * fan).normalized()
+		var root := _nose - _away * 0.04 + _right * side * 0.028 + _up * lerpf(-0.016, 0.02, t)
+		var local_root := _bone_point(root)
+		var local_dir := (_bone_point(root + dir) - local_root).normalized()
+		mi.mesh = mesh
+		mi.material_override = mat
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi.transform = Transform3D(_basis_from_x(local_dir), local_root)
+
+
+func _basis_from_x(dir: Vector3) -> Basis:
+	var x := dir.normalized()
+	var up := Vector3.UP
+	if absf(x.dot(up)) > 0.92:
+		up = Vector3.FORWARD
+	var z := x.cross(up).normalized()
+	var y := z.cross(x).normalized()
+	return Basis(x, y, z)
+
+
+func _whisker_mesh() -> ArrayMesh:
+	# A short tapered curve along local +X. Thin enough to read as a
+	# hair, long enough to see at the portrait distance.
+	var rings := 7
+	var segs := 5
+	var length := 0.17
+	var curl := 0.028
+	var positions := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var indices := PackedInt32Array()
+	var centers: Array[Vector3] = []
+	var radii: Array[float] = []
+	for i in rings:
+		var t := float(i) / float(rings - 1)
+		var p := Vector3(t * length, sin(t * PI) * curl - t * t * 0.018, 0.0)
+		centers.append(p)
+		radii.append(lerpf(0.0046, 0.00115, t))
+	for i in rings:
+		var tangent: Vector3
+		if i == 0:
+			tangent = (centers[1] - centers[0]).normalized()
+		elif i == rings - 1:
+			tangent = (centers[i] - centers[i - 1]).normalized()
+		else:
+			tangent = (centers[i + 1] - centers[i - 1]).normalized()
+		var side := Vector3.UP.cross(tangent)
+		if side.length_squared() < 0.0001:
+			side = Vector3.BACK.cross(tangent)
+		side = side.normalized()
+		var nup := tangent.cross(side).normalized()
+		for s in segs:
+			var a := TAU * float(s) / float(segs)
+			var n := (side * cos(a) + nup * sin(a)).normalized()
+			normals.append(n)
+			positions.append(centers[i] + n * radii[i])
+	for i in rings - 1:
+		for s in segs:
+			var a := i * segs + s
+			var b := i * segs + ((s + 1) % segs)
+			var c := (i + 1) * segs + s
+			var d := (i + 1) * segs + ((s + 1) % segs)
+			indices.append_array([a, c, d, a, d, b])
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = positions
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var out := ArrayMesh.new()
+	out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return out

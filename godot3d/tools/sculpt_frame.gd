@@ -44,7 +44,9 @@ func _ready() -> void:
 	cam.fov = 32
 	cam.current = true
 	add_child(cam)
-	cam.look_at_from_position(center + Vector3(aabb.size.x * 1.1 + 0.15, aabb.size.y * 0.35, aabb.size.z * 0.9 + 0.25), center)
+	# Nose is -Z. Sit the camera in front and a little to the side.
+	var eye := center + Vector3(aabb.size.x * 0.7 + 0.12, aabb.size.y * 0.42, -(aabb.size.z * 0.42 + 0.22))
+	cam.look_at_from_position(eye, center + Vector3(0, aabb.size.y * 0.08, 0))
 	for i in 8:
 		await get_tree().process_frame
 	await RenderingServer.frame_post_draw

@@ -103,13 +103,14 @@ def body_stations():
     # Blender: Z up, -Y is the nose (glTF/Godot forward).
     # (y, center_z, rx, rz) — a shoulder, a waist, a haunch, a muzzle.
     spec = [
-        (-0.62, 0.50, 0.028, 0.024),
-        (-0.55, 0.49, 0.055, 0.042),
-        (-0.48, 0.51, 0.088, 0.062),
-        (-0.40, 0.56, 0.112, 0.096),
-        (-0.33, 0.58, 0.108, 0.100),
-        (-0.26, 0.54, 0.078, 0.080),
-        (-0.18, 0.48, 0.070, 0.078),
+        # Nose leather, muzzle, cheeks, cranium, then the neck.
+        (-0.64, 0.508, 0.026, 0.020),
+        (-0.57, 0.498, 0.048, 0.038),
+        (-0.50, 0.512, 0.062, 0.050),
+        (-0.44, 0.555, 0.090, 0.076),
+        (-0.36, 0.598, 0.112, 0.096),
+        (-0.28, 0.575, 0.104, 0.090),
+        (-0.20, 0.505, 0.074, 0.080),
         (-0.10, 0.40, 0.118, 0.132),
         (-0.02, 0.42, 0.132, 0.128),
         (0.08, 0.43, 0.108, 0.110),
@@ -131,16 +132,16 @@ def leg_stations(side, kind):
             (s * 0.09, -0.06, 0.40, 0.050, 0.046),
             (s * 0.10, -0.08, 0.30, 0.040, 0.036),
             (s * 0.105, -0.09, 0.18, 0.030, 0.028),
-            (s * 0.108, -0.10, 0.09, 0.026, 0.024),
-            (s * 0.11, -0.11, 0.045, 0.038, 0.028),
+            (s * 0.108, -0.10, 0.09, 0.034, 0.030),
+            (s * 0.11, -0.12, 0.040, 0.044, 0.032),
         ]
     else:
         pts = [
             (s * 0.10, 0.30, 0.42, 0.062, 0.055),
             (s * 0.115, 0.22, 0.30, 0.042, 0.038),
             (s * 0.10, 0.30, 0.16, 0.030, 0.028),
-            (s * 0.095, 0.24, 0.07, 0.026, 0.024),
-            (s * 0.09, 0.20, 0.042, 0.040, 0.030),
+            (s * 0.095, 0.24, 0.07, 0.034, 0.030),
+            (s * 0.09, 0.18, 0.038, 0.046, 0.034),
         ]
     return [(Vector((x, y, z)), rx, rz) for x, y, z, rx, rz in pts]
 
@@ -159,9 +160,9 @@ def tail_stations():
 def ear_stations(side):
     s = 1.0 if side == "L" else -1.0
     pts = [
-        (s * 0.055, -0.36, 0.64, 0.038, 0.020),
-        (s * 0.062, -0.37, 0.70, 0.030, 0.014),
-        (s * 0.066, -0.375, 0.76, 0.016, 0.008),
+        (s * 0.052, -0.34, 0.66, 0.046, 0.024),
+        (s * 0.062, -0.355, 0.76, 0.028, 0.012),
+        (s * 0.070, -0.365, 0.86, 0.012, 0.006),
     ]
     return [(Vector((x, y, z)), rx, rz) for x, y, z, rx, rz in pts]
 
@@ -211,12 +212,12 @@ def apply_modifier(obj, mod_name):
 def fuse(obj):
     mod = obj.modifiers.new("remesh", "REMESH")
     mod.mode = "VOXEL"
-    mod.voxel_size = 0.0065
+    mod.voxel_size = 0.0052
     mod.adaptivity = 0.0
     apply_modifier(obj, "remesh")
     sm = obj.modifiers.new("smooth", "SMOOTH")
-    sm.iterations = 8
-    sm.factor = 0.45
+    sm.iterations = 4
+    sm.factor = 0.35
     apply_modifier(obj, "smooth")
     # Quadriflow gives the cage a usable quad layout for skinning.
     print("voxel verts", len(obj.data.vertices), "faces", len(obj.data.polygons))
@@ -252,10 +253,10 @@ def shape_details(obj):
             v.co.x *= 1.0 - 0.28 * k
             v.co.z -= 0.035 * k
         # Pull the ear tips up into points.
-        if z > 0.68 and y < -0.28:
-            v.co.z += 0.045
-            v.co.x *= 0.72
-            v.co.y -= 0.01
+        if z > 0.70 and y < -0.26:
+            v.co.z += 0.05
+            v.co.x *= 0.7
+            v.co.y -= 0.012
         # Waist tuck just behind the ribs.
         if 0.08 < y < 0.20 and z > 0.36:
             v.co.x *= 0.92
@@ -267,6 +268,55 @@ def shape_details(obj):
         if 0.28 < y < 0.42 and z > 0.42 and abs(x) > 0.05:
             v.co.x += math.copysign(0.012, x)
     me.update()
+
+
+def face_sculpt(obj):
+    """Carve sockets, a muzzle shelf and a nose after the subdiv.
+
+    The voxel fuse melts anything smaller than a few cells, so the
+    readable parts of the face are pushed in on the final surface.
+    """
+    me = obj.data
+    for v in me.vertices:
+        x, y, z = v.co
+        for sx in (-1.0, 1.0):
+            eye = Vector((sx * 0.052, -0.425, 0.578))
+            d = (v.co - eye).length
+            if d < 0.062:
+                fall = (1.0 - d / 0.062) ** 1.35
+                v.co += Vector((sx * -0.006, 0.036, -0.012)) * fall
+        x, y, z = v.co
+        if -0.50 < y < -0.36 and z > 0.605 and abs(x) < 0.095:
+            v.co.z += 0.018 * (1.0 - abs(x) / 0.095)
+        if y < -0.50:
+            k = min(1.0, (-0.50 - y) / 0.16)
+            v.co.x *= 1.0 - 0.18 * k
+            v.co.y -= 0.018 * k
+        nose = Vector((0.0, -0.63, 0.51))
+        d = (v.co - nose).length
+        if d < 0.05:
+            fall = (1.0 - d / 0.05) ** 1.15
+            v.co += Vector((0.0, -0.026, 0.012)) * fall
+            v.co.x *= 1.0 - 0.4 * fall
+        if y < -0.52 and z < 0.50 and abs(x) < 0.05:
+            v.co.z -= 0.014
+        if z > 0.74 and y < -0.26 and abs(x) > 0.03:
+            v.co.z += 0.035
+            v.co.x = math.copysign(abs(v.co.x) * 0.76, v.co.x)
+    me.update()
+
+
+def cleanup_mesh(obj):
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.mesh.remove_doubles(threshold=0.0001)
+    bpy.ops.mesh.delete_loose()
+    bpy.ops.mesh.normals_make_consistent(inside=False)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    obj.data.validate(verbose=False)
 
 
 def smart_uv(obj):
@@ -297,8 +347,8 @@ def _bary(p, a, b, c):
 def raster_textures(obj, size, willie_path, aggie_path, normal_path, rough_path):
     me = obj.data
     uv_layer = me.uv_layers.active.data
-    pixels_w = [(0.0, 0.0, 0.0)] * (size * size)
-    pixels_a = [(0.0, 0.0, 0.0)] * (size * size)
+    pixels_w = [(1.0, 1.0, 1.0)] * (size * size)
+    pixels_a = [AGGIE_BASE] * (size * size)
     pixels_n = [(0.5, 0.5, 1.0)] * (size * size)
     pixels_r = [0.82] * (size * size)
     covered = [False] * (size * size)
@@ -357,6 +407,10 @@ def raster_textures(obj, size, willie_path, aggie_path, normal_path, rough_path)
         for k in range(1, len(ids) - 1):
             paint_tri(ids[0], ids[k], ids[k + 1])
 
+    pixels_w, pixels_a, pixels_n, pixels_r, covered = _dilate_maps(
+        pixels_w, pixels_a, pixels_n, pixels_r, covered, size
+    )
+
     def save_rgb(path, pix, alpha=False):
         img = bpy.data.images.new(os.path.basename(path), size, size, alpha=alpha)
         buf = []
@@ -394,21 +448,42 @@ def raster_textures(obj, size, willie_path, aggie_path, normal_path, rough_path)
     print("textures covered", sum(1 for c in covered if c), "of", size * size)
 
 
+def _on_pad(co, n) -> bool:
+    """Toe beans only: downward faces under a paw, not the whole lower leg."""
+    x, y, z = co
+    if n.z > -0.4 or z > 0.07:
+        return False
+    for px, py in ((0.11, -0.13), (-0.11, -0.13), (0.09, 0.17), (-0.09, 0.17)):
+        if (x - px) ** 2 + (y - py) ** 2 < 0.04 ** 2:
+            return True
+    return False
+
+
+def _eye_rim(co) -> bool:
+    x, y, z = co
+    for sx in (-0.052, 0.052):
+        if (x - sx) ** 2 + (y + 0.425) ** 2 + (z - 0.575) ** 2 < 0.022 ** 2:
+            return True
+    return False
+
+
 def willie_color(co, n):
     x, y, z = co
     # Belly, chest, muzzle blaze, and paws stay white. The saddle is ginger.
     saddle = y > -0.34 and y < 0.46 and z > 0.46 and n.z > -0.15
-    cap = y < -0.28 and y > -0.46 and z > 0.58
-    cheek = y < -0.30 and y > -0.50 and abs(x) > 0.04 and z > 0.50 and z < 0.62
+    cap = y < -0.26 and y > -0.46 and z > 0.60
+    cheek = y < -0.32 and y > -0.52 and abs(x) > 0.035 and 0.50 < z < 0.63
     tail = y > 0.46
     tail_under = tail and n.z < 0.15
     stripe = False
     if saddle:
-        band = math.sin((y + 0.05) * 28.0) 
+        band = math.sin((y + 0.05) * 28.0)
         stripe = band > 0.55 and z > 0.50
-    if y < -0.56:
+    if y < -0.575 and abs(x) < 0.034 and 0.46 < z < 0.58:
         return NOSE
-    if z < 0.055 and y < 0.25 and abs(x) < 0.16 and y > -0.16:
+    if _eye_rim(co):
+        return (0.12, 0.09, 0.07)
+    if _on_pad(co, n):
         return PAD
     if tail_under:
         return GINGER
@@ -426,9 +501,11 @@ def willie_color(co, n):
 
 def aggie_color(co, n):
     x, y, z = co
-    if y < -0.56:
+    if y < -0.575 and abs(x) < 0.034 and 0.46 < z < 0.58:
         return (0.55, 0.32, 0.30)
-    if z < 0.055 and abs(x) < 0.16 and -0.16 < y < 0.25:
+    if _eye_rim(co):
+        return (0.05, 0.04, 0.035)
+    if _on_pad(co, n):
         return PAD
     # Deterministic patches. Same function every run.
     h = math.sin(x * 17.0 + y * 9.0) + math.sin(z * 13.0 - y * 6.0) + math.sin(x * 4.0 - z * 8.0)
@@ -442,22 +519,78 @@ def aggie_color(co, n):
 
 
 def fur_normal(n, tangent, bitangent, co):
-    # Lie the coat slightly up and back, then store it in tangent space.
-    fur = (n + Vector((0.0, 0.25, 0.55))).normalized()
+    # A gentle coat grain. Kept close to the geometric normal so a
+    # mismatched tangent basis cannot flip the lighting dark.
+    wobble = 0.1 * math.sin(co.x * 37.0 + co.y * 21.0)
+    fur = (n + Vector((0.0, 0.04, 0.05)) + tangent * wobble).normalized()
+    if fur.dot(n) < 0.94:
+        fur = n
     ts = Vector((fur.dot(tangent), fur.dot(bitangent), fur.dot(n)))
+    if ts.z < 0.0:
+        ts = Vector((-ts.x, -ts.y, -ts.z))
     if ts.length < 1e-6:
         ts = Vector((0.0, 0.0, 1.0))
     else:
         ts.normalize()
-    return (ts.x * 0.5 + 0.5, ts.y * 0.5 + 0.5, max(0.0, ts.z) * 0.5 + 0.5)
+    ts = (ts * 0.3 + Vector((0.0, 0.0, 1.0)) * 0.7).normalized()
+    return (ts.x * 0.5 + 0.5, ts.y * 0.5 + 0.5, ts.z * 0.5 + 0.5)
+
+
+def _dilate_maps(pixels_w, pixels_a, pixels_n, pixels_r, covered, size, times=5):
+    """Bleed painted texels into the gutter so UV seams are not black."""
+    for _ in range(times):
+        nw, na, nn, nr = pixels_w[:], pixels_a[:], pixels_n[:], pixels_r[:]
+        nc = covered[:]
+        for y in range(size):
+            row = y * size
+            for x in range(size):
+                i = row + x
+                if covered[i]:
+                    continue
+                acc_w = [0.0, 0.0, 0.0]
+                acc_a = [0.0, 0.0, 0.0]
+                acc_n = [0.0, 0.0, 0.0]
+                acc_r = 0.0
+                n = 0
+                for dy in (-1, 0, 1):
+                    yy = y + dy
+                    if yy < 0 or yy >= size:
+                        continue
+                    for dx in (-1, 0, 1):
+                        xx = x + dx
+                        if xx < 0 or xx >= size:
+                            continue
+                        j = yy * size + xx
+                        if not covered[j]:
+                            continue
+                        cw, ca, cn = pixels_w[j], pixels_a[j], pixels_n[j]
+                        acc_w[0] += cw[0]
+                        acc_w[1] += cw[1]
+                        acc_w[2] += cw[2]
+                        acc_a[0] += ca[0]
+                        acc_a[1] += ca[1]
+                        acc_a[2] += ca[2]
+                        acc_n[0] += cn[0]
+                        acc_n[1] += cn[1]
+                        acc_n[2] += cn[2]
+                        acc_r += pixels_r[j]
+                        n += 1
+                if n:
+                    nw[i] = (acc_w[0] / n, acc_w[1] / n, acc_w[2] / n)
+                    na[i] = (acc_a[0] / n, acc_a[1] / n, acc_a[2] / n)
+                    nn[i] = (acc_n[0] / n, acc_n[1] / n, acc_n[2] / n)
+                    nr[i] = acc_r / n
+                    nc[i] = True
+        pixels_w, pixels_a, pixels_n, pixels_r, covered = nw, na, nn, nr, nc
+    return pixels_w, pixels_a, pixels_n, pixels_r, covered
 
 
 def roughness_at(co, n):
     x, y, z = co
-    if y < -0.55:
+    if y < -0.575 and abs(x) < 0.034:
         return 0.38
-    if z < 0.05 and abs(x) < 0.16:
-        return 0.42
+    if _on_pad(co, n):
+        return 0.45
     if z > 0.66 and y < -0.30:
         return 0.55
     return 0.78
@@ -484,11 +617,11 @@ def build_armature():
     sp1 = add_bone(eb, "spine1", (0, 0.36, 0.44), (0, 0.22, 0.44), root)
     sp2 = add_bone(eb, "spine2", (0, 0.22, 0.43), (0, 0.05, 0.42), sp1, True)
     sp3 = add_bone(eb, "spine3", (0, 0.05, 0.42), (0, -0.12, 0.42), sp2, True)
-    neck = add_bone(eb, "neck", (0, -0.12, 0.46), (0, -0.24, 0.54), sp3)
-    head = add_bone(eb, "head", (0, -0.24, 0.54), (0, -0.46, 0.58), neck, True)
-    add_bone(eb, "jaw", (0, -0.40, 0.50), (0, -0.56, 0.48), head)
-    add_bone(eb, "ear.L", (-0.05, -0.36, 0.64), (-0.065, -0.38, 0.76), head)
-    add_bone(eb, "ear.R", (0.05, -0.36, 0.64), (0.065, -0.38, 0.76), head)
+    neck = add_bone(eb, "neck", (0, -0.12, 0.48), (0, -0.24, 0.56), sp3)
+    head = add_bone(eb, "head", (0, -0.24, 0.56), (0, -0.50, 0.59), neck, True)
+    add_bone(eb, "jaw", (0, -0.42, 0.51), (0, -0.60, 0.49), head)
+    add_bone(eb, "ear.L", (-0.052, -0.34, 0.66), (-0.070, -0.36, 0.86), head)
+    add_bone(eb, "ear.R", (0.052, -0.34, 0.66), (0.070, -0.36, 0.86), head)
     for side, s in (("L", -1.0), ("R", 1.0)):
         sho = add_bone(eb, f"shoulder.{side}", (s * 0.06, -0.04, 0.42), (s * 0.10, -0.06, 0.38), sp3)
         up = add_bone(eb, f"upper_arm.{side}", (s * 0.10, -0.06, 0.38), (s * 0.105, -0.09, 0.20), sho, True)
@@ -510,47 +643,121 @@ def build_armature():
     return arm
 
 
+def _bone_family(name: str) -> str:
+    if name.startswith(("upper_arm", "forearm", "paw_f", "shoulder")):
+        return "fore" + name[-1]
+    if name.startswith(("thigh", "shin", "hock", "paw_h")):
+        return "hind" + name[-1]
+    if name.startswith("tail"):
+        return "tail"
+    if name.startswith("ear"):
+        return "ear" + name[-1]
+    if name in ("head", "jaw", "neck"):
+        return "head"
+    return "body"
+
+
+def _bone_radius(name: str, length: float) -> float:
+    if name.startswith("paw"):
+        return 0.06
+    if name.startswith("ear"):
+        return 0.045
+    if name.startswith("tail"):
+        return 0.05
+    if name == "head":
+        return 0.12
+    if name == "jaw":
+        return 0.055
+    if name.startswith(("spine", "root")):
+        return 0.13
+    if name.startswith("thigh"):
+        return 0.075
+    if name.startswith("shoulder"):
+        return 0.055
+    return max(0.04, length * 0.55)
+
+
 def skin(mesh, arm):
+    """Envelope weights. Limb vertices stay on that limb.
+
+    Automatic heat from the fused volume was pulling the legs with the
+    spine, so a small idle sway collapsed the wrists and hocks.
+    """
     bpy.ops.object.select_all(action="DESELECT")
     mesh.select_set(True)
     arm.select_set(True)
     bpy.context.view_layer.objects.active = arm
-    try:
-        bpy.ops.object.parent_set(type="ARMATURE_AUTO")
-        print("auto weights ok", len(mesh.vertex_groups))
-    except Exception as exc:
-        print("auto weights failed", exc)
-        distance_weights(mesh, arm)
-
-
-def distance_weights(mesh, arm):
-    if mesh.parent != arm:
-        mesh.parent = arm
-        mesh.parent_type = "ARMATURE"
-        mesh.modifiers.new("Armature", "ARMATURE").object = arm
-    bones = [b for b in arm.data.bones]
+    bpy.ops.object.parent_set(type="ARMATURE_NAME")
+    for vg in list(mesh.vertex_groups):
+        mesh.vertex_groups.remove(vg)
+    bones = list(arm.data.bones)
+    segs = []
     for b in bones:
         mesh.vertex_groups.new(name=b.name)
+        head = arm.matrix_world @ b.head_local
+        tail = arm.matrix_world @ b.tail_local
+        length = max((tail - head).length, 0.02)
+        segs.append((b.name, head, tail, _bone_radius(b.name, length)))
+    limb_owned = 0
     for v in mesh.data.vertices:
-        weights = []
-        for b in bones:
-            # Distance to the bone segment.
-            head = arm.matrix_world @ b.head_local
-            tail = arm.matrix_world @ b.tail_local
-            co = mesh.matrix_world @ v.co
+        co = mesh.matrix_world @ v.co
+        scored = []
+        for name, head, tail, radius in segs:
             ab = tail - head
-            t = 0.0 if ab.length < 1e-6 else max(0.0, min(1.0, (co - head).dot(ab) / ab.length_squared))
+            denom = ab.length_squared
+            t = 0.0 if denom < 1e-8 else max(0.0, min(1.0, (co - head).dot(ab) / denom))
             d = (co - (head + ab * t)).length
-            weights.append((b.name, d))
-        weights.sort(key=lambda it: it[1])
-        chosen = weights[:3]
-        inv = []
-        for name, d in chosen:
-            inv.append((name, 1.0 / max(0.004, d) ** 2))
-        s = sum(w for _, w in inv) or 1.0
-        for name, w in inv:
-            mesh.vertex_groups[name].add([v.index], w / s, "REPLACE")
-    print("distance weights", len(mesh.vertex_groups))
+            if d >= radius * 1.4:
+                continue
+            w = (1.0 - min(d / radius, 1.0)) ** 2
+            if w > 0.001:
+                scored.append((name, w, d))
+        if not scored:
+            best_name, best_d = segs[0][0], 1e9
+            for name, head, tail, radius in segs:
+                ab = tail - head
+                denom = ab.length_squared
+                t = 0.0 if denom < 1e-8 else max(0.0, min(1.0, (co - head).dot(ab) / denom))
+                d = (co - (head + ab * t)).length
+                if d < best_d:
+                    best_d = d
+                    best_name = name
+            scored = [(best_name, 1.0, best_d)]
+        scored.sort(key=lambda it: -it[1])
+        fam = _bone_family(scored[0][0])
+        kept = []
+        if fam.startswith(("fore", "hind")):
+            limb_owned += 1
+            for name, w, _d in scored:
+                f = _bone_family(name)
+                if f == fam:
+                    kept.append((name, w))
+                elif f == "body" and w >= scored[0][1] * 0.55:
+                    # A little chest blend at the shoulder, not down the leg.
+                    kept.append((name, w * 0.25))
+        elif fam == "head":
+            for name, w, _d in scored:
+                if _bone_family(name) in ("head", "body") or name.startswith("ear"):
+                    kept.append((name, w if _bone_family(name) != "body" else w * 0.3))
+        elif fam.startswith("ear"):
+            for name, w, _d in scored:
+                if name == scored[0][0] or name in ("head", "neck"):
+                    kept.append((name, w))
+        elif fam == "tail":
+            for name, w, _d in scored:
+                if _bone_family(name) == "tail" or name in ("spine1", "root"):
+                    kept.append((name, w if _bone_family(name) == "tail" else w * 0.2))
+        else:
+            for name, w, _d in scored:
+                kept.append((name, w))
+        if not kept:
+            kept = [(scored[0][0], 1.0)]
+        kept.sort(key=lambda it: -it[1])
+        kept = kept[:4]
+        total = sum(w for _, w in kept) or 1.0
+        for name, w in kept:
+            mesh.vertex_groups[name].add([v.index], w / total, "REPLACE")
+    print("envelope weights", len(mesh.vertex_groups), "limb verts", limb_owned)
 
 
 def action_for(arm, name, keys):
@@ -776,6 +983,7 @@ def export(arm, meshes, path):
         export_skins=True,
         export_yup=True,
         export_materials="EXPORT",
+        export_tangents=True,
     )
     print("exported", path, os.path.getsize(path))
 
@@ -817,6 +1025,9 @@ def main():
     sub.levels = 1
     apply_modifier(body, "sub")
     print("subdiv verts", len(body.data.vertices))
+    face_sculpt(body)
+    cleanup_mesh(body)
+    print("clean verts", len(body.data.vertices))
     smart_uv(body)
     raster_textures(
         body,
@@ -829,8 +1040,12 @@ def main():
     arm = build_armature()
     skin(body, arm)
     build_actions(arm)
-    lod1 = make_lod(body, "CatLOD1", 0.45)
-    lod2 = make_lod(body, "CatLOD2", 0.18)
+    lod1 = make_lod(body, "CatLOD1", 0.5)
+    # 0.18 collapsed the wrists and hocks. 0.4 keeps the paws and is
+    # still well under the desktop mesh once the extra shells are gone.
+    lod2 = make_lod(body, "CatLOD2", 0.4)
+    cleanup_mesh(lod1)
+    cleanup_mesh(lod2)
     body.name = "CatLOD0"
     body.data.name = "CatLOD0"
     export(arm, [body, lod1, lod2], os.path.join(dest, "cat.glb"))

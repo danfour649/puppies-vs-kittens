@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode cull_disabled, diffuse_burley, specular_schlick_ggx;
+render_mode cull_back, diffuse_burley, specular_schlick_ggx, depth_draw_opaque;
 
 // Shell fur. One mesh is drawn several times; `layer` goes from
 // just off the skin to the tip. Strands are a stable hash so the
@@ -22,22 +22,30 @@ float hash13(vec3 p) {
 }
 
 void vertex() {
-	vec3 n = normalize(NORMAL);
+	vec3 n = NORMAL;
+	if (dot(n, n) < 0.0001) {
+		n = vec3(0.0, 1.0, 0.0);
+	}
+	n = normalize(n);
 	float h = layer * fur_length;
 	VERTEX += n * h;
-	// Gravity in mesh space. Length is already baked into the shell
-	// mesh, so this only droops the tips.
-	VERTEX.y -= layer * layer * 0.035;
+	// The shell mesh is already extruded. This droop is a hair of
+	// gravity on the tip, small enough that the shell stays outside
+	// the body. A larger drop sinks the coat and z-fights.
+	VERTEX.y -= layer * layer * 0.0015;
 	// Model space, so the strands stay put when the camera moves.
 	strand_pos = VERTEX;
+	NORMAL = n;
 }
 
 void fragment() {
 	// Inner shells stay solid so the coat has a silhouette even when
 	// the GL fallback is coarse. Outer shells break into strands.
-	vec3 cell = floor((strand_pos + vec3(5.0)) * vec3(48.0, 72.0, 48.0));
+	vec3 cell = floor((strand_pos + vec3(5.0)) * vec3(36.0, 48.0, 36.0));
 	float strand = hash13(cell);
-	float keep = mix(1.0, density * 0.84, smoothstep(0.45, 1.0, layer));
+	// Inner shells stay solid. Only the outer shell breaks into
+	// strands, so a discarded fragment shows coat rather than a hole.
+	float keep = mix(1.0, density * 0.55, smoothstep(0.72, 1.0, layer));
 	if (strand > keep) {
 		discard;
 	}
@@ -45,7 +53,7 @@ void fragment() {
 	if (use_tex) {
 		col *= texture(albedo_tex, UV).rgb;
 	}
-	col *= mix(1.06, 0.74, layer);
+	col *= mix(1.02, 0.88, layer);
 	ALBEDO = col;
 	ROUGHNESS = mix(0.68, 0.96, layer);
 	SPECULAR = 0.18;

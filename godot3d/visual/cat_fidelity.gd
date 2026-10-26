@@ -26,7 +26,9 @@ static func dress(cat: Node) -> void:
 			# Short coat. The body spheres are radius 0.5, so 0.05 is a
 			# plush edge rather than a second, spikier cat.
 			var sculpted := not (mi.mesh is PrimitiveMesh)
-			var amount := lerpf(0.0015, 0.0045, t) if sculpted else lerpf(0.018, 0.055, t)
+			# Sculpt shells sit just clear of the skin. Closer than this
+			# z-fights in GL; much further reads as a second skin.
+			var amount := lerpf(0.006, 0.016, t) if sculpted else lerpf(0.018, 0.055, t)
 			shell.mesh = _extrude(mi.mesh, amount)
 			shell.transform = mi.transform
 			shell.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -46,7 +48,7 @@ static func _is_fur_host(mi: MeshInstance3D) -> bool:
 	if mi == null or not mi.visible or not (mi.material_override is StandardMaterial3D):
 		return false
 	var n := str(mi.name)
-	if n == "FurShell" or n.begins_with("Whisker") or n.begins_with("Pupil") or n.begins_with("Cornea") or n.begins_with("Catchlight"):
+	if n == "FurShell" or n == "NoseLeather" or n.begins_with("Whisker") or n.begins_with("Pupil") or n.begins_with("Cornea") or n.begins_with("Catchlight"):
 		return false
 	if mi.mesh is CylinderMesh:
 		var cyl := mi.mesh as CylinderMesh
@@ -68,7 +70,12 @@ static func _extrude(mesh: Mesh, amount: float) -> Mesh:
 	var moved := PackedVector3Array()
 	moved.resize(verts.size())
 	for i in verts.size():
-		moved[i] = verts[i] + norms[i] * amount
+		var n := norms[i]
+		if n.length_squared() < 0.0001:
+			n = Vector3.UP
+		else:
+			n = n.normalized()
+		moved[i] = verts[i] + n * amount
 	arrays[Mesh.ARRAY_VERTEX] = moved
 	var out := ArrayMesh.new()
 	out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)

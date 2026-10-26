@@ -152,7 +152,8 @@ palette and pose handles the tests read; the mesh you see is the
 sculpt. `visual/cat_fidelity.gd` dresses that mesh with shell fur.
 The palette albedo stays on the original `StandardMaterial3D`, which
 the smoke test reads. The dress also adds a clear cornea, a dilating
-pupil, catchlights, subsurface inner ears, and whiskers. Aggie gets
+pupil, catchlights, subsurface inner ears, and thin whiskers seated
+on the sculpted muzzle with the eyes and the nose. Aggie gets
 the same body with her own coat. Clips play through an `AnimationTree`
 blend (walk, trot, sprint, stalk, sit, lounge, swipe, pounce, land,
 meow) while the pose nodes the tests step stay in place.
