@@ -29,6 +29,9 @@ var scent_map: CatScentMap = null
 var wall_query: Callable = Callable()
 var nibble_anchors: Array = []
 var heard_sounds: Array = []
+## Wall cracks and box-corners she can vanish into. Empty in the
+## open yard, so the chase there is unchanged.
+var cracks: Array = []
 
 var _target := Vector3.ZERO
 var _timer := 0.0
@@ -120,8 +123,9 @@ func _brain_intent(delta: float) -> Dictionary:
 		_brain = CreatureBrain.new()
 		_brain.bind_profile("mouse", 1)
 	# A harness can pin state back to idle; the shared machine follows.
-	if state == "idle" and _brain.fsm.state == "flee":
+	if state == "idle" and _brain.fsm.state in ["flee", "freeze", "crack", "return"]:
 		_brain.fsm.change_to("idle")
+		_brain.forget_alert()
 		_flee_t = 0.0
 	_brain.flee_t = _flee_t
 	var p := global_position
@@ -137,19 +141,27 @@ func _brain_intent(delta: float) -> Dictionary:
 	if scent_map != null:
 		novel = scent_map.nearest_novel(p, 1.5)
 	var has_cat := cat != null and is_instance_valid(cat)
+	var gait := ""
+	var sounds: Array = heard_sounds.duplicate()
+	if has_cat:
+		gait = String(cat.get("anim_state"))
+		if cat.has_meta("meow_until_msec") and Time.get_ticks_msec() < int(cat.get_meta("meow_until_msec")):
+			sounds.append(CatNoise.meow(cat.global_position))
 	var intent: Dictionary = _brain.step(delta, {
 		"pos": p,
 		"forward": CreaturePerception.forward_from_yaw(rotation.y),
 		"hour": world_hour,
 		"has_cat": has_cat,
 		"cat_pos": cat.global_position if has_cat else p,
+		"gait": gait,
 		"scent": scent,
-		"sounds": heard_sounds,
+		"sounds": sounds,
 		"wall_pull": pull,
 		"home": home,
 		"flee_range": FLEE_RADIUS,
 		"novel": novel,
 		"nibble_anchors": nibble_anchors,
+		"cracks": cracks,
 		"bounds_min": Vector3(bounds.position.x, 0.0, bounds.position.y),
 		"bounds_max": Vector3(bounds.position.x + bounds.size.x, 0.0, bounds.position.y + bounds.size.y),
 	})

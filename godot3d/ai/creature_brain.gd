@@ -23,6 +23,9 @@ var _hunt := "perch"
 var _crouch_t := 0.0
 var _pounce_t := 0.0
 var _recover_t := 0.0
+var _alert := false
+var _quiet_t := 0.0
+var _orbit_t := 0.0
 
 
 func bind_profile(id: String, seed_value: int = 1) -> void:
@@ -44,6 +47,9 @@ func bind_profile(id: String, seed_value: int = 1) -> void:
 	_crouch_t = 0.0
 	_pounce_t = 0.0
 	_recover_t = 0.0
+	_alert = false
+	_quiet_t = 0.0
+	_orbit_t = 0.0
 	runway.clear()
 	nibble_spots.clear()
 	_nibble_i = 0
@@ -157,30 +163,86 @@ static func decide_rat(state: String, hp: int, dist: float, packmates: int, aggr
 
 # --- mouse -----------------------------------------------------------------
 
+func forget_alert() -> void:
+	_alert = false
+	_quiet_t = 0.0
+	flee_t = 0.0
+
+
+## A crack the mouse can reach that puts more distance between her
+## and the threat. Already standing in one counts, even if the cat
+## has walked up to it — she holds. `ok` is false when the open
+## floor is the better idea.
+static func pick_cover(pos: Vector3, threat: Vector3, covers: Array, reach: float = 2.35) -> Dictionary:
+	var none := {"ok": false, "pos": pos, "dist": INF}
+	if covers.is_empty():
+		return none
+	var threat_d := Vector2(pos.x - threat.x, pos.z - threat.z).length()
+	var best := none
+	var best_gain := 0.2
+	for c: Variant in covers:
+		if typeof(c) != TYPE_VECTOR3:
+			continue
+		var cp: Vector3 = c
+		var dist := Vector2(pos.x - cp.x, pos.z - cp.z).length()
+		if dist <= 0.28:
+			return {"ok": true, "pos": cp, "dist": dist}
+		if dist > reach:
+			continue
+		var cover_d := Vector2(cp.x - threat.x, cp.z - threat.z).length()
+		var gain := cover_d - threat_d
+		if gain > best_gain:
+			best_gain = gain
+			best = {"ok": true, "pos": cp, "dist": dist}
+	return best
+
+
 func _step_mouse(delta: float, ctx: Dictionary) -> Dictionary:
 	var pos: Vector3 = ctx.get("pos", Vector3.ZERO)
 	var hour := float(ctx.get("hour", 21.0))
 	var activity := CreatureProfiles.nocturnal_activity(hour) if bool(profile.get("nocturnal", true)) else 1.0
 	var scent := float(ctx.get("scent", 0.0))
 	var flee_range := float(ctx.get("flee_range", profile.get("hearing_range", 2.4)))
-	var heard := perception.loudest(pos, ctx.get("sounds", []), float(profile.get("hearing_range", 6.0)))
+	# Sounds carry past the body radius, so a meow reaches a mouse
+	# who has not seen him yet. The body check below is unchanged
+	# for a walk or a sprint — the yard chase depends on it.
+	var hear_r := float(profile.get("hearing_range", 2.4)) * 2.2
+	var heard := perception.loudest(pos, ctx.get("sounds", []), hear_r)
 	var heard_loud := float(heard.get("loudness", 0.0))
 	var danger := maxf(scent, heard_loud)
 	var has_cat := bool(ctx.get("has_cat", false))
 	var cat_pos: Vector3 = ctx.get("cat_pos", pos)
+	var gait := String(ctx.get("gait", ""))
+	var stalking := gait == "stalk"
 	var cat_near := false
 	var away := Vector3.ZERO
 	if has_cat:
 		away = Vector3(pos.x - cat_pos.x, 0.0, pos.z - cat_pos.z)
 		var dist := away.length()
-		# Hearing covers a cat behind the mouse — the yard contract
-		# is "inside the radius", from any side.
-		if dist < flee_range and dist > 0.001:
-			cat_near = true
-			danger = maxf(danger, 1.0)
-		elif perception.can_see(pos, ctx.get("forward", Vector3(0, 0, -1)), cat_pos, bool(ctx.get("cat_blocked", false))):
-			cat_near = true
-			danger = maxf(danger, 0.85)
+		var fwd: Vector3 = ctx.get("forward", Vector3(0, 0, -1))
+		var blocked := bool(ctx.get("cat_blocked", false))
+		if stalking:
+			# A stalk is not "a cat in the radius". She hears the
+			# whisper, and she sees him if he is in front.
+			danger = maxf(danger, perception.hear_loudness(pos, cat_pos, CatNoise.loudness("stalk"), flee_range))
+			var seen := perception.can_see(pos, fwd, cat_pos, blocked)
+			if dist < 0.55:
+				cat_near = true
+				danger = maxf(danger, 1.0)
+			elif seen and dist < 0.85:
+				cat_near = true
+				danger = maxf(danger, 0.9)
+			elif seen:
+				danger = maxf(danger, 0.5)
+		else:
+			# Hearing covers a cat behind the mouse — the yard contract
+			# is "inside the radius", from any side.
+			if dist < flee_range and dist > 0.001:
+				cat_near = true
+				danger = maxf(danger, 1.0)
+			elif perception.can_see(pos, fwd, cat_pos, blocked):
+				cat_near = true
+				danger = maxf(danger, 0.85)
 	var flee_danger := float(profile.get("flee_danger", 0.7))
 	var freeze_danger := float(profile.get("freeze_danger", 0.42))
 	var home: Vector3 = ctx.get("home", pos)
@@ -188,6 +250,16 @@ func _step_mouse(delta: float, ctx: Dictionary) -> Dictionary:
 	var speed := 0.0
 	var target := pos
 	var next := fsm.state if fsm.state != "" else "idle"
+	var threatened := cat_near or danger >= freeze_danger
+	if threatened:
+		_alert = true
+		_quiet_t = 0.0
+		var threat := cat_pos if has_cat else pos
+		var cover := pick_cover(pos, threat, ctx.get("cracks", []))
+		if bool(cover.get("ok", false)):
+			var tucked := float(cover.get("dist", 1.0)) <= 0.28
+			target = _clamp_target(cover["pos"], ctx)
+			return _intent("crack", 0.0 if tucked else float(profile.get("flee_speed", 3.05)), target, false, false, "tucked" if tucked else "crack")
 
 	if cat_near or danger >= flee_danger:
 		# Entering a flee zeroes the burst timer. Continuing one keeps
@@ -209,7 +281,19 @@ func _step_mouse(delta: float, ctx: Dictionary) -> Dictionary:
 		target = pos
 		note = "freeze"
 	else:
-		if next == "flee" or next == "freeze":
+		_quiet_t += delta
+		var home_flat := Vector2(pos.x - home.x, pos.z - home.z).length()
+		var settle := float(profile.get("return_after", 0.75))
+		# The scare is over. She does not stay gone: once the floor
+		# is quiet she creeps back to the spot she was nibbling.
+		if _alert and _quiet_t >= settle and home_flat > 0.55:
+			flee_t = 0.0
+			target = _clamp_target(home, ctx)
+			remember_runway(pos)
+			return _intent("return", float(profile.get("wander_speed", 1.2)), target, false, false, "return")
+		if _alert and _quiet_t >= settle:
+			_alert = false
+		if next == "flee" or next == "freeze" or next == "crack" or next == "return":
 			next = "idle"
 			_timer = 0.35
 		flee_t = 0.0

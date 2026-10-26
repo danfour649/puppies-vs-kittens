@@ -22,6 +22,25 @@ func configure_maze(maze: Dictionary, anchors: Array) -> void:
 		_brain.profile["thigmotaxis"] = 2.4
 		_brain.profile["runway_reuse"] = 0.75
 		_brain.profile["hearing_range"] = 3.4
+	cracks = _crack_points(maze)
+
+
+## Corners where two stacks meet. She fits; the cat has to come in after her.
+func _crack_points(maze: Dictionary) -> Array:
+	var out: Array = []
+	var map: Array = maze.get("map", [])
+	for r in map.size():
+		var row := String(map[r])
+		for c in row.length():
+			if not HoarderGenerator.cell_walkable(maze, c, r, false):
+				continue
+			var walls := 0
+			for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				if not HoarderGenerator.cell_walkable(maze, c + d.x, r + d.y, false):
+					walls += 1
+			if walls >= 2:
+				out.append(HoarderGenerator.cell_center(c, r))
+	return out
 
 
 func _wall_pull(p: Vector3) -> Vector3:

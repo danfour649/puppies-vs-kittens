@@ -40,6 +40,7 @@ func _run() -> void:
 	_fsm()
 	_senses()
 	_scent()
+	_noise()
 	_mouse()
 	_rat()
 	_bird()
@@ -164,6 +165,70 @@ func _mouse() -> void:
 			all_nibbles = false
 	check(all_nibbles and unique.size() >= 5, "nibbles are scattered spots, not one cache (%d)" % unique.size())
 	check(CreatureProfiles.investigates_novel("mouse"), "mice are not wary of a new object")
+
+	var creeping := CreatureBrain.new()
+	creeping.bind_profile("mouse", 1)
+	var creep: Dictionary = creeping.step(0.1, _ctx({
+		"has_cat": true,
+		"cat_pos": Vector3(0, 0, 1.2),
+		"forward": Vector3(0, 0, -1),
+		"gait": "stalk",
+	}))
+	check(String(creep["state"]) != "flee" and String(creep["state"]) != "freeze", "a stalk behind her is quiet enough to ignore (state %s)" % String(creep["state"]))
+	var sprinter := CreatureBrain.new()
+	sprinter.bind_profile("mouse", 1)
+	var thunder: Dictionary = sprinter.step(0.1, _ctx({
+		"sounds": [CatNoise.footstep(Vector3(0.4, 0, 0), "sprint")],
+	}))
+	check(String(thunder["state"]) == "flee", "a sprint at her heels is loud enough to flee")
+	var shouted := CreatureBrain.new()
+	shouted.bind_profile("mouse", 1)
+	var shout: Dictionary = shouted.step(0.1, _ctx({
+		"sounds": [CatNoise.meow(Vector3(3.0, 0, 0))],
+	}))
+	check(String(shout["state"]) == "flee", "a meow from across the floor still sends her off")
+
+	var hider := CreatureBrain.new()
+	hider.bind_profile("mouse", 1)
+	var hid: Dictionary = hider.step(0.1, _ctx({
+		"scent": 0.95,
+		"has_cat": true,
+		"cat_pos": Vector3(-1.5, 0, 0),
+		"cracks": [Vector3(1.5, 0, 0.2)],
+	}))
+	check(String(hid["state"]) == "crack" and String(hid["note"]) == "crack", "she dives for a crack away from the cat instead of the open")
+	check(hid["target"].x > 1.0, "the crack she picks is the one behind her")
+	var tucked_brain := CreatureBrain.new()
+	tucked_brain.bind_profile("mouse", 1)
+	var tucked: Dictionary = tucked_brain.step(0.1, _ctx({
+		"pos": Vector3(1.45, 0, 0.1),
+		"scent": 0.95,
+		"has_cat": true,
+		"cat_pos": Vector3(-1.5, 0, 0),
+		"cracks": [Vector3(1.5, 0, 0.2)],
+	}))
+	check(String(tucked["state"]) == "crack" and float(tucked["speed"]) == 0.0 and String(tucked["note"]) == "tucked", "in the crack she holds still")
+
+	var comer := CreatureBrain.new()
+	comer.bind_profile("mouse", 1)
+	comer.step(0.1, _ctx({"scent": 0.95, "home": Vector3(3, 0, 0)}))
+	var back: Dictionary = comer.step(0.8, _ctx({"scent": 0.0, "home": Vector3(3, 0, 0)}))
+	check(String(back["state"]) == "return", "once it is quiet she comes back")
+	check(back["target"].distance_to(Vector3(3, 0, 0)) < 0.05, "she comes back to her own spot")
+
+
+func _noise() -> void:
+	check(CatNoise.loudness("stalk") < CatNoise.loudness("walk"), "a stalk is quieter than a walk")
+	check(CatNoise.loudness("walk") < CatNoise.loudness("sprint"), "a walk is quieter than a sprint")
+	check(CatNoise.loudness("sprint") < CatNoise.loudness("meow"), "a meow carries further than a sprint")
+	check(CatNoise.loudness("idle") == 0.0, "standing still makes no footfall")
+	check(CatNoise.gait_of(true, true, false) == "sprint", "sprinting is the sprint gait")
+	check(CatNoise.gait_of(true, false, true) == "stalk", "stalking is the stalk gait")
+	check(CatNoise.gait_of(false, true, false) == "idle", "shift held while still is not a footstep")
+	check(CatNoise.footstep(Vector3.ZERO, "idle").is_empty(), "an idle cat leaves no sound event")
+	check(String(CatNoise.meow(Vector3.ZERO)["kind"]) == "meow", "a meow is a meow")
+	check(CatNoise.scent_rate("stalk") < CatNoise.scent_rate("walk"), "a stalk leaves less scent than a walk")
+	check(CatNoise.scent_rate("walk") < CatNoise.scent_rate("sprint"), "a sprint leaves more scent than a walk")
 
 
 func _rat() -> void:

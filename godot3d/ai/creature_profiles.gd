@@ -44,7 +44,8 @@ static func mouse() -> Dictionary:
 		"flee_speed": 3.05,
 		"flee_tired": 1.95,
 		"flee_burst": 1.2,
-		"states": ["idle", "nibble", "runway", "freeze", "flee"],
+		"return_after": 0.75,
+		"states": ["idle", "nibble", "runway", "freeze", "flee", "crack", "return"],
 	}
 
 
