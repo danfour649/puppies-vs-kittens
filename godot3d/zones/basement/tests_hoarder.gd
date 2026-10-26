@@ -72,5 +72,31 @@ func _run() -> void:
 			tall = false
 	check(tall, "stacks stand taller than a step")
 
+	for floor_id: String in ["ground_floor", "attic"]:
+		for seed_value: int in seeds:
+			var level: Dictionary = HoarderGenerator.generate_floor(floor_id, seed_value)
+			var report: Dictionary = HoarderGenerator.playable(level, true)
+			var why := ""
+			if not bool(report["ok"]):
+				why = ", ".join(report["reasons"])
+			check(bool(report["ok"]), "%s seed %d is playable%s" % [floor_id, seed_value, ("" if why == "" else " — " + why)])
+		var again_f: Dictionary = HoarderGenerator.generate_floor(floor_id, 42)
+		var once_f: Dictionary = HoarderGenerator.generate_floor(floor_id, 42)
+		check(HoarderGenerator.maps_equal(again_f, once_f), "%s seed builds the same rooms" % floor_id)
+		check(not HoarderGenerator.maps_equal(HoarderGenerator.generate_floor(floor_id, 1), HoarderGenerator.generate_floor(floor_id, 2)), "%s two seeds differ" % floor_id)
+		var sample_f: Dictionary = HoarderGenerator.generate_floor(floor_id, 42)
+		check(int(sample_f["items"].size()) >= 12, "%s keeps a keepsake from every decade (%d)" % [floor_id, sample_f["items"].size()])
+		check(int(sample_f["nests"].size()) >= 2, "%s hides mouse nests (%d)" % [floor_id, sample_f["nests"].size()])
+		var named := false
+		for item: Variant in sample_f["items"]:
+			var nm := String((item as Dictionary).get("name", ""))
+			if nm.contains("Glenys") or nm.contains("Daniel") or nm.contains("cats"):
+				named = true
+		check(named, "%s keepsakes name the household" % floor_id)
+		check(String(sample_f["mood"]) != "", "%s carries a light mood (%s)" % [floor_id, sample_f["mood"]])
+	var basement_again: Dictionary = HoarderGenerator.generate_floor("basement", 7)
+	check(HoarderGenerator.maps_equal(basement_again, once), "basement generate_floor matches generate")
+	check(not HoarderGenerator.maps_equal(HoarderGenerator.generate_floor("ground_floor", 7), once), "the ground floor is not a copy of the basement")
+
 	print("HOARDER TESTS DONE: %d passed, %d failed" % [_pass, _fail])
 	get_tree().quit(1 if _fail > 0 else 0)
