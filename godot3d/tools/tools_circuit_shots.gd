@@ -64,16 +64,42 @@ func _frame_keepsake() -> void:
 		if not lab.text.to_lower().contains("photograph"):
 			continue
 		var world := _label_world(lab)
-		_game.cat.global_position = world + Vector3(0.15, -0.15, 0.9)
+		var offsets: Array[Vector3] = [
+			Vector3(0.15, -0.1, 0.7),
+			Vector3(0.65, -0.1, 0.25),
+			Vector3(-0.65, -0.1, 0.25),
+			Vector3(0.4, -0.1, 0.45),
+			Vector3(-0.35, -0.1, 0.55),
+			Vector3(0.2, -0.1, -0.55),
+		]
+		var best := offsets[0]
+		var best_dist := -1.0
+		for off: Vector3 in offsets:
+			_game.cat.global_position = world + off
+			_game.cat.velocity = Vector3.ZERO
+			var to: Vector3 = world - _game.cat.global_position
+			_look(atan2(-to.x, -to.z))
+			await _wait(0.28)
+			if not lab.visible:
+				continue
+			var cam_now := get_viewport().get_camera_3d()
+			if cam_now == null:
+				continue
+			var away: float = cam_now.global_position.distance_to(_game.cat.global_position)
+			if away > best_dist:
+				best_dist = away
+				best = off
+		_game.cat.global_position = world + best
 		_game.cat.velocity = Vector3.ZERO
-		_look(0.0)
-		await _wait(0.45)
+		var aim: Vector3 = world - _game.cat.global_position
+		_look(atan2(-aim.x, -aim.z))
+		await _wait(0.35)
 		var cam := get_viewport().get_camera_3d()
 		var vp := get_viewport().get_visible_rect().size
 		if cam != null:
 			var screen: Vector2 = cam.unproject_position(world)
 			var behind: bool = cam.is_position_behind(world)
-			print("LABEL ", lab.text.replace("\n", " | "), " screen=", screen, " behind=", behind, " vp=", vp, " font=", lab.get_theme_font_size("font_size"), " box=", lab.position, lab.size, " vis=", lab.visible)
+			print("LABEL ", lab.text.replace("\n", " | "), " screen=", screen, " behind=", behind, " vp=", vp, " font=", lab.get_theme_font_size("font_size"), " box=", lab.position, lab.size, " vis=", lab.visible, " stand=", best)
 		await _shot("keepsake")
 		return
 	print("SHOT keepsake missing")

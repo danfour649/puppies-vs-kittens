@@ -448,7 +448,7 @@ func _place_names() -> void:
 		lab.size = sz
 		var screen := cam.unproject_position(world)
 		var rect := _safe_label_rect(screen - sz * 0.5, sz, vp, placed)
-		if _hits_hud(rect, vp):
+		if _hits_hud(rect, vp) or not _on_screen(rect, vp):
 			lab.visible = false
 			continue
 		lab.visible = true
@@ -472,46 +472,54 @@ func _hits_hud(rect: Rect2, vp: Vector2) -> bool:
 	return false
 
 
+func _clamp_pos(pos: Vector2, sz: Vector2, vp: Vector2, margin: float) -> Vector2:
+	return Vector2(
+		clampf(pos.x, margin, maxf(margin, vp.x - margin - sz.x)),
+		clampf(pos.y, margin, maxf(margin, vp.y - margin - sz.y)))
+
+
+func _blocked_by(rect: Rect2, vp: Vector2, placed: Array[Rect2]) -> Rect2:
+	for block: Rect2 in _hud_blockers(vp):
+		if rect.intersects(block):
+			return block
+	for other: Rect2 in placed:
+		if rect.intersects(other):
+			return other
+	return Rect2()
+
+
+func _on_screen(rect: Rect2, vp: Vector2) -> bool:
+	return rect.position.x >= 8.0 and rect.position.y >= 8.0 and rect.end.x <= vp.x - 8.0 and rect.end.y <= vp.y - 8.0
+
+
 func _safe_label_rect(origin: Vector2, sz: Vector2, vp: Vector2, placed: Array[Rect2]) -> Rect2:
 	var margin := 12.0
-	var pos := origin
-	pos.x = clampf(pos.x, margin, maxf(margin, vp.x - margin - sz.x))
-	pos.y = clampf(pos.y, margin, maxf(margin, vp.y - margin - sz.y))
-	for _step in 4:
-		var rect := Rect2(pos, sz)
-		var moved := false
-		for block: Rect2 in _hud_blockers(vp):
-			if not rect.intersects(block):
-				continue
-			var options: Array[Vector2] = [
-				Vector2(block.position.x - margin - sz.x, pos.y),
-				Vector2(block.end.x + margin, pos.y),
-				Vector2(pos.x, block.position.y - margin - sz.y),
-				Vector2(pos.x, block.end.y + margin),
-			]
-			var best := pos
-			var best_d := 1.0e12
-			for opt: Vector2 in options:
-				var clamped := Vector2(
-					clampf(opt.x, margin, maxf(margin, vp.x - margin - sz.x)),
-					clampf(opt.y, margin, maxf(margin, vp.y - margin - sz.y)))
-				if Rect2(clamped, sz).intersects(block):
-					continue
-				var d := clamped.distance_squared_to(origin)
-				if d < best_d:
-					best_d = d
-					best = clamped
-			if best.distance_squared_to(pos) > 0.25:
-				pos = best
-				moved = true
-		for other: Rect2 in placed:
-			if not Rect2(pos, sz).intersects(other):
-				continue
-			pos.y = other.position.y - sz.y - 6.0
-			pos.y = clampf(pos.y, margin, maxf(margin, vp.y - margin - sz.y))
-			moved = true
-		if not moved:
+	var pos := _clamp_pos(origin, sz, vp, margin)
+	for _step in 6:
+		var hit := _blocked_by(Rect2(pos, sz), vp, placed)
+		if hit.size == Vector2.ZERO:
 			break
+		var options: Array[Vector2] = [
+			Vector2(hit.position.x - margin - sz.x, pos.y),
+			Vector2(hit.end.x + margin, pos.y),
+			Vector2(pos.x, hit.position.y - margin - sz.y),
+			Vector2(pos.x, hit.end.y + margin),
+		]
+		var best := pos
+		var best_d := 1.0e12
+		var found := false
+		for opt: Vector2 in options:
+			var clamped := _clamp_pos(opt, sz, vp, margin)
+			if _blocked_by(Rect2(clamped, sz), vp, placed).size != Vector2.ZERO:
+				continue
+			var d := clamped.distance_squared_to(origin)
+			if d < best_d:
+				best_d = d
+				best = clamped
+				found = true
+		if not found:
+			break
+		pos = best
 	return Rect2(pos, sz)
 
 
