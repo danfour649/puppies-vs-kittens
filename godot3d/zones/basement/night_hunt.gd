@@ -273,13 +273,14 @@ func _process(delta: float) -> void:
 		scent.decay(delta)
 		scent.age_novels(delta)
 		if cat != null:
-			var amount := 0.85 * delta
-			if _sprinting():
-				amount += 0.45 * delta
-				_pending_sounds.append({"pos": cat.global_position, "loudness": 0.6, "kind": "footstep"})
-			scent.deposit(cat.global_position, amount)
+			var gait := _willie_gait()
+			var foot := CatNoise.footstep(cat.global_position, gait)
+			if not foot.is_empty():
+				_pending_sounds.append(foot)
+			scent.deposit(cat.global_position, CatNoise.scent_rate(gait) * delta)
 		if _meow and cat != null:
-			_pending_sounds.append({"pos": cat.global_position, "loudness": 1.0, "kind": "meow"})
+			_pending_sounds.append(CatNoise.meow(cat.global_position))
+			cat.set_meta("meow_until_msec", Time.get_ticks_msec() + 650)
 			_meow = false
 		_live_sounds = _pending_sounds.duplicate()
 		_pending_sounds.clear()
@@ -408,8 +409,13 @@ func _jump_or_pounce() -> void:
 		cat.pounce()
 
 
-func _sprinting() -> bool:
-	return Input.is_physical_key_pressed(KEY_SHIFT)
+func _willie_gait() -> String:
+	if cat == null:
+		return "idle"
+	if cat.is_pouncing():
+		return "pounce"
+	var moving := cat.anim_state in ["walk", "stalk", "sprint"]
+	return CatNoise.gait_of(moving, cat.anim_state == "sprint", cat.anim_state == "stalk", false)
 
 
 # --- presentation -----------------------------------------------------------
@@ -435,7 +441,7 @@ func _build_ui() -> void:
 	body.position = Vector2(48, 150)
 	body.size = Vector2(664, 180)
 	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var how := _label(_title, "WASD move    Shift sprint    F paw    Space jump    M meow\nRight-drag looks    R starts the night over", 16)
+	var how := _label(_title, "WASD move    Shift sprint (loud)    Ctrl stalk (quiet)    F paw\nSpace jump    M meow    Right-drag looks    R starts the night over", 16)
 	how.position = Vector2(48, 340)
 	how.size = Vector2(664, 56)
 	how.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -492,7 +498,7 @@ func _update_hud() -> void:
 		_banner.text = "She is waiting."
 	else:
 		_goal.text = "Mice for Glenys: %d / %d" % [mini(caught, GOAL), GOAL]
-		_banner.text = "They nibble, they hug the boxes, they freeze when they smell you."
+		_banner.text = "Stalk, and they only mind you if they see you. A sprint or a meow carries."
 
 
 func _clock() -> String:

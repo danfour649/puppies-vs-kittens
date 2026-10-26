@@ -195,6 +195,8 @@ func emit_meow(cat: PvKCat) -> void:
 		bubble.text = "MEOW!" if cat == willie_cat else "mew"
 		bubble.visible = true
 		_bubble_t[cat] = 0.9
+	# Mice and the yard hear it for a short beat after the sound itself.
+	cat.set_meta("meow_until_msec", Time.get_ticks_msec() + 650)
 	if prov != null:
 		prov.hear_meow(cat)
 
