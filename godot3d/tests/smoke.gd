@@ -129,7 +129,7 @@ func _run() -> void:
 		await _catch_one(cat, _game.mice[i])
 	check(_game.won, "win state reached after all mice caught")
 	check((_game.get("_banner") as Label).visible, "win banner visible")
-	# --- Aggie: the calico sister, lounging on the garden chair. ---
+	# --- Aggie: the tortoiseshell sister, lounging on the garden chair. ---
 	var aggie = _game.aggie
 	check(aggie != null, "aggie exists")
 	check(aggie.species_name == "Aggie", "second cat is Aggie (got %s)" % aggie.species_name)
@@ -139,7 +139,7 @@ func _run() -> void:
 	var j_base: Array = apal.get("base", [])
 	var want_base := Color(float(j_base[0]), float(j_base[1]), float(j_base[2]))
 	var a_torso := (aggie._torso.material_override as StandardMaterial3D).albedo_color
-	check(a_torso.is_equal_approx(want_base), "aggie torso is the calico base (got %s)" % a_torso)
+	check(a_torso.is_equal_approx(want_base), "aggie torso is the tortoiseshell base (got %s)" % a_torso)
 	var j_orange: Array = apal.get("mottle_orange", [])
 	var want_orange := Color(float(j_orange[0]), float(j_orange[1]), float(j_orange[2]))
 	var j_cream: Array = apal.get("mottle_cream", [])

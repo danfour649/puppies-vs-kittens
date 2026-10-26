@@ -119,7 +119,9 @@ module as it now stands:
   values are quoted in the module or in §9. Per Daniel's ruling
   (2026-10-25) Willie's canonical appearance is his recorded
   spec — ginger **#E8AF54**, **dark eyes**, tail **white with
-  ginger rear/underside** — and Aggie is a **calico**. The
+  ginger rear/underside** — and Aggie is a **tortoiseshell**
+  (tortie; Daniel confirmed the coat name on 2026-10-26,
+  correcting the calico word in this 2026-10-25 note). The
   photo-tuned values (#C97020/#975417, green-gold eyes, ringed
   tail) that an older lift may carry are **superseded**; the
   canonical values live in `cat_kit` (revert owned by the
