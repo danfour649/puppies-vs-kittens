@@ -45,6 +45,7 @@ func _run() -> void:
 	_rat()
 	_bird()
 	_cat()
+	_creatures()
 	print("AI TESTS DONE: %d passed, %d failed" % [_pass, _fail])
 	get_tree().quit(1 if _fail > 0 else 0)
 
@@ -389,3 +390,39 @@ func _cat() -> void:
 		"perches": [Vector3(0, 1.6, 0)],
 	}))
 	check(String(nap["state"]) == "perch", "at noon she stays on the box even if Willie walks in")
+
+
+func _creatures() -> void:
+	var moth := CreatureBrain.new()
+	moth.bind_profile("moth", 1)
+	var lamp := Vector3(0, 1.5, 0)
+	var orbit: Dictionary = moth.step(0.2, {"pos": lamp, "lamp": lamp, "sounds": [], "has_cat": false})
+	check(String(orbit["state"]) == "orbit", "a moth with a quiet lamp stays on it")
+	check((orbit["target"] as Vector3).distance_to(lamp) < 0.7, "the orbit stays in the lamp's pool")
+	var scare: Dictionary = moth.step(0.1, {
+		"pos": lamp,
+		"lamp": lamp,
+		"has_cat": true,
+		"cat_pos": lamp + Vector3(0.4, 0, 0),
+		"sounds": [],
+	})
+	check(String(scare["state"]) == "startle", "a cat in the pool startles the moth off the lamp")
+	var spider := CreatureBrain.new()
+	spider.bind_profile("spider", 1)
+	var anchor := Vector3(0, 1.4, 0)
+	var hang: Dictionary = spider.step(0.1, {"anchor": anchor, "drop": 0.0, "has_cat": true, "cat_pos": Vector3(0, 0, 4)})
+	check(String(hang["state"]) == "hang", "a spider stays up when the cat is not under it")
+	var descend: Dictionary = spider.step(0.1, {"anchor": anchor, "drop": 0.0, "has_cat": true, "cat_pos": Vector3(0.3, 0, 0)})
+	check(String(descend["state"]) == "descend", "a cat underneath brings the spider down")
+	var back: Dictionary = spider.step(0.1, {"anchor": anchor, "drop": 0.8, "has_cat": true, "cat_pos": Vector3(0.3, 0, 0), "retreating": true})
+	check(String(back["state"]) == "retreat", "after the drop she goes back up")
+	var sq := CreatureBrain.new()
+	sq.bind_profile("squirrel", 1)
+	var graze: Dictionary = sq.step(0.1, {"pos": Vector3.ZERO, "tree": Vector3(4, 0, 0), "cat_dist": 8.0, "meow": 0.0, "at_tree": false})
+	check(String(graze["state"]) == "forage", "a squirrel with a quiet yard keeps foraging")
+	var up: Dictionary = sq.step(0.1, {"pos": Vector3.ZERO, "tree": Vector3(4, 0, 0), "cat_dist": 5.0, "meow": CatNoise.loudness("meow"), "at_tree": false})
+	check(String(up["state"]) == "flee_tree", "a meow sends the squirrel for its tree")
+	check((up["target"] as Vector3).distance_to(Vector3(4, 0, 0)) < 0.05, "the tree is the one she knows")
+	check(CreatureBrain.squirrel_hears_meow(5.0, CatNoise.loudness("meow")), "meow inside the radius is heard")
+	check(not CreatureBrain.squirrel_hears_meow(5.0, CatNoise.loudness("stalk")), "a stalk at the same distance is not")
+	check(not CreatureBrain.squirrel_hears_meow(8.0, CatNoise.loudness("meow")), "a meow past the radius fades out")

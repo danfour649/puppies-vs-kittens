@@ -65,6 +65,12 @@ func step(delta: float, ctx: Dictionary) -> Dictionary:
 			intent = _step_cat(delta, ctx)
 		"rat":
 			intent = _step_rat(delta, ctx)
+		"moth":
+			intent = _step_moth(delta, ctx)
+		"spider":
+			intent = _step_spider(delta, ctx)
+		"squirrel":
+			intent = _step_squirrel(delta, ctx)
 		_:
 			intent = _step_mouse(delta, ctx)
 	var next := String(intent.get("state", fsm.state))
@@ -595,6 +601,89 @@ func _highest_perch(pos: Vector3, perches: Array) -> Vector3:
 		if pp.y > best.y:
 			best = pp
 	return best
+
+
+# --- moth, spider, squirrel ------------------------------------------------
+
+func _step_moth(delta: float, ctx: Dictionary) -> Dictionary:
+	var pos: Vector3 = ctx.get("pos", Vector3.ZERO)
+	var lamp: Vector3 = ctx.get("lamp", pos + Vector3(0, 0.6, 0))
+	var has_cat := bool(ctx.get("has_cat", false))
+	var cat_pos: Vector3 = ctx.get("cat_pos", pos)
+	var cat_d := INF
+	if has_cat:
+		cat_d = Vector2(pos.x - cat_pos.x, pos.z - cat_pos.z).length()
+	var heard := perception.loudest(pos, ctx.get("sounds", []), float(profile.get("hearing_range", 3.4)))
+	var spooked := float(heard.get("loudness", 0.0)) >= 0.34 or cat_d < float(profile.get("sight_range", 1.4))
+	_orbit_t += delta
+	if spooked:
+		_alert = true
+		_quiet_t = 0.0
+		var away := pos - (cat_pos if has_cat else lamp)
+		away.y = 0.0
+		if away.length() < 0.05:
+			away = Vector3(1, 0, 0)
+		var bolt := pos + away.normalized() * 1.5 + Vector3(0, 0.45, 0)
+		return _intent("startle", float(profile.get("panic_speed", 2.6)), bolt, false, false, "lamp-scare")
+	if _alert:
+		_quiet_t += delta
+		if _quiet_t < 0.85:
+			return _intent("resettle", float(profile.get("orbit_speed", 1.7)), lamp, false, false, "resettle")
+		_alert = false
+	var radius := float(profile.get("orbit_radius", 0.42))
+	var ang := _orbit_t * float(profile.get("orbit_speed", 1.7))
+	var orbit := lamp + Vector3(cos(ang) * radius, 0.08 + sin(ang * 2.0) * 0.04, sin(ang) * radius)
+	return _intent("orbit", float(profile.get("orbit_speed", 1.7)) * 0.55, orbit, false, false, "lamp")
+
+
+func _step_spider(delta: float, ctx: Dictionary) -> Dictionary:
+	var anchor: Vector3 = ctx.get("anchor", ctx.get("pos", Vector3.ZERO))
+	var drop := float(ctx.get("drop", 0.0))
+	var trigger := float(profile.get("trigger", 1.05))
+	var dist := INF
+	if bool(ctx.get("has_cat", false)):
+		var cat_pos: Vector3 = ctx.get("cat_pos", anchor)
+		dist = Vector2(anchor.x - cat_pos.x, anchor.z - cat_pos.z).length()
+	var going_up := bool(ctx.get("retreating", false)) or fsm.state == "retreat"
+	if going_up:
+		if drop <= 0.06 and dist > trigger * 1.15:
+			return _intent("hang", 0.0, anchor, false, false, "hang")
+		return _intent("retreat", float(profile.get("retreat_speed", 3.0)), anchor, false, false, "retreat")
+	if dist < trigger:
+		var down := anchor + Vector3(0, -1.0, 0)
+		return _intent("descend", float(profile.get("drop_speed", 2.2)), down, false, false, "descend")
+	return _intent("hang", 0.0, anchor, false, false, "hang")
+
+
+func _step_squirrel(delta: float, ctx: Dictionary) -> Dictionary:
+	var pos: Vector3 = ctx.get("pos", Vector3.ZERO)
+	var tree: Vector3 = ctx.get("tree", pos)
+	var dist := float(ctx.get("cat_dist", INF))
+	var meow := float(ctx.get("meow", 0.0))
+	var at_tree := bool(ctx.get("at_tree", false))
+	var flee_r := float(profile.get("flee_radius", 3.4))
+	var meow_r := float(profile.get("meow_radius", 6.2))
+	var calm_r := float(profile.get("calm_radius", 5.5))
+	var heard_meow := meow >= 1.0 and dist < meow_r
+	if not at_tree and (dist < flee_r or heard_meow):
+		_alert = true
+		_quiet_t = 0.0
+		return _intent("flee_tree", float(profile.get("run_speed", 3.3)), tree, false, false, "tree")
+	if at_tree and (dist < calm_r or heard_meow):
+		_quiet_t = 0.0
+		return _intent("taunt", 0.0, tree, false, false, "taunt")
+	if at_tree:
+		_quiet_t += delta
+		if _quiet_t >= float(profile.get("calm_time", 4.0)):
+			return _intent("descend", 1.4, pos + Vector3(0, -1, 0), false, false, "descend")
+		return _intent("taunt", 0.0, tree, false, false, "taunt")
+	return _intent("forage", 0.6, pos + Vector3(0.4, 0, 0.2), false, false, "forage")
+
+
+## A meow in the yard. The body keeps its own climb; this is the
+## extra reason to start it. Close cats are the body's own radii.
+static func squirrel_hears_meow(dist: float, meow_loud: float, radius: float = 6.2) -> bool:
+	return meow_loud >= 1.0 and dist < radius
 
 
 # --- helpers ---------------------------------------------------------------
