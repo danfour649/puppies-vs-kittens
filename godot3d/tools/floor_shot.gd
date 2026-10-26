@@ -1,0 +1,59 @@
+extends Node
+## One frame of a floor, for the house report.
+##   xvfb-run godot --path godot3d res://tools/floor_shot.tscn -- --floor ground --out /tmp/floor.png
+
+
+func _ready() -> void:
+	var floor_id := "ground"
+	var out := "/tmp/floor.png"
+	var args := OS.get_cmdline_user_args()
+	for i in args.size():
+		if args[i] == "--floor" and i + 1 < args.size():
+			floor_id = args[i + 1]
+		elif args[i] == "--out" and i + 1 < args.size():
+			out = args[i + 1]
+	var scene_path := "res://zones/ground_floor/ground_floor.tscn"
+	var eye := Vector3(2.2, 1.15, 2.4)
+	var at := Vector3(-1.0, 0.4, -1.2)
+	if floor_id == "basement":
+		scene_path = "res://zones/basement/basement.tscn"
+		eye = Vector3(3.2, 1.45, 4.4)
+		at = Vector3(-0.4, 0.35, -0.6)
+	elif floor_id == "attic":
+		scene_path = "res://zones/attic/attic.tscn"
+		eye = Vector3(2.2, 1.25, 2.4)
+		at = Vector3(-0.8, 0.35, -1.0)
+	var zone := (load(scene_path) as PackedScene).instantiate()
+	add_child(zone)
+	# The zone's own night environment hides the surfaces. This shot
+	# is a look at the rooms, so the zone fog steps aside.
+	for n in zone.find_children("*", "WorldEnvironment", true, false):
+		n.queue_free()
+	var world := WorldEnvironment.new()
+	var env := Environment.new()
+	env.background_mode = Environment.BG_COLOR
+	env.background_color = Color(0.08, 0.07, 0.06)
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = Color(0.72, 0.66, 0.58)
+	env.ambient_light_energy = 0.85
+	env.tonemap_mode = Environment.TONE_MAPPER_ACES
+	world.environment = env
+	add_child(world)
+	var key := DirectionalLight3D.new()
+	key.rotation_degrees = Vector3(-48, -30, 0)
+	key.light_energy = 1.3
+	key.shadow_enabled = true
+	add_child(key)
+	for i in 8:
+		await get_tree().process_frame
+	var cam := Camera3D.new()
+	cam.fov = 50
+	cam.current = true
+	add_child(cam)
+	cam.look_at_from_position(eye, at)
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var img := get_viewport().get_texture().get_image()
+	var err := img.save_png(out)
+	print("FLOOR ", floor_id, " ", out, " ", img.get_size(), " save ", err)
+	get_tree().quit()
