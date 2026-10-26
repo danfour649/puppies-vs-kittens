@@ -17,8 +17,9 @@ func _ready() -> void:
 	var at := Vector3(4.6, 0.45, -2.4)
 	if floor_id == "basement":
 		scene_path = "res://zones/basement/basement.tscn"
-		eye = Vector3(3.2, 1.35, 4.2)
-		at = Vector3(0.6, 0.45, 1.4)
+		# South corridor sits inside the shell (z about 4.15). Look north into the maze.
+		eye = Vector3(2.2, 1.22, 3.72)
+		at = Vector3(0.15, 0.38, 0.6)
 	elif floor_id == "attic":
 		scene_path = "res://zones/attic/attic.tscn"
 		eye = Vector3(2.2, 1.25, 2.4)
