@@ -104,11 +104,12 @@ func _run() -> void:
 		cat.manner_k = 1.0
 		cat.manner_phase = 0.4
 		await _frames(2)
-		var wiggling := _tip_y(sk, int(live.get("spine_a", tip)))
+		var wag_bone := int(live.get("tail_tip", tip))
+		var wiggling := _tip_at(sk, wag_bone)
 		cat.manner_clips = {"wiggle": true}
 		await _frames(2)
-		var clipped := _tip_y(sk, int(live.get("spine_a", tip)))
-		check(absf(wiggling - clipped) > 0.002, "the fallback steps aside when a wiggle clip exists (%.3f vs %.3f)" % [wiggling, clipped])
+		var clipped := _tip_at(sk, wag_bone)
+		check(wiggling.distance_to(clipped) > 0.004, "the fallback steps aside when a wiggle clip exists")
 	var cat_voice := cat.get_node_or_null("CatVoice") as CatVoice
 	check(cat_voice != null and cat_voice.get_node_or_null("Voice_meow") != null, "the cat carries a positional meow")
 	cat.play_meow()
@@ -119,6 +120,12 @@ func _run() -> void:
 
 	print("HOUSE AUDIO DONE: %d passed, %d failed" % [_pass, _fail])
 	get_tree().quit(0 if _fail == 0 else 1)
+
+
+func _tip_at(sk: Skeleton3D, idx: int) -> Vector3:
+	if idx < 0:
+		return Vector3.ZERO
+	return sk.to_global(sk.get_bone_global_pose(idx).origin)
 
 
 func _tip_y(sk: Skeleton3D, idx: int) -> float:

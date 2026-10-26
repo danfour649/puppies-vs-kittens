@@ -54,10 +54,11 @@ func _build(cat: Node) -> bool:
 	root.name = "Sculpt"
 	rig = root
 	var model := cat.get("_model") as Node3D
-	var body_node := cat.get("_body") as Node3D
-	# Under the body so stalk, sit, lounge and the hiss still move
-	# the whole cat. The clips move the limbs inside that.
-	(body_node if body_node != null else model).add_child(root)
+	# The ellipsoid body pitches and squashes for a sit. Parenting the
+	# skinned cat under that folded the Hunyuan mesh into the floor and
+	# pointed the head at the ceiling. The skeleton poses the mesh; the
+	# model only carries the character scale.
+	(model if model != null else cat).add_child(root)
 	var meshes: Array[MeshInstance3D] = []
 	var player: AnimationPlayer
 	_walk(root, meshes, player)
@@ -90,6 +91,8 @@ func _build(cat: Node) -> bool:
 	body.material_override = _baked_material(body)
 	body.set_meta("baked_coat", true)
 	body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	_relax_hip_weights(body, skeleton)
+	_seat_on_floor(root, body)
 	_hide_primitives(cat)
 	_loops(player)
 	tree = _make_tree(player, root)
@@ -160,10 +163,74 @@ func _baked_material(mi: MeshInstance3D) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
 	if src != null:
 		mat = src.duplicate() as StandardMaterial3D
-	mat.roughness = 0.72
+	mat.roughness = 0.82
 	mat.roughness_texture = null
+	mat.metallic = 0.0
+	mat.metallic_specular = 0.04
+	mat.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
+	mat.rim_enabled = true
+	mat.rim = 0.08
+	mat.rim_tint = 0.35
 	mat.normal_enabled = false
 	return mat
+
+
+## Hip and thigh vertices were sharing the tail bones. Lifting the
+## tail then stretched that skin into a pale smear. The weight moves
+## onto whichever spine, root or thigh bone already owns the vertex.
+func _relax_hip_weights(mi: MeshInstance3D, sk: Skeleton3D) -> void:
+	if mi.mesh == null or mi.mesh.get_surface_count() < 1:
+		return
+	var arrays: Array = mi.mesh.surface_get_arrays(0)
+	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var bones_a: PackedInt32Array = arrays[Mesh.ARRAY_BONES]
+	var weights: PackedFloat32Array = arrays[Mesh.ARRAY_WEIGHTS]
+	if bones_a.is_empty() or weights.is_empty():
+		return
+	var changed := false
+	for v in verts.size():
+		var p: Vector3 = verts[v]
+		if p.y < 0.22 or p.y > 0.58 or p.z < -0.5 or p.z > -0.12 or absf(p.x) > 0.2:
+			continue
+		var top_b := 0
+		var top_w := 0.0
+		var tail_w := 0.0
+		for k in 4:
+			var b := bones_a[v * 4 + k]
+			var w := weights[v * 4 + k]
+			var name := sk.get_bone_name(b) if b >= 0 and b < sk.get_bone_count() else ""
+			if name.begins_with("tail"):
+				tail_w += w
+			elif w > top_w:
+				top_w = w
+				top_b = b
+		if tail_w < 0.18 or top_w <= 0.0:
+			continue
+		for k in 4:
+			var b2 := bones_a[v * 4 + k]
+			var name2 := sk.get_bone_name(b2) if b2 >= 0 and b2 < sk.get_bone_count() else ""
+			if name2.begins_with("tail"):
+				weights[v * 4 + k] = 0.0
+		for k in 4:
+			if bones_a[v * 4 + k] == top_b:
+				weights[v * 4 + k] += tail_w
+				break
+		changed = true
+	if not changed:
+		return
+	var mesh := ArrayMesh.new()
+	arrays[Mesh.ARRAY_WEIGHTS] = weights
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	mi.mesh = mesh
+
+
+## The bind pose should meet the capsule bottom, which sits on the
+## floor at the character origin. A mesh that starts below that reads
+## as stumpy legs.
+func _seat_on_floor(root: Node3D, mi: MeshInstance3D) -> void:
+	var bounds: AABB = root.global_transform.affine_inverse() * (mi.global_transform * mi.get_aabb())
+	if bounds.position.y < -0.002:
+		root.position.y -= bounds.position.y
 
 
 func _coat_material(aggie: bool) -> StandardMaterial3D:
@@ -475,8 +542,12 @@ func apply_state(cat: Node, delta: float) -> void:
 	_set_blend("gait", sf)
 	_set_blend("idle_move", 1.0 if moving and state != "stalk" else 0.0)
 	_set_blend("stalk_mix", 1.0 if state == "stalk" else 0.0)
-	_set_blend("sit_mix", float(cat.get("_sit_k")))
-	_set_blend("lounge_mix", float(cat.get("_lounge_k")))
+	var held_manner := str(cat.get("manner"))
+	var manner_holds := held_manner != "" and float(cat.get("manner_k")) > 0.2
+	# A manner owns the skeleton. The sit clip pitches the chest at the
+	# ceiling and sinks the hips, which is what broke the greeting.
+	_set_blend("sit_mix", 0.0 if manner_holds else float(cat.get("_sit_k")))
+	_set_blend("lounge_mix", 0.0 if manner_holds else float(cat.get("_lounge_k")))
 	_set_blend("strike_mix", 1.0 if state == "strike" else 0.0)
 	_set_blend("pounce_mix", float(cat.get("pounce_amount")))
 	_set_blend("land_mix", float(cat.get("land_amount")))
@@ -510,10 +581,13 @@ func adopt_whiskers(cat: Node) -> void:
 		_drop_head_cylinders(head)
 		return
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.78, 0.74, 0.66)
-	mat.roughness = 0.55
-	mat.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
-	mat.metallic_specular = 0.08
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.albedo_color = Color(0.86, 0.83, 0.76, 0.42)
+	mat.roughness = 0.92
+	mat.metallic = 0.0
+	mat.metallic_specular = 0.0
+	mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 	var per_side := maxi(found.size() / 2, 1)
 	for i in found.size():
 		var mi := found[i]
@@ -567,8 +641,8 @@ func _whisker_mesh() -> ArrayMesh:
 	# hair, long enough to see at the portrait distance.
 	var rings := 7
 	var segs := 5
-	var length := 0.11
-	var curl := 0.016
+	var length := 0.09
+	var curl := 0.012
 	var positions := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var indices := PackedInt32Array()
@@ -576,9 +650,9 @@ func _whisker_mesh() -> ArrayMesh:
 	var radii: Array[float] = []
 	for i in rings:
 		var t := float(i) / float(rings - 1)
-		var p := Vector3(t * length, sin(t * PI) * curl - t * t * 0.018, 0.0)
+		var p := Vector3(t * length, sin(t * PI) * curl - t * t * 0.012, 0.0)
 		centers.append(p)
-		radii.append(lerpf(0.0024, 0.00055, t))
+		radii.append(lerpf(0.00085, 0.00012, t))
 	for i in rings:
 		var tangent: Vector3
 		if i == 0:

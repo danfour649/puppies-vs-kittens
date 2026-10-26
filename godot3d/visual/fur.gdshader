@@ -55,6 +55,6 @@ void fragment() {
 	}
 	col *= mix(1.02, 0.88, layer);
 	ALBEDO = col;
-	ROUGHNESS = mix(0.68, 0.96, layer);
-	SPECULAR = 0.18;
+	ROUGHNESS = mix(0.84, 0.96, layer);
+	SPECULAR = 0.03;
 }
