@@ -59,6 +59,7 @@ var _lbl_lives: Label
 var outside: OutsideSystem = null # OUTSIDE
 var occupants: OccupantSystem = null # OCCUPANTS (hub)
 var glenys: GlenysSystem = null # GLENYS (the cat-chaser)
+var night: NightRun = null # the round: floors, Glenys, dawn
 var run_over := false # POISON: a poison death ends the run (no respawn)
 var catch_radius := 0.62
 var duo_shake := Vector3.ZERO
@@ -127,6 +128,10 @@ func _ready() -> void:
 	module.build_occupants()
 	occupants = module.occupants
 	_build_glenys()
+	night = NightRun.new()
+	night.name = "NightRun"
+	add_child(night)
+	night.setup(self)
 	# OUTSIDE: trees + squirrels, feeder birds + ambush, the street
 	# frontage (hostile traffic, the Corolla island, the fish
 	# treat) and pedestrians walking dogs.
@@ -657,6 +662,8 @@ func _jump_or_pounce() -> void:
 		return
 	if duo != null and duo.input_locked():
 		return
+	if night != null and night.blocks_move():
+		return
 	if cat.is_on_floor():
 		cat.jump()
 	else:
@@ -769,7 +776,9 @@ func _physics_process(_delta: float) -> void:
 		# the smoke test drives straight through it.)
 		if duo != null and duo.input_locked():
 			dir = Vector3.ZERO
-		if run_over: # POISON: the run is over; the cat goes nowhere.
+		if run_over or (night != null and night.blocks_move()):
+			# Poison, or the night card / the ending. The override
+			# above is left alone so the suites can still walk.
 			dir = Vector3.ZERO
 			sprint = false
 			stalk = false
