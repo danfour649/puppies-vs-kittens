@@ -22,6 +22,7 @@ var body: MeshInstance3D
 var skeleton: Skeleton3D
 var rig: Node3D
 var _blends: Dictionary = {}
+var _found_manners: Dictionary = {}
 var _head_idx := -1
 var _nose := Vector3.ZERO
 var _head_origin := Vector3.ZERO
@@ -92,6 +93,7 @@ func _build(cat: Node) -> bool:
 	_hide_primitives(cat)
 	_loops(player)
 	tree = _make_tree(player, root)
+	cat.set("manner_clips", _found_manners)
 	_prepare_face(cat)
 	var mod: SkeletonModifier3D = PoseMod.new()
 	mod.name = "PoseModifier"
@@ -255,12 +257,14 @@ func _make_tree(player: AnimationPlayer, root: Node) -> AnimationTree:
 		blend.connect_node(str(spec[1]), 1, str(spec[0]) + "_clip")
 		current = str(spec[1])
 		_blends[str(spec[1])] = "parameters/%s/blend_amount" % str(spec[1])
+	_found_manners = {}
 	for manner_name in CatManners.CLIP_NAMES:
 		if current == "":
 			break
 		var manner_clip := _clip(player, manner_name)
 		if manner_clip == null:
 			continue
+		_found_manners[manner_name] = true
 		blend.add_node(manner_name + "_clip", manner_clip)
 		var manner_mix := AnimationNodeBlend2.new()
 		var mix_name := manner_name + "_mix"

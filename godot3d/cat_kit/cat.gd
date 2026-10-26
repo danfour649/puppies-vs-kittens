@@ -80,6 +80,11 @@ var anim_state := "idle"
 ## does not. Gameplay never depends on the clip being present.
 var manner := ""
 var manner_k := 0.0
+## Seconds into the manner. Negative follows the wall clock.
+var manner_phase := -1.0
+## Manner names whose clip is actually on this rig. The pose
+## fallback stays quiet for those and plays for the rest.
+var manner_clips: Dictionary = {}
 var stamina := 100.0
 var is_lounging := false
 ## HEAT: the courtship pose blend (Aggie's solicitation -- a rocking
@@ -230,6 +235,9 @@ func _json_vec3(v: Variant, fallback: Vector3) -> Vector3:
 
 func _ready() -> void:
 	_build_model()
+	var voice := CatVoice.new()
+	voice.name = "CatVoice"
+	add_child(voice)
 	var col := CollisionShape3D.new()
 	var cap := CapsuleShape3D.new()
 	cap.radius = 0.15
@@ -731,6 +739,9 @@ func set_lounge(on: bool) -> void:
 ## Opens the jaw clip. Gameplay meows (M, and Aggie's chirp) call this.
 func play_meow() -> void:
 	meow_k = 1.0
+	var voice := get_node_or_null("CatVoice") as CatVoice
+	if voice != null:
+		voice.speak("chirp" if character_id == "aggie" else "meow")
 
 
 ## HEAT: blend the courtship pose in or out.
@@ -886,6 +897,9 @@ func hiss() -> bool:
 		return false
 	_hiss_t = 0.0
 	hissed.emit(self)
+	var voice := get_node_or_null("CatVoice") as CatVoice
+	if voice != null:
+		voice.speak("hiss")
 	return true
 
 

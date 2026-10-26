@@ -24,6 +24,9 @@ var _wing_l: Node3D
 var _wing_r: Node3D
 var _rng := RandomNumberGenerator.new()
 var _flap := 0.0
+var _alarm: AudioStreamPlayer3D
+var _wings: AudioStreamPlayer3D
+var _alarm_cd := 0.0
 
 
 func _ready() -> void:
@@ -31,6 +34,8 @@ func _ready() -> void:
 	brain = CreatureBrain.new()
 	brain.bind_profile("songbird", _rng.randi())
 	_build()
+	_alarm = HouseAudio.make_player(self, "alarm", false)
+	_wings = HouseAudio.make_player(self, "wingbeat", true)
 
 
 func _process(delta: float) -> void:
@@ -55,6 +60,16 @@ func _process(delta: float) -> void:
 		"hour": hour,
 	})
 	state = String(intent.get("state", state))
+	_alarm_cd = maxf(0.0, _alarm_cd - delta)
+	if bool(intent.get("alarm", false)) and _alarm != null and _alarm.stream != null and _alarm_cd <= 0.0:
+		_alarm.play()
+		_alarm_cd = 0.7
+	if _wings != null and _wings.stream != null:
+		var flushing := state == "panic_light"
+		if flushing and not _wings.playing:
+			_wings.play()
+		elif not flushing and _wings.playing:
+			_wings.stop()
 	if bool(intent.get("alarm", false)) and sound_sink != null:
 		sound_sink.append({
 			"pos": global_position,

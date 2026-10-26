@@ -124,6 +124,7 @@ func _begin() -> void:
 		_title.visible = false
 	_generate()
 	_build_world()
+	FloorAmbience.attach(self, "basement")
 	_spawn_cast()
 	_build_camera()
 	if _touch == null:

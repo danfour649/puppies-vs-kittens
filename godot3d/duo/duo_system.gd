@@ -187,7 +187,9 @@ func emit_meow(cat: PvKCat) -> void:
 		cat.play_meow()
 	var kind := "willie" if cat == willie_cat else "aggie"
 	var voice := _voices.get(cat) as AudioStreamPlayer3D
-	if voice != null:
+	# CatVoice already plays the Ogg. The synth remains for a cat
+	# that has not grown a voice node yet.
+	if cat.get_node_or_null("CatVoice") == null and voice != null:
 		voice.stream = MeowAudio.stream_for(kind)
 		voice.play()
 	var bubble := _bubbles.get(cat) as Label3D
