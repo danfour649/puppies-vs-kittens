@@ -20,6 +20,7 @@ var rig: Node3D
 var _blends: Dictionary = {}
 var _head_idx := -1
 var _nose := Vector3.ZERO
+var _head_origin := Vector3.ZERO
 var _away := Vector3(0, 0, -1)
 var _right := Vector3.RIGHT
 var _up := Vector3.UP
@@ -275,6 +276,7 @@ func _measure_face() -> void:
 		return
 	var to_skel := skeleton.global_transform.affine_inverse() * body.global_transform
 	var head_o: Vector3 = skeleton.get_bone_global_rest(_head_idx).origin
+	_head_origin = head_o
 	var tail_i := skeleton.find_bone("tail04")
 	var tail_o := skeleton.get_bone_global_rest(tail_i).origin if tail_i >= 0 else head_o + Vector3(0, 0, 1)
 	_away = (head_o - tail_o)
@@ -364,13 +366,16 @@ func _seat_eyes(cat: Node) -> void:
 			continue
 		mi.get_parent().remove_child(mi)
 		att.add_child(mi)
-		var target := _nose - _away * 0.105 + _up * 0.02 + _right * side * 0.05
-		var center := _nearest(target)
+		# Halfway from the skull to the nose, then sunk into the socket
+		# so the sphere is not perched on the surface.
+		var radius := 0.016
+		var target := _head_origin.lerp(_nose, 0.58) + _up * 0.02 + _right * side * 0.05
+		var center := _nearest(target) - _hit_normal * (0.01 + radius * 0.62)
 		var outward := _hit_normal
 		if outward.dot(_away) < 0.2:
-			outward = (_away + _right * side * 0.25 + _up * 0.12).normalized()
+			outward = (_away + _right * side * 0.35 + _up * 0.15).normalized()
 		mi.transform = Transform3D(_bone_basis(_basis_facing(outward)).orthonormalized(), _bone_point(center))
-		mi.scale = Vector3(0.052, 0.048, 0.04)
+		mi.scale = Vector3(radius * 2.1, radius * 1.9, radius * 1.25)
 		mi.visible = true
 		side = 1.0
 
@@ -393,9 +398,11 @@ func _seat_nose(cat: Node) -> void:
 	nose.material_override = mat
 	nose.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	att.add_child(nose)
-	var tip := _nose + _away * 0.012 + _up * -0.006
-	nose.position = _bone_point(tip)
-	nose.scale = Vector3(0.032, 0.022, 0.026)
+	# Wide and shallow, sitting on the muzzle rather than stuck out past it.
+	var outward := _away
+	var tip := _nose - _away * 0.008 + _up * -0.006
+	nose.transform = Transform3D(_bone_basis(_basis_facing(outward)).orthonormalized(), _bone_point(tip))
+	nose.scale = Vector3(0.022, 0.013, 0.009)
 
 
 func apply_state(cat: Node, delta: float) -> void:
@@ -434,9 +441,10 @@ func adopt_whiskers(cat: Node) -> void:
 	for child in head.get_children():
 		if str(child.name).begins_with("Whisker"):
 			found.append(child as MeshInstance3D)
-	if found.is_empty():
-		return
 	var mesh := _whisker_mesh()
+	if found.is_empty():
+		_drop_head_cylinders(head)
+		return
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Color(0.78, 0.74, 0.66)
 	mat.roughness = 0.55
@@ -450,15 +458,34 @@ func adopt_whiskers(cat: Node) -> void:
 		var side := -1.0 if i < per_side else 1.0
 		var k := i % per_side
 		var t := float(k) / float(maxi(per_side - 1, 1))
-		var fan := lerpf(-0.28, 0.34, t)
-		var dir := (_right * side * 0.9 + _away * 0.32 + _up * fan).normalized()
-		var root := _nose - _away * 0.04 + _right * side * 0.028 + _up * lerpf(-0.016, 0.02, t)
+		var fan := lerpf(-0.16, 0.14, t)
+		var dir := (_right * side + _away * 0.18 + _up * fan).normalized()
+		var root := _nose - _away * 0.02 + _right * side * 0.02 + _up * lerpf(-0.012, 0.008, t)
 		var local_root := _bone_point(root)
 		var local_dir := (_bone_point(root + dir) - local_root).normalized()
 		mi.mesh = mesh
 		mi.material_override = mat
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		mi.transform = Transform3D(_basis_from_x(local_dir), local_root)
+	_drop_head_cylinders(head)
+
+
+func _drop_head_cylinders(head: Node) -> void:
+	# Anything still parented to the ellipsoid head is the legacy bar.
+	# The sculpted whiskers live on HeadSocket.
+	if head == null:
+		return
+	var doomed: Array[MeshInstance3D] = []
+	for child in head.get_children():
+		var mi := child as MeshInstance3D
+		if mi == null:
+			continue
+		if mi.mesh is CylinderMesh or str(mi.name).begins_with("Whisker"):
+			doomed.append(mi)
+	for mi in doomed:
+		mi.visible = false
+		head.remove_child(mi)
+		mi.queue_free()
 
 
 func _basis_from_x(dir: Vector3) -> Basis:
@@ -476,8 +503,8 @@ func _whisker_mesh() -> ArrayMesh:
 	# hair, long enough to see at the portrait distance.
 	var rings := 7
 	var segs := 5
-	var length := 0.17
-	var curl := 0.028
+	var length := 0.11
+	var curl := 0.016
 	var positions := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var indices := PackedInt32Array()
@@ -487,7 +514,7 @@ func _whisker_mesh() -> ArrayMesh:
 		var t := float(i) / float(rings - 1)
 		var p := Vector3(t * length, sin(t * PI) * curl - t * t * 0.018, 0.0)
 		centers.append(p)
-		radii.append(lerpf(0.0046, 0.00115, t))
+		radii.append(lerpf(0.0024, 0.00055, t))
 	for i in rings:
 		var tangent: Vector3
 		if i == 0:
