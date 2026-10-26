@@ -83,7 +83,12 @@ func _frame_label(hunt: NightHunt) -> bool:
 
 func _run() -> void:
 	DirAccess.make_dir_recursive_absolute("res://screenshots/hunt")
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(NightHunt.HINT_FILE))
+	# The floor shot is about the keepsake name, so the first-night hint stays down.
+	var hint_path := ProjectSettings.globalize_path(NightHunt.HINT_FILE)
+	var hint_file := FileAccess.open(hint_path, FileAccess.WRITE)
+	if hint_file != null:
+		hint_file.store_string("seen")
+		hint_file.close()
 	var hunt: NightHunt = HuntScene.instantiate()
 	hunt.autostart = true
 	hunt.seed_value = 42
