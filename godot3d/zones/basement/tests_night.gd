@@ -191,11 +191,38 @@ func _framing(hunt: NightHunt) -> void:
 	check(dist > 0.9 and dist < 2.15, "Willie is close enough to read (camera %.2f m)" % dist)
 
 
+func _name_fully_on_screen(hunt: NightHunt, what: String) -> void:
+	var cam := hunt.get_viewport().get_camera_3d()
+	if cam == null:
+		check(false, what)
+		return
+	var vp := hunt.get_viewport().get_visible_rect().size
+	var found := false
+	for lab: Variant in hunt.keepsake_labels:
+		var l := lab as Label3D
+		if l == null or not l.visible:
+			continue
+		found = true
+		var ahead := not cam.is_position_behind(l.global_position)
+		var at := cam.unproject_position(l.global_position)
+		var half: Vector2 = hunt.label_screen_half(l, cam)
+		var inside := NightHunt.block_inside(at, half, vp, NightHunt.LABEL_MARGIN)
+		check(ahead and inside, "%s — \"%s\" at %s half %s view %s" % [what, l.text, at, half, vp])
+	if not found:
+		check(false, "%s — a name is showing" % what)
+
+
 func _labels(hunt: NightHunt) -> void:
 	check(NightHunt.keepsake_alpha(0.4) == 1.0, "a name beside Willie is solid")
 	check(NightHunt.keepsake_alpha(2.2) < NightHunt.keepsake_alpha(1.2), "a name fades as he walks off")
 	check(NightHunt.keepsake_alpha(8.0) == 0.0, "a name across the room is hidden")
+	var pinned := NightHunt.clamp_screen(Vector2(576, -70), Vector2(170, 80), Vector2(1152, 648), NightHunt.LABEL_MARGIN)
+	check(is_equal_approx(pinned.x, 576.0) and is_equal_approx(pinned.y, 96.0), "a name above the frame drops until the whole line fits")
+	check(NightHunt.block_inside(pinned, Vector2(170, 80), Vector2(1152, 648), NightHunt.LABEL_MARGIN), "that dropped name stays inside the frame")
+	var mid := NightHunt.clamp_screen(Vector2(-40, 900), Vector2(900, 900), Vector2(1152, 648), NightHunt.LABEL_MARGIN)
+	check(is_equal_approx(mid.x, 576.0) and is_equal_approx(mid.y, 324.0), "a name bigger than the screen is pinned to the middle")
 	check(hunt.keepsake_labels.size() >= 4, "the marked decades still have names (%d)" % hunt.keepsake_labels.size())
+	_name_fully_on_screen(hunt, "the keepsake beside Willie at the start stays on screen")
 	var home := hunt.cat.global_position
 	var spot: Vector3 = hunt.keepsake_points[0]
 	hunt.cat.global_position = spot + Vector3(0, 0.1, 0)
@@ -209,6 +236,7 @@ func _labels(hunt: NightHunt) -> void:
 			shown += 1
 			shown_i = i
 	check(shown == 1 and shown_i == 0, "only the nearest keepsake is named (shown %d, idx %d)" % [shown, shown_i])
+	_name_fully_on_screen(hunt, "the name stays on screen when Willie stands over the keepsake")
 	var named: Label3D = hunt.keepsake_labels[0]
 	check(named.autowrap_mode != TextServer.AUTOWRAP_OFF and named.width > 0.0, "a long name wraps instead of running off")
 	check(named.text.length() > 12, "the name is the keepsake's own (%s)" % named.text)

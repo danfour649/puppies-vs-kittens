@@ -22,6 +22,9 @@ const CATCH_RADIUS := 0.72
 ## once he has walked off. Only the nearest one is ever shown.
 const LABEL_FULL := 1.2
 const LABEL_GONE := 3.35
+const LABEL_PIXEL := 0.0025
+## Keep the whole wrapped name inside the frame, not just its anchor.
+const LABEL_MARGIN := 16.0
 
 @export var seed_value := 0 ## 0 = pick one at random
 @export var autostart := false
@@ -698,15 +701,20 @@ func _build_camera() -> void:
 
 ## One name at a time, wrapped so a long keepsake does not run off
 ## the screen, and faded out as Willie walks away from it.
+## The anchor is the centre of the text, so a name whose home sits
+## above the frame can be slid back down without losing a line.
 func _keepsake_label(text: String, pos: Vector3) -> Label3D:
 	var lab := Label3D.new()
 	lab.text = text
 	lab.font_size = 48
-	lab.pixel_size = 0.0025
+	lab.pixel_size = LABEL_PIXEL
 	lab.width = 340.0
 	lab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lab.position = pos + Vector3(0, 0.36, 0)
+	lab.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var home := pos + Vector3(0, 0.36, 0)
+	lab.position = home
+	lab.set_meta("home", home)
 	lab.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	lab.outline_size = 12
 	lab.outline_modulate = Color(0.08, 0.05, 0.04, 1.0)
@@ -739,15 +747,126 @@ func _update_keepsake_labels() -> void:
 		if d < best_d - 0.001:
 			best_d = d
 			best = i
+	var cam := get_viewport().get_camera_3d()
 	for i in keepsake_labels.size():
 		var lab: Label3D = keepsake_labels[i]
-		if i != best:
+		var alpha := keepsake_alpha(best_d) if i == best else 0.0
+		if i != best or alpha <= 0.04:
 			lab.visible = false
+			_reset_label_home(lab)
 			continue
-		var alpha := keepsake_alpha(best_d)
-		lab.visible = alpha > 0.04
+		lab.visible = true
 		lab.modulate = Color(0.98, 0.95, 0.88, alpha)
 		lab.outline_modulate = Color(0.08, 0.05, 0.04, alpha)
+		if cam != null:
+			_clamp_label_to_view(lab, cam)
+
+
+func _reset_label_home(lab: Label3D) -> void:
+	lab.pixel_size = LABEL_PIXEL
+	if lab.has_meta("home"):
+		lab.global_position = lab.get_meta("home")
+
+
+## Slide the name's centre so the wrapped block stays inside the
+## viewport, when that home is already near the frame. A name behind
+## the camera, or off in some other room of the view, stays at home
+## instead of being dragged onto whatever the camera is looking at.
+func _clamp_label_to_view(lab: Label3D, cam: Camera3D) -> void:
+	var home: Vector3 = lab.get_meta("home")
+	var vp := get_viewport().get_visible_rect().size
+	if vp.x < 2.0 or vp.y < 2.0:
+		lab.global_position = home
+		return
+	var depth := _view_depth(cam, home)
+	if depth <= cam.near:
+		_reset_label_home(lab)
+		return
+	var screen := cam.unproject_position(home)
+	var near_view := screen.x > -vp.x and screen.x < vp.x * 2.0 and screen.y > -vp.y and screen.y < vp.y * 2.0
+	if not near_view:
+		_reset_label_home(lab)
+		return
+	lab.pixel_size = LABEL_PIXEL
+	var half := _screen_half(lab, cam, depth, vp)
+	var avail := vp - Vector2(LABEL_MARGIN, LABEL_MARGIN) * 2.0
+	var fit := 1.0
+	if half.x * 2.0 > avail.x and half.x > 0.0:
+		fit = minf(fit, avail.x / (half.x * 2.0))
+	if half.y * 2.0 > avail.y and half.y > 0.0:
+		fit = minf(fit, avail.y / (half.y * 2.0))
+	if fit < 0.999:
+		lab.pixel_size = LABEL_PIXEL * fit
+		half *= fit
+	var clamped := clamp_screen(screen, half, vp, LABEL_MARGIN)
+	if clamped.distance_squared_to(screen) > 0.25:
+		lab.global_position = cam.project_position(clamped, depth)
+	else:
+		lab.global_position = home
+
+
+func _view_depth(cam: Camera3D, world: Vector3) -> float:
+	var local: Vector3 = cam.get_camera_transform().affine_inverse() * world
+	return -local.z
+
+
+func _screen_half(lab: Label3D, cam: Camera3D, depth: float, vp: Vector2) -> Vector2:
+	var font_px := label_font_px(lab.text, lab.width, lab.font_size, lab.outline_size)
+	var world := font_px * lab.pixel_size
+	var xform := cam.get_camera_transform()
+	var center := cam.project_position(vp * 0.5, depth)
+	var edge := center + xform.basis.x.normalized() * world.x * 0.5 + xform.basis.y.normalized() * world.y * 0.5
+	if cam.is_position_behind(center) or cam.is_position_behind(edge):
+		var ppm := vp.y / maxf(0.05, 2.0 * depth * tan(deg_to_rad(cam.fov) * 0.5))
+		return world * 0.5 * ppm
+	return (cam.unproject_position(edge) - cam.unproject_position(center)).abs()
+
+
+## Half-extents of the wrapped name in font pixels, outline included.
+static func label_font_px(text: String, width: float, font_size: int, outline: int) -> Vector2:
+	var measured := Vector2(minf(width, maxf(1.0, text.length()) * font_size * 0.55), font_size * 1.3)
+	var font := ThemeDB.fallback_font
+	if font != null and text.length() > 0:
+		var size := font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, width, font_size, -1, TextServer.BREAK_WORD_BOUND | TextServer.BREAK_ADAPTIVE)
+		if size.x > 1.0 and size.y > 1.0:
+			measured = size
+	measured += Vector2(outline, outline) * 2.0
+	return measured * 1.08
+
+
+func label_screen_half(lab: Label3D, cam: Camera3D) -> Vector2:
+	var vp := get_viewport().get_visible_rect().size
+	if vp.x < 2.0 or vp.y < 2.0 or cam == null:
+		return Vector2.ZERO
+	var depth := _view_depth(cam, lab.global_position)
+	if depth <= cam.near:
+		depth = maxf(cam.near * 4.0, 0.2)
+	return _screen_half(lab, cam, depth, vp)
+
+
+## Pull a screen point in until a block of the given half-extents
+## sits inside the viewport. A block larger than the view is pinned
+## to the middle.
+static func clamp_screen(point: Vector2, half: Vector2, vp: Vector2, margin: float) -> Vector2:
+	var lo := Vector2(margin + half.x, margin + half.y)
+	var hi := Vector2(vp.x - margin - half.x, vp.y - margin - half.y)
+	if lo.x > hi.x:
+		var mid_x := vp.x * 0.5
+		lo.x = mid_x
+		hi.x = mid_x
+	if lo.y > hi.y:
+		var mid_y := vp.y * 0.5
+		lo.y = mid_y
+		hi.y = mid_y
+	return Vector2(clampf(point.x, lo.x, hi.x), clampf(point.y, lo.y, hi.y))
+
+
+static func block_inside(screen: Vector2, half: Vector2, vp: Vector2, margin: float) -> bool:
+	var slack := 3.0
+	return screen.x - half.x >= margin - slack \
+		and screen.y - half.y >= margin - slack \
+		and screen.x + half.x <= vp.x - margin + slack \
+		and screen.y + half.y <= vp.y - margin + slack
 
 
 func _save_shot() -> void:
