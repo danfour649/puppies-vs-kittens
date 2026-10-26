@@ -91,7 +91,9 @@ func _build(cat: Node) -> bool:
 	body.material_override = _baked_material(body)
 	body.set_meta("baked_coat", true)
 	body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-	_repair_coat_skin(body, skeleton)
+	# The Hunyuan skin already binds the tail vertices to the tail
+	# bones. Rewriting those weights tore the rump into cones and
+	# stretched the white chest across the ginger.
 	_seat_on_floor(root, body)
 	# Stay on the full cage. A generated LOD collapses the neck and
 	# reads as a blocky toy once the cat is small on screen.
@@ -139,19 +141,25 @@ func _find_skeleton(node: Node) -> Skeleton3D:
 	return null
 
 
+func hide_leftovers(cat: Node) -> void:
+	_hide_primitives(cat)
+
+
 func _hide_primitives(cat: Node) -> void:
-	var keep := {}
-	for eye in cat.get("_eyes"):
-		keep[eye] = true
 	var model := cat.get("_model") as Node
 	if model == null:
 		return
 	for node in model.find_children("*", "MeshInstance3D", true, false):
 		var mi := node as MeshInstance3D
-		if keep.has(mi) or mi == body or _under_sculpt(mi):
+		if mi == body:
 			continue
-		# Spec-lock shells (torso, saddle, stripes, tail) stay for tests.
-		mi.visible = false
+		if str(mi.name).begins_with("Whisker"):
+			continue
+		# The ellipsoid cat (torso, saddle, stripes, tail spheres, leg
+		# cones) stays in the tree for the palette tests. The Hunyuan
+		# mesh is the only body that draws. Its own tail is skinned.
+		if mi.mesh is PrimitiveMesh or not _under_sculpt(mi) or str(mi.name) == "FurShell" or str(mi.name) == "NoseLeather":
+			mi.visible = false
 
 
 func _under_sculpt(node: Node) -> bool:
@@ -179,90 +187,15 @@ func _baked_material(mi: MeshInstance3D) -> StandardMaterial3D:
 	mat.rim = 0.04
 	mat.rim_tint = 0.15
 	mat.normal_enabled = false
-	# Full 2048 albedo: linear samples, mipmaps for distance, anisotropy
-	# on the grazing angles of the flank.
-	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	# The imported material is double-sided. The back faces catch the
+	# fill as pale blotches on top of the ginger.
+	mat.cull_mode = BaseMaterial3D.CULL_BACK
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+	mat.vertex_color_use_as_albedo = false
+	# The 2048 atlas has no padding. Mips blend the white chest into
+	# the ginger flank. Mip 0 is the close-up bake.
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
 	return mat
-
-
-## Hip and chest vertices were sharing the tail, or carrying a facet
-## normal that caught the fill as a pale patch. Tail weight on the
-## body moves back to the spine or thigh. Chest and hip normals are
-## blended toward the face normal so a single facet cannot flare.
-func _repair_coat_skin(mi: MeshInstance3D, sk: Skeleton3D) -> void:
-	if mi.mesh == null or mi.mesh.get_surface_count() < 1:
-		return
-	var arrays: Array = mi.mesh.surface_get_arrays(0)
-	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-	var norms: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
-	var bones_a: PackedInt32Array = arrays[Mesh.ARRAY_BONES]
-	var weights: PackedFloat32Array = arrays[Mesh.ARRAY_WEIGHTS]
-	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
-	if verts.is_empty():
-		return
-	var changed := false
-	if not bones_a.is_empty() and not weights.is_empty():
-		var stride := int(weights.size() / verts.size())
-		var spine := sk.find_bone("spine1")
-		for v in verts.size():
-			var p: Vector3 = verts[v]
-			var on_tail := p.z < -0.46 and absf(p.x) < 0.12 and p.y < 0.42
-			if on_tail:
-				continue
-			var top_b := spine
-			var top_w := 0.0
-			var tail_w := 0.0
-			for k in stride:
-				var b := bones_a[v * stride + k]
-				var w := weights[v * stride + k]
-				var name := sk.get_bone_name(b) if b >= 0 and b < sk.get_bone_count() else ""
-				if name.begins_with("tail"):
-					tail_w += w
-				elif w > top_w:
-					top_w = w
-					top_b = b
-			if tail_w < 0.04 or top_b < 0:
-				continue
-			for k in stride:
-				var b2 := bones_a[v * stride + k]
-				var name2 := sk.get_bone_name(b2) if b2 >= 0 and b2 < sk.get_bone_count() else ""
-				if name2.begins_with("tail"):
-					weights[v * stride + k] = 0.0
-			for k in stride:
-				if bones_a[v * stride + k] == top_b:
-					weights[v * stride + k] += tail_w
-					break
-			changed = true
-		arrays[Mesh.ARRAY_WEIGHTS] = weights
-	if not norms.is_empty() and indices.size() >= 3:
-		var acc: PackedVector3Array = PackedVector3Array()
-		acc.resize(verts.size())
-		for t in range(0, indices.size() - 2, 3):
-			var i0 := indices[t]
-			var i1 := indices[t + 1]
-			var i2 := indices[t + 2]
-			var fn: Vector3 = (verts[i1] - verts[i0]).cross(verts[i2] - verts[i0])
-			acc[i0] = acc[i0] + fn
-			acc[i1] = acc[i1] + fn
-			acc[i2] = acc[i2] + fn
-		for v in verts.size():
-			var p2: Vector3 = verts[v]
-			var chest := p2.y > 0.24 and p2.y < 0.58 and p2.z > -0.05 and p2.z < 0.34 and absf(p2.x) < 0.16
-			var hip := p2.y > 0.16 and p2.y < 0.58 and p2.z < -0.02 and p2.z > -0.5 and absf(p2.x) < 0.2
-			if not chest and not hip:
-				continue
-			if acc[v].length_squared() < 0.000001:
-				continue
-			var face_n := acc[v].normalized()
-			var had := norms[v].normalized() if norms[v].length_squared() > 0.0001 else face_n
-			norms[v] = (had * 0.2 + face_n * 0.8).normalized()
-			changed = true
-		arrays[Mesh.ARRAY_NORMAL] = norms
-	if not changed:
-		return
-	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	mi.mesh = mesh
 
 
 ## The bind pose should meet the capsule bottom, which sits on the
@@ -587,7 +520,10 @@ func apply_state(cat: Node, delta: float) -> void:
 	var held_manner := str(cat.get("manner"))
 	var manner_holds := held_manner != "" and float(cat.get("manner_k")) > 0.2
 	# A manner owns the skeleton. The sit clip pitches the chest at the
-	# ceiling and sinks the hips, which is what broke the greeting.
+	# ceiling, and a gait clip keeps the loaf looking mid-stride.
+	if manner_holds:
+		_set_blend("gait", 0.0)
+		_set_blend("idle_move", 0.0)
 	_set_blend("sit_mix", 0.0 if manner_holds else float(cat.get("_sit_k")))
 	_set_blend("lounge_mix", 0.0 if manner_holds else float(cat.get("_lounge_k")))
 	_set_blend("strike_mix", 1.0 if state == "strike" else 0.0)

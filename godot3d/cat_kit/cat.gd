@@ -585,6 +585,7 @@ func _build_model() -> void:
 	CatFidelity.dress(self)
 	if _sculpt != null:
 		_sculpt.adopt_whiskers(self)
+		_sculpt.hide_leftovers(self)
 
 
 ## Willie's markings: a LARGE ginger saddle over the whole back and

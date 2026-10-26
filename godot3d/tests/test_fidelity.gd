@@ -58,11 +58,17 @@ func _run() -> void:
 	check(longest > 0.05 and longest < 0.28, "whiskers are short strands (%.3f)" % longest)
 	check(on_head, "whiskers sit on the head rather than the back")
 	var stray := 0
+	var primitive := 0
 	for node in cat.find_children("*", "MeshInstance3D", true, false):
 		var bar := node as MeshInstance3D
-		if bar.is_visible_in_tree() and bar.mesh is CylinderMesh and (bar.mesh as CylinderMesh).height > 0.08:
+		if not bar.is_visible_in_tree():
+			continue
+		if bar.mesh is CylinderMesh and (bar.mesh as CylinderMesh).height > 0.08:
 			stray += 1
+		if bar.mesh is PrimitiveMesh or str(bar.name) == "FurShell":
+			primitive += 1
 	check(stray == 0, "no long cylinder is left visible (%d)" % stray)
+	check(primitive == 0, "no leftover body primitive is visible (%d)" % primitive)
 	cat.play_meow()
 	check(cat.meow_k > 0.9, "play_meow opens the jaw clip (%.2f)" % cat.meow_k)
 	check(sculpt != null and sculpt._blends.has("meow_mix"), "meow jaw clip is wired into the blend tree")
