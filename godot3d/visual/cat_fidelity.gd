@@ -192,25 +192,30 @@ static func _add_whiskers(cat: Node) -> int:
 	if head == null:
 		return 0
 	var n := 0
+	# A short stand-in. adopt_whiskers replaces this with a curved
+	# strand and moves it onto the head bone. Sharing the name
+	# "Whisker" made Godot drop the other eleven back to default
+	# names, so those fat cylinders stayed on the head and crossed
+	# above the shoulders.
 	var mesh := CylinderMesh.new()
-	mesh.top_radius = 0.016
-	mesh.bottom_radius = 0.005
-	mesh.height = 0.34
-	mesh.radial_segments = 4
+	mesh.top_radius = 0.004
+	mesh.bottom_radius = 0.0015
+	mesh.height = 0.08
+	mesh.radial_segments = 6
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.92, 0.9, 0.86)
-	mat.roughness = 0.35
+	mat.albedo_color = Color(0.78, 0.74, 0.66)
+	mat.roughness = 0.55
 	for side in [-1.0, 1.0]:
+		var tag := "L" if side < 0.0 else "R"
 		for i in 6:
 			var w := MeshInstance3D.new()
-			w.name = "Whisker"
+			w.name = "Whisker%s%d" % [tag, i]
 			w.mesh = mesh
 			w.material_override = mat
 			w.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			var along := lerpf(-0.35, 0.42, float(i) / 5.0)
-			w.position = Vector3(side * 0.09, -0.02 + along * 0.02, -0.2)
-			# Cylinder axis is Y. Tip it outward and a little forward (-Z).
-			w.rotation = Vector3(along * 0.55, 0.0, side * 1.15)
+			var along := lerpf(-0.22, 0.18, float(i) / 5.0)
+			w.position = Vector3(side * 0.08, along * 0.02, -0.16)
+			w.rotation = Vector3(along * 0.4, 0.0, side * 1.35)
 			head.add_child(w)
 			n += 1
 	return n

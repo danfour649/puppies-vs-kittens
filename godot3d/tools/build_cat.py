@@ -103,14 +103,13 @@ def body_stations():
     # Blender: Z up, -Y is the nose (glTF/Godot forward).
     # (y, center_z, rx, rz) — a shoulder, a waist, a haunch, a muzzle.
     spec = [
-        # Nose leather, muzzle, cheeks, cranium, then the neck.
-        (-0.64, 0.508, 0.026, 0.020),
-        (-0.57, 0.498, 0.048, 0.038),
-        (-0.50, 0.512, 0.062, 0.050),
-        (-0.44, 0.555, 0.090, 0.076),
-        (-0.36, 0.598, 0.112, 0.096),
-        (-0.28, 0.575, 0.104, 0.090),
-        (-0.20, 0.505, 0.074, 0.080),
+        # Short muzzle. A cat's nose sits just in front of the cheeks.
+        (-0.48, 0.548, 0.036, 0.028),
+        (-0.44, 0.562, 0.055, 0.044),
+        (-0.39, 0.586, 0.086, 0.072),
+        (-0.33, 0.604, 0.112, 0.096),
+        (-0.26, 0.586, 0.108, 0.094),
+        (-0.18, 0.520, 0.078, 0.084),
         (-0.10, 0.40, 0.118, 0.132),
         (-0.02, 0.42, 0.132, 0.128),
         (0.08, 0.43, 0.108, 0.110),
@@ -129,31 +128,34 @@ def leg_stations(side, kind):
     s = 1.0 if side == "L" else -1.0
     if kind == "front":
         pts = [
-            (s * 0.09, -0.06, 0.40, 0.050, 0.046),
-            (s * 0.10, -0.08, 0.30, 0.040, 0.036),
-            (s * 0.105, -0.09, 0.18, 0.030, 0.028),
-            (s * 0.108, -0.10, 0.09, 0.034, 0.030),
-            (s * 0.11, -0.12, 0.040, 0.044, 0.032),
+            (s * 0.11, -0.04, 0.40, 0.048, 0.044),
+            (s * 0.115, -0.06, 0.28, 0.038, 0.034),
+            (s * 0.118, -0.07, 0.16, 0.028, 0.026),
+            (s * 0.12, -0.08, 0.08, 0.032, 0.028),
+            (s * 0.12, -0.10, 0.035, 0.042, 0.030),
         ]
     else:
+        # Parallel columns, set wider than the thigh radius so the
+        # hocks cannot occupy the same space.
         pts = [
-            (s * 0.10, 0.30, 0.42, 0.062, 0.055),
-            (s * 0.115, 0.22, 0.30, 0.042, 0.038),
-            (s * 0.10, 0.30, 0.16, 0.030, 0.028),
-            (s * 0.095, 0.24, 0.07, 0.034, 0.030),
-            (s * 0.09, 0.18, 0.038, 0.046, 0.034),
+            (s * 0.145, 0.26, 0.40, 0.055, 0.048),
+            (s * 0.152, 0.24, 0.26, 0.038, 0.034),
+            (s * 0.150, 0.22, 0.14, 0.028, 0.024),
+            (s * 0.146, 0.18, 0.07, 0.030, 0.026),
+            (s * 0.142, 0.14, 0.032, 0.042, 0.030),
         ]
     return [(Vector((x, y, z)), rx, rz) for x, y, z, rx, rz in pts]
 
 
 def tail_stations():
+    # A short thick curve. The old tail climbed into a thin stalk.
     pts = []
-    for i in range(10):
-        t = i / 9.0
-        y = 0.48 + t * 0.42
-        z = 0.42 + math.sin(t * 1.1) * 0.16 + t * 0.08
-        r = 0.046 * (1.0 - t * 0.72)
-        pts.append((Vector((0.0, y, z)), r, r * 0.92))
+    for i in range(8):
+        t = i / 7.0
+        y = 0.40 + t * 0.18
+        z = 0.40 + math.sin(t * 1.05) * 0.045 + t * 0.03
+        r = 0.052 * (1.0 - t * 0.42)
+        pts.append((Vector((0.0, y, z)), r, r * 0.9))
     return pts
 
 
@@ -186,8 +188,8 @@ def build_parts():
         parts.append(tube(f"ear_{side}", ear_stations(side), n=8, cap=True))
         s = 1.0 if side == "L" else -1.0
         for i, dx in enumerate((-0.018, -0.006, 0.008, 0.018)):
-            parts.append(toe_blob(f"toe_f_{side}_{i}", (s * 0.11 + dx, -0.145, 0.028), 0.012))
-            parts.append(toe_blob(f"toe_h_{side}_{i}", (s * 0.09 + dx, 0.165, 0.026), 0.012))
+            parts.append(toe_blob(f"toe_f_{side}_{i}", (s * 0.12 + dx, -0.115, 0.028), 0.012))
+            parts.append(toe_blob(f"toe_h_{side}_{i}", (s * 0.142 + dx, 0.125, 0.026), 0.012))
     parts.append(tube("tail", tail_stations(), n=10, cap=True))
     return parts
 
@@ -246,12 +248,13 @@ def shape_details(obj):
     me = obj.data
     for v in me.vertices:
         x, y, z = v.co
-        # Muzzle: the nose is the -Y end. Narrow it and drop it a touch.
-        if y < -0.42:
-            k = (-0.42 - y) / 0.22
+        # Only the last bit of the muzzle narrows. A hard pinch
+        # turned the face into a tube.
+        if y < -0.44:
+            k = (-0.44 - y) / 0.06
             k = max(0.0, min(1.0, k))
-            v.co.x *= 1.0 - 0.28 * k
-            v.co.z -= 0.035 * k
+            v.co.x *= 1.0 - 0.12 * k
+            v.co.z -= 0.008 * k
         # Pull the ear tips up into points.
         if z > 0.70 and y < -0.26:
             v.co.z += 0.05
@@ -280,26 +283,22 @@ def face_sculpt(obj):
     for v in me.vertices:
         x, y, z = v.co
         for sx in (-1.0, 1.0):
-            eye = Vector((sx * 0.052, -0.425, 0.578))
+            eye = Vector((sx * 0.055, -0.38, 0.605))
             d = (v.co - eye).length
-            if d < 0.062:
-                fall = (1.0 - d / 0.062) ** 1.35
-                v.co += Vector((sx * -0.006, 0.036, -0.012)) * fall
+            if d < 0.055:
+                fall = (1.0 - d / 0.055) ** 1.4
+                v.co += Vector((sx * -0.008, 0.022, -0.006)) * fall
         x, y, z = v.co
-        if -0.50 < y < -0.36 and z > 0.605 and abs(x) < 0.095:
-            v.co.z += 0.018 * (1.0 - abs(x) / 0.095)
-        if y < -0.50:
-            k = min(1.0, (-0.50 - y) / 0.16)
-            v.co.x *= 1.0 - 0.18 * k
-            v.co.y -= 0.018 * k
-        nose = Vector((0.0, -0.63, 0.51))
+        if -0.42 < y < -0.32 and z > 0.60 and abs(x) < 0.08:
+            v.co.z += 0.012 * (1.0 - abs(x) / 0.08)
+        nose = Vector((0.0, -0.475, 0.55))
         d = (v.co - nose).length
-        if d < 0.05:
-            fall = (1.0 - d / 0.05) ** 1.15
-            v.co += Vector((0.0, -0.026, 0.012)) * fall
-            v.co.x *= 1.0 - 0.4 * fall
-        if y < -0.52 and z < 0.50 and abs(x) < 0.05:
-            v.co.z -= 0.014
+        if d < 0.032:
+            fall = (1.0 - d / 0.032) ** 1.2
+            v.co += Vector((0.0, -0.006, 0.004)) * fall
+            v.co.x *= 1.0 - 0.25 * fall
+        if y < -0.455 and z < 0.54 and abs(x) < 0.04:
+            v.co.z -= 0.006
         if z > 0.74 and y < -0.26 and abs(x) > 0.03:
             v.co.z += 0.035
             v.co.x = math.copysign(abs(v.co.x) * 0.76, v.co.x)
@@ -453,7 +452,7 @@ def _on_pad(co, n) -> bool:
     x, y, z = co
     if n.z > -0.4 or z > 0.07:
         return False
-    for px, py in ((0.11, -0.13), (-0.11, -0.13), (0.09, 0.17), (-0.09, 0.17)):
+    for px, py in ((0.12, -0.11), (-0.12, -0.11), (0.142, 0.13), (-0.142, 0.13)):
         if (x - px) ** 2 + (y - py) ** 2 < 0.04 ** 2:
             return True
     return False
@@ -461,8 +460,8 @@ def _on_pad(co, n) -> bool:
 
 def _eye_rim(co) -> bool:
     x, y, z = co
-    for sx in (-0.052, 0.052):
-        if (x - sx) ** 2 + (y + 0.425) ** 2 + (z - 0.575) ** 2 < 0.022 ** 2:
+    for sx in (-0.055, 0.055):
+        if (x - sx) ** 2 + (y + 0.38) ** 2 + (z - 0.605) ** 2 < 0.02 ** 2:
             return True
     return False
 
@@ -471,15 +470,15 @@ def willie_color(co, n):
     x, y, z = co
     # Belly, chest, muzzle blaze, and paws stay white. The saddle is ginger.
     saddle = y > -0.34 and y < 0.46 and z > 0.46 and n.z > -0.15
-    cap = y < -0.26 and y > -0.46 and z > 0.60
-    cheek = y < -0.32 and y > -0.52 and abs(x) > 0.035 and 0.50 < z < 0.63
-    tail = y > 0.46
+    cap = y < -0.22 and y > -0.42 and z > 0.58
+    cheek = y < -0.30 and y > -0.44 and abs(x) > 0.04 and 0.52 < z < 0.64
+    tail = y > 0.38
     tail_under = tail and n.z < 0.15
     stripe = False
     if saddle:
         band = math.sin((y + 0.05) * 28.0)
         stripe = band > 0.55 and z > 0.50
-    if y < -0.575 and abs(x) < 0.034 and 0.46 < z < 0.58:
+    if y < -0.455 and abs(x) < 0.02 and 0.50 < z < 0.58:
         return NOSE
     if _eye_rim(co):
         return (0.12, 0.09, 0.07)
@@ -501,7 +500,7 @@ def willie_color(co, n):
 
 def aggie_color(co, n):
     x, y, z = co
-    if y < -0.575 and abs(x) < 0.034 and 0.46 < z < 0.58:
+    if y < -0.455 and abs(x) < 0.02 and 0.50 < z < 0.58:
         return (0.55, 0.32, 0.30)
     if _eye_rim(co):
         return (0.05, 0.04, 0.035)
@@ -617,25 +616,26 @@ def build_armature():
     sp1 = add_bone(eb, "spine1", (0, 0.36, 0.44), (0, 0.22, 0.44), root)
     sp2 = add_bone(eb, "spine2", (0, 0.22, 0.43), (0, 0.05, 0.42), sp1, True)
     sp3 = add_bone(eb, "spine3", (0, 0.05, 0.42), (0, -0.12, 0.42), sp2, True)
-    neck = add_bone(eb, "neck", (0, -0.12, 0.48), (0, -0.24, 0.56), sp3)
-    head = add_bone(eb, "head", (0, -0.24, 0.56), (0, -0.50, 0.59), neck, True)
-    add_bone(eb, "jaw", (0, -0.42, 0.51), (0, -0.60, 0.49), head)
-    add_bone(eb, "ear.L", (-0.052, -0.34, 0.66), (-0.070, -0.36, 0.86), head)
-    add_bone(eb, "ear.R", (0.052, -0.34, 0.66), (0.070, -0.36, 0.86), head)
+    neck = add_bone(eb, "neck", (0, -0.12, 0.48), (0, -0.22, 0.56), sp3)
+    head = add_bone(eb, "head", (0, -0.22, 0.56), (0, -0.42, 0.58), neck, True)
+    # The meow clip keys this bone by name. Keep the name "jaw".
+    add_bone(eb, "jaw", (0, -0.36, 0.52), (0, -0.46, 0.50), head)
+    add_bone(eb, "ear.L", (-0.052, -0.32, 0.66), (-0.070, -0.34, 0.84), head)
+    add_bone(eb, "ear.R", (0.052, -0.32, 0.66), (0.070, -0.34, 0.84), head)
     for side, s in (("L", -1.0), ("R", 1.0)):
-        sho = add_bone(eb, f"shoulder.{side}", (s * 0.06, -0.04, 0.42), (s * 0.10, -0.06, 0.38), sp3)
-        up = add_bone(eb, f"upper_arm.{side}", (s * 0.10, -0.06, 0.38), (s * 0.105, -0.09, 0.20), sho, True)
-        fr = add_bone(eb, f"forearm.{side}", (s * 0.105, -0.09, 0.20), (s * 0.11, -0.11, 0.06), up, True)
-        add_bone(eb, f"paw_f.{side}", (s * 0.11, -0.11, 0.06), (s * 0.11, -0.15, 0.02), fr, True)
-        th = add_bone(eb, f"thigh.{side}", (s * 0.08, 0.32, 0.42), (s * 0.11, 0.24, 0.26), sp1)
-        sh = add_bone(eb, f"shin.{side}", (s * 0.11, 0.24, 0.26), (s * 0.10, 0.30, 0.12), th, True)
-        hk = add_bone(eb, f"hock.{side}", (s * 0.10, 0.30, 0.12), (s * 0.09, 0.22, 0.05), sh, True)
-        add_bone(eb, f"paw_h.{side}", (s * 0.09, 0.22, 0.05), (s * 0.09, 0.16, 0.02), hk, True)
+        sho = add_bone(eb, f"shoulder.{side}", (s * 0.06, -0.02, 0.44), (s * 0.11, -0.04, 0.40), sp3)
+        up = add_bone(eb, f"upper_arm.{side}", (s * 0.11, -0.04, 0.40), (s * 0.115, -0.06, 0.28), sho, True)
+        fr = add_bone(eb, f"forearm.{side}", (s * 0.115, -0.06, 0.28), (s * 0.118, -0.07, 0.16), up, True)
+        add_bone(eb, f"paw_f.{side}", (s * 0.118, -0.07, 0.16), (s * 0.12, -0.10, 0.035), fr, True)
+        th = add_bone(eb, f"thigh.{side}", (s * 0.11, 0.30, 0.44), (s * 0.152, 0.24, 0.26), sp1)
+        sh = add_bone(eb, f"shin.{side}", (s * 0.152, 0.24, 0.26), (s * 0.150, 0.22, 0.14), th, True)
+        hk = add_bone(eb, f"hock.{side}", (s * 0.150, 0.22, 0.14), (s * 0.146, 0.18, 0.07), sh, True)
+        add_bone(eb, f"paw_h.{side}", (s * 0.146, 0.18, 0.07), (s * 0.142, 0.14, 0.032), hk, True)
     parent = sp1
-    prev = (0.0, 0.46, 0.42)
-    for i in range(9):
-        t = (i + 1) / 9.0
-        nxt = (0.0, 0.48 + t * 0.40, 0.42 + math.sin(t * 1.1) * 0.16 + t * 0.06)
+    prev = (0.0, 0.38, 0.40)
+    for i in range(8):
+        t = (i + 1) / 8.0
+        nxt = (0.0, 0.40 + t * 0.18, 0.40 + math.sin(t * 1.05) * 0.045 + t * 0.03)
         bone = add_bone(eb, f"tail{i:02d}", prev, nxt, parent, i > 0)
         parent = bone
         prev = nxt
