@@ -36,7 +36,6 @@ var _hint: Label
 var _arrow: Label
 var _where: Label
 var _list: Label
-var _compass: PanelContainer
 var _objectives_open := false
 var _seen_glenys_zone := ""
 

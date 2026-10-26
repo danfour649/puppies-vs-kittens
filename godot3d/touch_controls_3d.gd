@@ -31,7 +31,7 @@ var _mouse_btn := 0
 var _mouse_from := Vector2.ZERO
 var _mouse_moved := 0.0
 var _mouse_look := false
-var _blocked := false
+var _suppressed := false
 
 
 func _ready() -> void:
@@ -57,12 +57,13 @@ static func stick_size(vp: Vector2) -> Vector2:
 ## Hide the paw while the character select is up, so a tap lands
 ## on a roster cell instead of the stick.
 func set_blocked(blocked: bool) -> void:
-	if blocked == _blocked:
+	if blocked == _suppressed:
 		return
-	_blocked = blocked
+	_suppressed = blocked
 	visible = not blocked
 	if blocked:
-		_touch_id = -2
+		_fingers.clear()
+		_restart_sent = false
 		stalk_held = false
 		swipe_dir = Vector2.ZERO
 		_mouse_btn = 0
@@ -118,7 +119,7 @@ func _process(_delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _blocked or not visible:
+	if _suppressed or not visible:
 		return
 	if event is InputEventScreenTouch:
 		_on_screen_touch(event as InputEventScreenTouch)
