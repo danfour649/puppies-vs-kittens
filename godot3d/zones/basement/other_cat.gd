@@ -11,6 +11,8 @@ var body: PvKCat
 var state := "perch"
 var prey: Node3D = null
 var perches: Array = []
+## Walkable cells tucked against a stack. She waits there.
+var covers: Array = []
 var hour := 19.0
 var territory := Vector3.ZERO
 var territory_radius := 5.5
@@ -25,6 +27,7 @@ var bapped := false
 
 var _pos := Vector3.ZERO
 var _watch_t := 0.0
+var _manner_label: Label3D
 const WATCH_BEFORE_HUNT := 2.5
 
 
@@ -37,6 +40,16 @@ func _ready() -> void:
 	add_child(body)
 	body.set_collision_layer_value(1, false)
 	body.set_collision_mask_value(1, false)
+	_manner_label = Label3D.new()
+	_manner_label.font_size = 42
+	_manner_label.pixel_size = 0.0032
+	_manner_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_manner_label.outline_size = 8
+	_manner_label.no_depth_test = true
+	_manner_label.modulate = Color(0.96, 0.9, 0.82)
+	_manner_label.position = Vector3(0, 0.78, 0)
+	_manner_label.visible = false
+	body.add_child(_manner_label)
 	_pos = global_position
 
 
@@ -70,9 +83,22 @@ func _process(delta: float) -> void:
 		"has_rival": has_rival,
 		"rival_pos": rival.global_position if has_rival else _pos,
 		"prey_options": options,
+		"covers": covers,
 	})
 	var prev := state
 	state = String(intent.get("state", state))
+	if state == "crouch":
+		body.manner = "wiggle"
+		body.manner_k = 1.0
+	elif state == "ambush":
+		body.manner = "ambush"
+		body.manner_k = 1.0
+	elif body.manner == "wiggle" or body.manner == "ambush":
+		body.manner = ""
+		body.manner_k = 0.0
+	if _manner_label != null:
+		_manner_label.visible = body.manner != ""
+		_manner_label.text = body.manner
 	var speed := float(intent.get("speed", 0.0))
 	var target: Vector3 = intent.get("target", _pos)
 	if state == "perch" or state == "recover":

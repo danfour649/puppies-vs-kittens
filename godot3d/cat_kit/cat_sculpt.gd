@@ -257,6 +257,20 @@ func _make_tree(player: AnimationPlayer, root: Node) -> AnimationTree:
 		blend.connect_node(str(spec[1]), 1, str(spec[0]) + "_clip")
 		current = str(spec[1])
 		_blends[str(spec[1])] = "parameters/%s/blend_amount" % str(spec[1])
+	for manner_name in CatManners.CLIP_NAMES:
+		if current == "":
+			break
+		var manner_clip := _clip(player, manner_name)
+		if manner_clip == null:
+			continue
+		blend.add_node(manner_name + "_clip", manner_clip)
+		var manner_mix := AnimationNodeBlend2.new()
+		var mix_name := manner_name + "_mix"
+		blend.add_node(mix_name, manner_mix)
+		blend.connect_node(mix_name, 0, current)
+		blend.connect_node(mix_name, 1, manner_name + "_clip")
+		current = mix_name
+		_blends[mix_name] = "parameters/%s/blend_amount" % mix_name
 	if current == "":
 		return null
 	blend.connect_node("output", 0, current)
@@ -466,6 +480,10 @@ func apply_state(cat: Node, delta: float) -> void:
 	_set_blend("land_mix", float(cat.get("land_amount")))
 	var meow := float(cat.get("meow_k"))
 	_set_blend("meow_mix", clampf(meow, 0.0, 1.0))
+	var manner := str(cat.get("manner"))
+	var manner_k := clampf(float(cat.get("manner_k")), 0.0, 1.0)
+	for manner_name in CatManners.CLIP_NAMES:
+		_set_blend(manner_name + "_mix", manner_k if manner == manner_name else 0.0)
 	if meow > 0.0:
 		cat.set("meow_k", maxf(0.0, meow - delta * 1.6))
 

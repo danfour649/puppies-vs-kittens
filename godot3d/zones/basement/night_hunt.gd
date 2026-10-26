@@ -44,6 +44,20 @@ var moths: Array = []
 var cellar_spider: CellarSpider
 var other: OtherCat
 var ledger := NightLoop.new()
+var litter_pos := Vector3.ZERO
+var covers: Array = []
+var _ledge_items: Array = []
+var _manner_label: Label3D
+var _wiggle := 0.0
+var _zoom_t := 0.0
+var _zoom_from_litter := false
+var _dusk_zoom := false
+var _idle_t := 0.0
+var _trust := 0.0
+var _bond_cd := 0.0
+var _chatter_t := 0.0
+var _knead_t := 0.0
+var _manner_rng := RandomNumberGenerator.new()
 var scent := CatScentMap.new()
 var elapsed := 0.0
 
@@ -131,6 +145,7 @@ func _generate() -> void:
 		guard += 1
 		level_seed += 1
 		level = HoarderGenerator.generate(level_seed)
+	_manner_rng.seed = level_seed
 
 
 func _build_world() -> void:
@@ -211,6 +226,7 @@ func _build_world() -> void:
 	glenys_pos = entry_pos + Vector3(0.0, 0.0, 0.35)
 	_stairs(entry_pos)
 	_glenys(glenys_pos)
+	_place_cat_places()
 	scent.setup(Vector2(-8, -6), Vector2(16, 12), 0.5)
 
 
@@ -226,6 +242,17 @@ func _spawn_cast() -> void:
 	cat.global_position = HoarderGenerator.cell_center(spawn_cell.x, spawn_cell.y) + Vector3(0, 0.08, 0)
 	cat.rotation.y = PI
 	cat.paw_swiped.connect(_on_paw)
+	_manner_label = Label3D.new()
+	_manner_label.name = "Manner"
+	_manner_label.font_size = 42
+	_manner_label.pixel_size = 0.0032
+	_manner_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_manner_label.outline_size = 8
+	_manner_label.no_depth_test = true
+	_manner_label.modulate = Color(0.98, 0.95, 0.88)
+	_manner_label.position = Vector3(0, 0.78, 0)
+	_manner_label.visible = false
+	cat.add_child(_manner_label)
 	var anchors: Array = []
 	var shut := HoarderGenerator.reachable_from(level, entry, true)
 	for item: Variant in level["items"]:
@@ -301,6 +328,7 @@ func _spawn_cast() -> void:
 	other.quarry = mice
 	other.territory = HoarderGenerator.cell_center(heart.x, heart.y)
 	other.territory_radius = 5.5
+	other.covers = covers
 	other._pos = Vector3(perch.x, perch.y, perch.z)
 	if other.body != null:
 		other.body.global_position = other._pos
@@ -346,6 +374,7 @@ func _process(delta: float) -> void:
 	_update_hud()
 	_update_camera(delta)
 	_update_keepsake_labels()
+	_update_manners(delta)
 	if _hint != null and _hint.visible:
 		_hint_t += delta
 		if _hint_t > 8.0:
@@ -381,6 +410,13 @@ func _physics_process(_delta: float) -> void:
 	var stalk := Input.is_physical_key_pressed(KEY_CTRL) or Input.is_physical_key_pressed(KEY_C)
 	if _touch != null and _touch.stalk_held:
 		stalk = true
+	if _zoom_t > 0.0:
+		_zoom_t = maxf(0.0, _zoom_t - _delta)
+		var ang := _zoom_t * 9.0
+		dir = Vector3(sin(ang), 0.0, cos(ang))
+		sprint = true
+		stalk = false
+		ledger.note_noise("zoomies", _delta)
 	cat.set_move_input(dir, sprint, stalk)
 
 
@@ -420,6 +456,13 @@ func _on_paw() -> void:
 	if cat == null or (phase != "play" and phase != "gift"):
 		return
 	var pp := cat.paw_point()
+	if cat.is_pouncing():
+		var charged := _wiggle
+		if _chatter_t > 0.0:
+			charged = minf(1.0, charged + 0.25)
+		pp += CatManners.pounce_offset(cat.forward_dir(), charged, _manner_rng.randf_range(-1.0, 1.0))
+		_wiggle = 0.0
+	_knock_ledges(pp)
 	for m: Variant in mice:
 		if not is_instance_valid(m):
 			continue
@@ -867,6 +910,145 @@ static func block_inside(screen: Vector2, half: Vector2, vp: Vector2, margin: fl
 		and screen.y - half.y >= margin - slack \
 		and screen.x + half.x <= vp.x - margin + slack \
 		and screen.y + half.y <= vp.y - margin + slack
+
+
+func _place_cat_places() -> void:
+	var map: Array = level.get("map", [])
+	var litter_set := false
+	var ledges := 0
+	for r in map.size():
+		var row := String(map[r])
+		for c in row.length():
+			var ch := row.substr(c, 1)
+			if ch == "#":
+				var open_neighbor := Vector2i(-1, -1)
+				for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+					if HoarderGenerator.cell_walkable(level, c + d.x, r + d.y, true):
+						open_neighbor = Vector2i(c, r) + d
+						break
+				if open_neighbor.x >= 0 and covers.size() < 8:
+					covers.append(HoarderGenerator.cell_center(open_neighbor.x, open_neighbor.y))
+				if open_neighbor.x >= 0 and ledges < 3:
+					var h := 1.05
+					for s: Variant in level.get("stacks", []):
+						var sd: Dictionary = s
+						var cell: Vector2i = sd["cell"]
+						if cell == Vector2i(c, r):
+							h = float(sd["height"])
+					var top := HoarderGenerator.cell_center(c, r) + Vector3(0, h + 0.07, 0)
+					var mi := MeshInstance3D.new()
+					var box := BoxMesh.new()
+					box.size = Vector3(0.16, 0.1, 0.14)
+					mi.mesh = box
+					mi.material_override = _mat(Color(0.72, 0.58, 0.36))
+					mi.position = top
+					mi.name = "LedgeTrinket%d" % ledges
+					add_child(mi)
+					_ledge_items.append({"node": mi, "fallen": false})
+					ledges += 1
+				continue
+			if litter_set or not HoarderGenerator.cell_walkable(level, c, r, true):
+				continue
+			var center := HoarderGenerator.cell_center(c, r)
+			if center.distance_to(glenys_pos) < 3.2:
+				continue
+			litter_pos = center + Vector3(0, 0.04, 0)
+			_mesh(Vector3(0.46, 0.08, 0.34), litter_pos, Color(0.55, 0.48, 0.32))
+			litter_set = true
+
+
+func _knock_ledges(paw: Vector3) -> void:
+	for item: Variant in _ledge_items:
+		var rec: Dictionary = item
+		if bool(rec["fallen"]):
+			continue
+		var mi := rec["node"] as MeshInstance3D
+		if mi == null:
+			continue
+		var flat := Vector2(mi.global_position.x - paw.x, mi.global_position.z - paw.z).length()
+		if flat > 0.72:
+			continue
+		rec["fallen"] = true
+		var drop := mi.global_position
+		drop.y = 0.08
+		mi.global_position = drop
+		ledger.note_noise("knock", 1.0)
+
+
+func _update_manners(delta: float) -> void:
+	if cat == null or (phase != "play" and phase != "gift"):
+		return
+	_bond_cd = maxf(0.0, _bond_cd - delta)
+	_chatter_t = maxf(0.0, _chatter_t - delta)
+	var still := Vector2(cat.velocity.x, cat.velocity.z).length() < 0.3
+	if cat.anim_state == "stalk" and still and _zoom_t <= 0.0:
+		_wiggle = minf(1.0, _wiggle + delta / 0.48)
+	elif _zoom_t <= 0.0 and not cat.is_pouncing():
+		_wiggle = maxf(0.0, _wiggle - delta * 0.12)
+	if not _zoom_from_litter and litter_pos != Vector3.ZERO and cat.global_position.distance_to(litter_pos) < 0.55:
+		_zoom_from_litter = true
+		if CatManners.zoomies_wants(true, 18.5):
+			_zoom_t = 1.6
+	if not _dusk_zoom and elapsed > 6.0 and still and cat.anim_state == "idle" and CatManners.zoomies_wants(false, 18.5):
+		_idle_t += delta
+		if _idle_t >= 6.0:
+			_dusk_zoom = true
+			_zoom_t = 1.4
+	elif not still:
+		_idle_t = 0.0
+	var manner := ""
+	if _zoom_t > 0.0:
+		manner = "zoomies"
+	else:
+		var birds: Array = []
+		for b: Variant in self.birds:
+			if is_instance_valid(b):
+				birds.append((b as Node3D).global_position)
+		var seen := CatManners.chatter_bird(cat.global_position, cat.forward_dir(), _window, birds)
+		var toward_glenys := CatManners.greeting(cat.global_position, cat.forward_dir(), glenys_pos, not still)
+		var sister := 999.0
+		var sister_calm := false
+		if other != null and other.body != null:
+			sister = cat.global_position.distance_to(other.body.global_position)
+			sister_calm = other.state != "pounce" and other.state != "stalk" and cat.anim_state != "sprint"
+		if seen != Vector3.INF:
+			manner = "chatter"
+			_chatter_t = 4.0
+		elif _wiggle > 0.2 and (cat.anim_state == "stalk" or cat.is_pouncing()):
+			manner = "wiggle"
+		elif toward_glenys:
+			manner = "greet"
+		elif CatManners.groom_ready(sister, _trust, sister_calm):
+			manner = "groom"
+			if _bond_cd <= 0.0:
+				cat.heal(CatManners.groom_heal())
+				other.body.heal(CatManners.groom_heal())
+				_trust = minf(1.0, _trust + 0.15)
+				_bond_cd = 1.6
+		elif CatManners.blink_ready(sister, _trust, sister_calm):
+			manner = "blink"
+			if _bond_cd <= 0.0:
+				_trust = minf(1.0, _trust + CatManners.blink_gain())
+				cat.heal(1.5)
+				if other.body != null:
+					other.body.heal(1.5)
+				_bond_cd = 1.3
+		elif still and cat.anim_state == "idle" and not cat.is_lounging:
+			_knead_t += delta
+			manner = "loaf" if _knead_t > 2.6 else "knead"
+		else:
+			_knead_t = 0.0
+			if cat.is_lounging:
+				manner = "loaf"
+	if manner == "knead" or manner == "loaf":
+		cat.heal(CatManners.rest_heal(manner, delta))
+	cat.manner = manner
+	cat.manner_k = 1.0 if manner != "" else 0.0
+	if manner == "wiggle":
+		cat.manner_k = _wiggle
+	if _manner_label != null:
+		_manner_label.visible = manner != ""
+		_manner_label.text = manner
 
 
 func _save_shot() -> void:
