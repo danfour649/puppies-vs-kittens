@@ -20,6 +20,7 @@ const BRIEFING := 5.0
 var phase := "wait" # wait, briefing, playing, won, failed
 var fail_reason := ""
 var seconds_left := LENGTH
+var _brief_arm := 0.0
 
 var _game: Node = null
 var _brief_t := 0.0
@@ -90,6 +91,9 @@ func _open_briefing() -> void:
 		return
 	phase = "briefing"
 	_brief_t = 0.0
+	# The finger that picks a cat also synthesizes a click. Ignore that
+	# click, or the card would vanish on the same tap that opened it.
+	_brief_arm = 0.4
 	if _card != null:
 		_card.visible = true
 
@@ -99,8 +103,10 @@ func _process(delta: float) -> void:
 		return
 	if phase == "briefing":
 		# A long first frame (the web pack waking up) must not skip the card.
-		_brief_t += minf(delta, 0.25)
-		if _brief_t >= BRIEFING or _enter_pressed():
+		var step := minf(delta, 0.25)
+		_brief_t += step
+		_brief_arm = maxf(0.0, _brief_arm - step)
+		if _brief_arm <= 0.0 and (_brief_t >= BRIEFING or _enter_pressed()):
 			seconds_left = LENGTH
 			start_playing()
 	elif phase == "playing":
@@ -119,7 +125,7 @@ func _enter_pressed() -> bool:
 
 
 func _input(event: InputEvent) -> void:
-	if phase != "briefing":
+	if phase != "briefing" or _brief_arm > 0.0:
 		return
 	var tap := false
 	if event is InputEventScreenTouch:
