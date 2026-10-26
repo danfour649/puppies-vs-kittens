@@ -2,9 +2,5 @@
   "framework": null,
   "buildCommand": "",
   "installCommand": "",
-  "outputDirectory": ".",
-  "ignoreCommand": "exit 0",
-  "git": {
-    "deploymentEnabled": false
-  }
+  "outputDirectory": "."
 }
