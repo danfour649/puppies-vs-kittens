@@ -11,7 +11,7 @@ uniform vec4 fur_color : source_color = vec4(1.0);
 uniform float layer = 0.5;
 uniform float fur_length = 0.05;
 uniform bool use_tex = false;
-uniform sampler2D albedo_tex : source_color, hint_default_white;
+uniform sampler2D albedo_tex : source_color, filter_linear_mipmap_anisotropic, hint_default_white;
 uniform float density = 0.98;
 varying vec3 strand_pos;
 
@@ -51,7 +51,15 @@ void fragment() {
 	}
 	vec3 col = fur_color.rgb;
 	if (use_tex) {
-		col *= texture(albedo_tex, UV).rgb;
+		// An extruded shell inflates UV derivatives and the GPU then
+		// picks a tiny mip. Clamp the gradient so a close view still
+		// reads the full albedo, with mipmaps and anisotropy beyond that.
+		vec2 dx = dFdx(UV);
+		vec2 dy = dFdy(UV);
+		float limit = 6.0 / 2048.0;
+		dx = clamp(dx, vec2(-limit), vec2(limit));
+		dy = clamp(dy, vec2(-limit), vec2(limit));
+		col *= textureGrad(albedo_tex, UV, dx, dy).rgb;
 	}
 	col *= mix(1.02, 0.88, layer);
 	ALBEDO = col;

@@ -22,10 +22,15 @@ func _process_modification() -> void:
 		_add(sk, "spine2", Vector3(-0.45 * hiss, 0.0, 0.0))
 		_add(sk, "spine3", Vector3(-0.25 * hiss, 0.0, 0.0))
 		_add(sk, "tail00", Vector3(-0.7 * hiss, 0.0, 0.0))
+	var manner_now := str(host.get("manner"))
+	var head_owned := manner_now in ["chatter", "groom", "greet", "blink", "ambush"]
 	var head := host.get("_head") as Node3D
-	if head != null:
-		var pitch := clampf(head.rotation.x * 0.45, -0.16, 0.16)
-		var yaw := clampf(head.rotation.y * 0.55, -0.4, 0.4)
+	# The ellipsoid head is a look-around on top of the manner. Stacking
+	# it tucked the chin into the chest. A manner that owns the head
+	# is the only pitch on that bone.
+	if head != null and not head_owned:
+		var pitch := clampf(head.rotation.x * 0.45, -0.05, 0.1)
+		var yaw := clampf(head.rotation.y * 0.55, -0.35, 0.35)
 		_add(sk, "head", Vector3(pitch, yaw, 0.0))
 	var ears: Array = host.get("_ears")
 	if ears.size() == 2:

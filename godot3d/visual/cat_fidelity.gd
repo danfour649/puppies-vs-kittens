@@ -48,10 +48,12 @@ static func dress(cat: Node) -> void:
 static func _is_fur_host(mi: MeshInstance3D) -> bool:
 	if mi == null or not mi.visible or not (mi.material_override is StandardMaterial3D):
 		return false
-	# A light shell over the baked albedo, desktop only. The low tier
-	# keeps the painted coat on its own.
+	# The baked 2048 coat is the sharp one. A shell over it sampled
+	# in spatial cells and read as nearest-neighbour blocks, and the
+	# puff hid the neck. The material itself is linear, mipmapped
+	# and anisotropic. Shells stay on the primitive body only.
 	if mi.get_meta("baked_coat", false):
-		return VisualQuality.is_high()
+		return false
 	var n := str(mi.name)
 	if n == "FurShell" or n == "NoseLeather" or n.begins_with("Whisker") or n.begins_with("Pupil") or n.begins_with("Cornea") or n.begins_with("Catchlight"):
 		return false
