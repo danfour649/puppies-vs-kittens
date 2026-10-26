@@ -19,24 +19,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Download Godot 4.7
-        run: |
-          set -euo pipefail
-          mkdir -p "$HOME/godot" "$HOME/.local/share/godot/export_templates/4.7.stable"
-          curl -fsSL -o /tmp/godot.zip "https://github.com/godotengine/godot-builds/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip"
-          curl -fsSL -o /tmp/templates.tpz "https://github.com/godotengine/godot-builds/releases/download/4.7-stable/Godot_v4.7-stable_export_templates.tpz"
-          unzip -q /tmp/godot.zip -d "$HOME/godot"
-          unzip -q /tmp/templates.tpz -d /tmp/godot-templates
-          cp -a /tmp/godot-templates/templates/. "$HOME/.local/share/godot/export_templates/4.7.stable/"
-          chmod +x "$HOME/godot/Godot_v4.7-stable_linux.x86_64"
       - name: Export Web
+        run: bash scripts/export-web.sh
+      - name: Web size budget
         run: |
           set -euo pipefail
-          mkdir -p "$GITHUB_WORKSPACE/godot3d/build/web"
-          "$HOME/godot/Godot_v4.7-stable_linux.x86_64" --headless --path "$GITHUB_WORKSPACE/godot3d" --import --quit
-          "$HOME/godot/Godot_v4.7-stable_linux.x86_64" --headless --path "$GITHUB_WORKSPACE/godot3d" --export-release "Web" "$GITHUB_WORKSPACE/godot3d/build/web/index.html"
-          test -f "$GITHUB_WORKSPACE/godot3d/build/web/index.html"
-          test -f "$GITHUB_WORKSPACE/godot3d/build/web/index.wasm"
+          pck_bytes="$(stat -c%s godot3d/build/web/index.pck)"
+          wasm_bytes="$(stat -c%s godot3d/build/web/index.wasm)"
+          budget=$((15 * 1024 * 1024))
+          pck_mib="$(awk -v n="$pck_bytes" 'BEGIN { printf "%.2f", n/1048576 }')"
+          wasm_mib="$(awk -v n="$wasm_bytes" 'BEGIN { printf "%.2f", n/1048576 }')"
+          {
+            echo "### Web size"
+            echo ""
+            echo "| file | bytes | MiB |"
+            echo "| --- | ---: | ---: |"
+            echo "| index.pck | ${pck_bytes} | ${pck_mib} |"
+            echo "| index.wasm | ${wasm_bytes} | ${wasm_mib} |"
+            echo ""
+            echo "Pack budget is 15 MiB. The pack is ${pck_mib} MiB."
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$pck_bytes" -gt "$budget" ]; then
+            echo "index.pck is ${pck_bytes} bytes, over the 15 MiB budget" >&2
+            exit 1
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: willie-aggie-web
