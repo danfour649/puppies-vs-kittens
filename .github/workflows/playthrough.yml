@@ -1,0 +1,65 @@
+name: Playthrough
+
+# On every pull request, walk the yard through the front door,
+# the ground floor, the basement, and the attic. Screenshots and
+# frame times land in the job summary. A missed zone fails the job.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  play:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scripted playthrough
+        run: bash scripts/playthrough.sh
+      - name: Job summary
+        if: always()
+        run: |
+          set -euo pipefail
+          out="godot3d/build/playthrough"
+          {
+            echo "### Playthrough"
+            echo ""
+            if [ ! -f "$out/stats.json" ]; then
+              echo "The playthrough did not write stats."
+              exit 0
+            fi
+            python3 - "$out" <<'PY'
+          import base64, json, pathlib, sys
+          out = pathlib.Path(sys.argv[1])
+          stats = json.loads((out / "stats.json").read_text())
+          print(f"Boot {stats.get('boot_ms', 0)} ms. Renderer `{stats.get('renderer', '')}`.")
+          print("")
+          print("| place | zone | mean ms | median ms | p95 ms |")
+          print("| --- | --- | ---: | ---: | ---: |")
+          for leg in stats.get("legs", []):
+              mark = "" if leg.get("ok") else " FAIL"
+              print("| {name}{mark} | {zone} | {mean:.1f} | {median:.1f} | {p95:.1f} |".format(
+                  name=leg["name"], mark=mark, zone=leg["zone"],
+                  mean=float(leg["mean_ms"]), median=float(leg["median_ms"]),
+                  p95=float(leg["p95_ms"])))
+          print("")
+          print(f"Door walk {stats.get('door_frames', '?')} frames, basement {stats.get('basement_frames', '?')}, attic {stats.get('attic_frames', '?')}.")
+          print("")
+          for name in ("yard", "ground_floor", "basement", "attic"):
+              small = out / f"{name}_small.png"
+              if not small.exists():
+                  continue
+              b64 = base64.b64encode(small.read_bytes()).decode()
+              print(f'<img alt="{name}" width="480" src="data:image/png;base64,{b64}" />')
+              print("")
+          PY
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playthrough
+          path: godot3d/build/playthrough
+          if-no-files-found: ignore
