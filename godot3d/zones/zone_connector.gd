@@ -35,7 +35,8 @@ func setup(cfg: Dictionary) -> void:
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.albedo_color = Color(1.0, 0.85, 0.5, 0.35)
+	var win := LightMood.window_color(target_zone)
+	m.albedo_color = Color(win.r, win.g, win.b, 0.4)
 	disc.material_override = m
 	disc.position = Vector3(0, -position.y + 0.02, 0) # hug this zone's floor
 	disc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

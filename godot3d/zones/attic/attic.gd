@@ -161,6 +161,9 @@ func _ready() -> void:
 	_build_shell()
 	_build_props()
 	_build_lights()
+	# Dawn clutter in the open parts of the floor. Keep-rects leave
+	# the hatch, the nest, the insulation and the speed-check walks.
+	HoarderDressing.build(self, HoarderGenerator.generate_floor(HouseSpec.ATTIC, 25502))
 	_spawn_family()
 	# INTEGRATION: the zone-root contract (entry node + return
 	# connector) comes from HouseSpec — docs/massey-zones.md §9.
@@ -606,11 +609,13 @@ func _build_lights() -> void:
 	# The window shaft light: warm, tight, angled down into the room.
 	var spot := SpotLight3D.new()
 	spot.position = Vector3(5.55, 2.30, 0)
-	spot.light_color = Color(1.0, 0.88, 0.68)
-	spot.light_energy = 5.0
+	var dawn := LightMood.palette("dawn")
+	spot.light_color = dawn["window"]
+	spot.light_energy = 4.2
 	spot.spot_range = 9.0
 	spot.spot_angle = 26.0
-	spot.shadow_enabled = true
+	# Shadows on the high tier only. The web build is GL Compatibility.
+	spot.shadow_enabled = VisualQuality.is_high()
 	add_child(spot)
 	var aim := Node3D.new()
 	aim.position = Vector3(1.4, 0.1, 0)

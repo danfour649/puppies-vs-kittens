@@ -23,6 +23,8 @@ run outside zones/outside/tests_outside.tscn
 run occupants occupants/tests_occupants.tscn
 run ai ai/tests_ai.tscn
 run hoarder zones/basement/tests_hoarder.tscn
+run dressing house/tests_dressing.tscn
+run yard zones/outside/tests_yard_life.tscn
 run night zones/basement/tests_night.tscn
 run fidelity tests/test_fidelity.tscn
 echo "ALL DONE" >> "$OUT/summary.txt"
