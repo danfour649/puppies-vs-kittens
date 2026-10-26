@@ -245,6 +245,8 @@ func _ready() -> void:
 	_build_lights()
 	HouseSurfaces.dress(self, HouseSpec.BASEMENT)
 	HouseProps.dress(self, HouseSpec.BASEMENT)
+	HouseSurfaces.dress_rest(self)
+	HouseDecals.scatter(self, HouseSpec.BASEMENT)
 	FloorAmbience.attach(self, "basement")
 	_spawn_actors()
 	if not spawn_standalone_cat:
@@ -375,11 +377,11 @@ func _build_environment() -> void:
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = Color(0.03, 0.025, 0.02)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.36, 0.30, 0.23)
-	env.ambient_light_energy = 0.55
+	env.ambient_light_color = Color(0.30, 0.33, 0.38)
+	env.ambient_light_energy = 0.18
 	env.fog_enabled = true
-	env.fog_light_color = Color(0.42, 0.34, 0.22)
-	env.fog_density = 0.03
+	env.fog_light_color = Color(0.32, 0.36, 0.42)
+	env.fog_density = 0.016
 	VisualQuality.apply_environment(env, "basement")
 	we.environment = env
 	add_child(we)
@@ -667,10 +669,10 @@ func _build_lights() -> void:
 		add_child(pivot)
 		_vis_cyl(pivot, Vector3(0, -0.25, 0), 0.008, 0.5, Color(0.1, 0.1, 0.1))
 		var bulb_mat := StandardMaterial3D.new()
-		bulb_mat.albedo_color = Color(1.0, 0.85, 0.58)
+		bulb_mat.albedo_color = Color(0.86, 0.90, 0.96)
 		bulb_mat.emission_enabled = true
-		bulb_mat.emission = Color(1.0, 0.78, 0.45)
-		bulb_mat.emission_energy_multiplier = 2.2
+		bulb_mat.emission = Color(0.78, 0.86, 0.98)
+		bulb_mat.emission_energy_multiplier = 1.1
 		var bulb := MeshInstance3D.new()
 		var sm := SphereMesh.new()
 		sm.radius = 0.045
@@ -681,18 +683,27 @@ func _build_lights() -> void:
 		pivot.add_child(bulb)
 		var omni := OmniLight3D.new()
 		omni.position = Vector3(0, -0.56, 0)
-		omni.light_color = Color(1.0, 0.78, 0.50)
-		omni.light_energy = 1.25
-		omni.omni_range = 7.5
-		omni.shadow_enabled = i == 0 and VisualQuality.is_high()
+		omni.light_color = Color(0.74, 0.82, 0.96)
+		omni.light_energy = 0.48
+		omni.omni_range = 6.5
+		omni.shadow_enabled = VisualQuality.is_high()
 		if VisualQuality.is_high():
-			omni.light_volumetric_fog_energy = 0.8
+			omni.omni_shadow_mode = OmniLight3D.SHADOW_CUBE
+			omni.light_volumetric_fog_energy = 0.25
 		pivot.add_child(omni)
 		_bulbs.append([pivot, float(i) * 1.93])
 	# Dust in the bulb light. One shaft is enough; more would wash the maze.
 	if BULB_SPOTS.size() > 0:
 		var spot: Vector3 = BULB_SPOTS[0]
-		VisualQuality.add_dust_shaft(self, Vector3(spot.x, CEILING_H - 0.15, spot.z), -75.0, 15.0)
+		var shaft := VisualQuality.add_dust_shaft(self, Vector3(spot.x, CEILING_H - 0.15, spot.z), -75.0, 15.0)
+		shaft.light_color = Color(0.72, 0.80, 0.94)
+		shaft.light_energy = 1.4 if VisualQuality.is_high() else 0.7
+		var cone := shaft.get_parent().get_child(1) as MeshInstance3D
+		if cone != null:
+			var cone_mat := cone.material_override as StandardMaterial3D
+			if cone_mat != null:
+				cone_mat.albedo_color = Color(0.75, 0.82, 0.92, 0.045)
+				cone_mat.emission = Color(0.68, 0.76, 0.90)
 
 
 # --- actors --------------------------------------------------------------------------------

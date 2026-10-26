@@ -13,38 +13,29 @@ func _ready() -> void:
 		elif args[i] == "--out" and i + 1 < args.size():
 			out = args[i + 1]
 	var scene_path := "res://zones/ground_floor/ground_floor.tscn"
-	var eye := Vector3(2.2, 1.15, 2.4)
-	var at := Vector3(-1.0, 0.4, -1.2)
+	var eye := Vector3(2.4, 1.45, 1.5)
+	var at := Vector3(4.6, 0.45, -2.4)
 	if floor_id == "basement":
 		scene_path = "res://zones/basement/basement.tscn"
-		eye = Vector3(3.2, 1.45, 4.4)
-		at = Vector3(-0.4, 0.35, -0.6)
+		# South corridor sits inside the shell (z about 4.15). Look north into the maze.
+		eye = Vector3(2.2, 1.22, 3.72)
+		at = Vector3(0.15, 0.38, 0.6)
 	elif floor_id == "attic":
 		scene_path = "res://zones/attic/attic.tscn"
 		eye = Vector3(2.2, 1.25, 2.4)
 		at = Vector3(-0.8, 0.35, -1.0)
 	var zone := (load(scene_path) as PackedScene).instantiate()
 	add_child(zone)
-	# The zone's own night environment hides the surfaces. This shot
-	# is a look at the rooms, so the zone fog steps aside.
-	for n in zone.find_children("*", "WorldEnvironment", true, false):
-		n.queue_free()
-	var world := WorldEnvironment.new()
-	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.08, 0.07, 0.06)
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.72, 0.66, 0.58)
-	env.ambient_light_energy = 0.85
-	env.tonemap_mode = Environment.TONE_MAPPER_ACES
-	world.environment = env
-	add_child(world)
-	var key := DirectionalLight3D.new()
-	key.rotation_degrees = Vector3(-48, -30, 0)
-	key.light_energy = 1.3
-	key.shadow_enabled = true
-	add_child(key)
-	for i in 8:
+	# The zone keeps its own bulbs. A weak cool fill only stops the
+	# frame from going black; it does not repaint the basement.
+	var fill := OmniLight3D.new()
+	fill.light_color = Color(0.78, 0.82, 0.9)
+	fill.light_energy = 0.12 if floor_id == "basement" else 0.35
+	fill.omni_range = 28.0
+	fill.position = eye + Vector3(0, 0.4, 0)
+	fill.shadow_enabled = false
+	add_child(fill)
+	for i in 12:
 		await get_tree().process_frame
 	var cam := Camera3D.new()
 	cam.fov = 50

@@ -106,3 +106,42 @@ static func lay_kitchen(root: Node3D) -> void:
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(mi)
 		_paint(mi, "linoleum", 0.72)
+
+
+## Flat slabs the floor and wall pass leaves alone: rug, counters,
+## wainscot, picture frames, shelves, and the thin cardboard walls.
+static func dress_rest(root: Node) -> void:
+	for n: Node in root.find_children("*", "MeshInstance3D", true, false):
+		var mi := n as MeshInstance3D
+		if mi == null or not mi.visible or not (mi.mesh is BoxMesh):
+			continue
+		if mi.get_meta("house_prop", "") != "":
+			continue
+		var mat := mi.material_override as StandardMaterial3D
+		if mat != null and mat.albedo_texture != null:
+			continue
+		var size := (mi.mesh as BoxMesh).size
+		var c := mat.albedo_color if mat != null else Color(0.55, 0.45, 0.35)
+		if c.b > c.r + 0.08 and c.b > 0.55:
+			continue
+		if c.r < 0.16 and c.g < 0.16 and c.b < 0.18:
+			continue
+		var which := "hardwood"
+		var rough := 0.84
+		# Box-like cardboard (maze walls, tunnel lids, leftover piles).
+		# Long counters and stair treads stay wood.
+		var boxy := size.x < 1.7 and size.z < 1.7 and size.y > 0.08 and size.y < 2.2
+		if _cardboard(c) and boxy:
+			which = "kraft"
+			rough = 0.96
+		elif size.y < 0.08 and size.x > 1.0 and size.z > 0.8 and c.r > c.b + 0.08:
+			which = "rug"
+			rough = 0.92
+		elif c.r > 0.72 and c.g > 0.68 and (size.y > 0.35 or maxf(size.x, size.z) > 1.5):
+			which = "wallpaper"
+			rough = 0.9
+		_paint(mi, which, rough)
+
+
+static func _cardboard(c: Color) -> bool:
+	return c.r > 0.45 and c.r < 0.86 and c.g > 0.28 and c.g < 0.72 and c.b < 0.5 and c.r > c.b + 0.1

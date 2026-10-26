@@ -72,6 +72,28 @@ in the repo.
   the small shelf clutter. A further retry would have pushed the set
   past the $5 cap if the failed attempts were billed, so it was stopped.
 - Spend: about $0.03 for the five photos, plus $0.675 for the three
-  meshes that landed. If Fal also billed the fifteen empty 504s, the
-  Rapid total is 18 × $0.225 = $4.05 and the house total is about
-  $4.08. Either way it stays under $5.
+  meshes that landed. Fal's billing docs say HTTP 500 and above are
+  never charged. The fifteen empty attempts are HTTP 504
+  `downstream_service_unavailable` with no mesh in request history,
+  so they were not billed. The house total at that point was about
+  $0.705.
+- The lamp, jars, laundry, fridge, and television, plus four cardboard
+  variants (open, crushed, taped, labelled) and a grocery bag, a
+  storage bin, and a book stack, were retried on Hunyuan3D v3.1 Pro
+  text-to-3d (`fal-ai/hunyuan-3d/v3.1/pro/text-to-3d`). Published price
+  is $0.375 a generation. PBR and a custom face count were left off
+  (each would have added $0.15). All twelve returned a mesh.
+  Lamp `01a1766b-e795-7c11-996e-f9ad5323a5f5`,
+  jars `01a1766b-e7d9-7522-b694-bac9797e256c`,
+  laundry `01a1766b-e7cb-7370-bbc0-c7636a496fc3`,
+  fridge `01a1766b-e7d3-7d31-afe5-1bef9b3346c0`,
+  television `01a1766b-e7d4-7311-bbd9-15cfb1893d50`,
+  open box `01a1766b-e7cc-7920-a13b-6177617bf9d3`,
+  crushed box `01a1766b-e7c8-7fc3-9683-bf65aa764b77`,
+  taped box `01a1766b-e7d6-70f0-a997-8e3a6c1e445a`,
+  labelled box `01a1766c-0606-7c21-86f8-fd2139effe1b`,
+  bag `01a1766c-0606-7fc1-9e9a-b35d5e74191d`,
+  bin `01a1766c-0605-7792-8149-addff00135ae`,
+  books `01a1766c-0602-7962-a584-5608ea7e0852`.
+  Twelve times $0.375 is $4.50. House total: about $5.21, under the
+  $8 cap. Kraft, rug, dust, stain, and paper maps were made locally.

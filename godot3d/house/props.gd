@@ -10,6 +10,18 @@ const MESH_SIZE := {
 	"boxes": Vector3(0.636, 1.0, 0.611),
 	"papers": Vector3(2.075, 0.958, 1.733),
 	"recliner": Vector3(0.966, 1.0, 0.998),
+	"box_open": Vector3(1.683, 1.0, 1.595),
+	"box_crush": Vector3(0.824, 1.0, 1.303),
+	"box_tape": Vector3(1.187, 1.0, 1.397),
+	"box_label": Vector3(1.126, 1.0, 1.124),
+	"bags": Vector3(0.898, 1.0, 0.778),
+	"bins": Vector3(1.08, 1.0, 0.838),
+	"books": Vector3(0.753, 1.0, 0.907),
+	"lamp": Vector3(0.602, 1.0, 0.346),
+	"jars": Vector3(2.354, 1.0, 1.045),
+	"laundry": Vector3(2.723, 1.0, 2.858),
+	"fridge": Vector3(0.492, 1.0, 0.514),
+	"tv": Vector3(1.28, 1.0, 1.238),
 }
 
 const HEIGHT := {
@@ -23,18 +35,35 @@ const HEIGHT := {
 	"tv": 0.7,
 }
 
+## Closed box plus the generated variants. Missing files drop out.
+const CLUTTER := [
+	"boxes", "box_open", "box_crush", "box_tape", "box_label", "bags", "bins", "books",
+]
+
+const KRAFT := {
+	"boxes": true,
+	"box_open": true,
+	"box_crush": true,
+	"box_tape": true,
+	"box_label": true,
+	"bags": true,
+	"papers": true,
+}
+
 
 static var _scenes := {}
 
 
-static func dress(root: Node3D, floor_id: String) -> void:
+static func dress(root: Node3D, _floor_id: String) -> void:
 	_swap_clutter(root)
+	_swap_books(root)
 	_swap_tagged(root)
-	_scatter(root, floor_id)
+	_scatter(root, _floor_id)
 
 
 static func _swap_clutter(root: Node3D) -> void:
-	if _scene("boxes") == null:
+	var kinds := _clutter_kinds()
+	if kinds.is_empty():
 		return
 	var groups := {}
 	for n: Node in root.find_children("*", "MeshInstance3D", true, false):
@@ -47,7 +76,15 @@ static func _swap_clutter(root: Node3D) -> void:
 			groups[key] = []
 		(groups[key] as Array).append(mi)
 	for key: String in groups:
-		_fill(root, groups[key], "boxes")
+		_fill_clutter(root, groups[key], key, kinds)
+
+
+static func _clutter_kinds() -> Array:
+	var kinds: Array = []
+	for id: String in CLUTTER:
+		if _scene(id) != null:
+			kinds.append(id)
+	return kinds
 
 
 static func _is_clutter(mi: MeshInstance3D) -> bool:
@@ -61,19 +98,116 @@ static func _is_clutter(mi: MeshInstance3D) -> bool:
 	if kind == "stack" or kind == "wall":
 		return true
 	var size := (mi.mesh as BoxMesh).size
-	if size.x < 0.35 or size.y < 0.25 or size.z < 0.35:
+	if size.x < 0.28 or size.y < 0.22 or size.z < 0.28:
 		return false
-	if size.x > 1.45 or size.y > 1.45 or size.z > 1.45:
+	if size.x > 1.6 or size.y > 1.6 or size.z > 1.6:
 		return false
 	var longest := maxf(size.x, maxf(size.y, size.z))
 	var shortest := minf(size.x, minf(size.y, size.z))
-	if longest > shortest * 2.6:
+	if longest > shortest * 3.2:
 		return false
+	return _cardboard_color(_albedo(mi))
+
+
+static func _cardboard_color(c: Color) -> bool:
+	return c.r > 0.45 and c.r < 0.86 and c.g > 0.28 and c.g < 0.72 and c.b < 0.5 and c.r > c.b + 0.1
+
+
+static func _albedo(mi: MeshInstance3D) -> Color:
 	var mat := mi.material_override as StandardMaterial3D
-	if mat == null or mat.albedo_texture != null:
-		return false
-	var c := mat.albedo_color
-	return c.r > 0.48 and c.r < 0.82 and c.g > 0.32 and c.g < 0.68 and c.b < 0.48 and c.r > c.b + 0.12
+	if mat == null:
+		return Color(0.6, 0.48, 0.32)
+	return mat.albedo_color
+
+
+static func _fill_clutter(root: Node3D, meshes: Array, key: String, kinds: Array) -> void:
+	var lo := Vector3(INF, INF, INF)
+	var hi := Vector3(-INF, -INF, -INF)
+	for item: Variant in meshes:
+		var mi := item as MeshInstance3D
+		var he := (mi.mesh as BoxMesh).size * 0.5
+		var xf := mi.global_transform
+		for sx in [-1.0, 1.0]:
+			for sy in [-1.0, 1.0]:
+				for sz in [-1.0, 1.0]:
+					var p := xf * Vector3(he.x * sx, he.y * sy, he.z * sz)
+					lo = lo.min(p)
+					hi = hi.max(p)
+		mi.visible = false
+	var ext := hi - lo
+	if ext.y < 0.16 or ext.x < 0.12 or ext.z < 0.12:
+		return
+	var seed := absi(key.hash())
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed
+	var layers := 1
+	if ext.y > 0.55:
+		layers = 2
+	if ext.y > 1.15:
+		layers = 3
+	var footprint := minf(ext.x, ext.z)
+	var count := layers
+	if footprint > 0.75 and kinds.size() > 1:
+		count += 1
+	count = mini(count, 4)
+	var cx := (lo.x + hi.x) * 0.5
+	var cz := (lo.z + hi.z) * 0.5
+	var y := lo.y
+	for i in count:
+		var id := String(kinds[(seed + i * 3) % kinds.size()])
+		if i == count - 1 and kinds.size() > 5:
+			id = String(kinds[kinds.size() - 1 - (seed + i) % 3])
+		var bounds: Vector3 = MESH_SIZE.get(id, Vector3(0.7, 1.0, 0.7))
+		var layer_h := ext.y / float(layers)
+		var fit_h := layer_h / bounds.y
+		var fit_xz := footprint / maxf(bounds.x, bounds.z)
+		var s := minf(fit_h, fit_xz) * rng.randf_range(0.88, 1.08)
+		s = clampf(s, 0.2, 1.45)
+		var inst := _place(root, id)
+		if inst == null:
+			continue
+		var side := i == layers
+		var jx := rng.randf_range(-0.08, 0.08) * footprint
+		var jz := rng.randf_range(-0.08, 0.08) * footprint
+		if side:
+			jx += footprint * 0.28 * (1.0 if (seed + i) % 2 == 0 else -1.0)
+			y = lo.y
+		inst.global_position = Vector3(cx + jx, y, cz + jz)
+		inst.rotation.y = rng.randf() * TAU
+		inst.scale = Vector3(s, s, s)
+		_tint(inst, rng, id)
+		if not side:
+			y += bounds.y * s * 0.9
+
+
+static func _swap_books(root: Node3D) -> void:
+	if _scene("books") == null:
+		return
+	var n := 0
+	for node: Node in root.find_children("*", "MeshInstance3D", true, false):
+		var mi := node as MeshInstance3D
+		if mi == null or not mi.visible or not (mi.mesh is BoxMesh):
+			continue
+		if mi.get_meta("house_prop", "") != "":
+			continue
+		var size := (mi.mesh as BoxMesh).size
+		if size.x > 0.16 or size.y < 0.2 or size.y > 0.5 or size.z < 0.7:
+			continue
+		var c := _albedo(mi)
+		var sat := maxf(c.r, maxf(c.g, c.b)) - minf(c.r, minf(c.g, c.b))
+		if sat < 0.15:
+			continue
+		mi.visible = false
+		var inst := _place(root, "books")
+		if inst == null:
+			mi.visible = true
+			continue
+		var bounds: Vector3 = MESH_SIZE.get("books", Vector3(0.8, 1.0, 0.65))
+		var s := clampf(size.y / bounds.y, 0.18, 0.55)
+		inst.global_position = mi.global_position - Vector3(0, size.y * 0.5, 0)
+		inst.rotation.y = mi.global_rotation.y + float(n) * 0.4
+		inst.scale = Vector3(s, s, s)
+		n += 1
 
 
 static func _swap_tagged(root: Node3D) -> void:
@@ -118,13 +252,16 @@ static func _fill(root: Node3D, meshes: Array, id: String) -> void:
 		return
 	root.add_child(inst)
 	inst.global_position = Vector3((lo.x + hi.x) * 0.5, lo.y, (lo.z + hi.z) * 0.5)
-	# Box stacks fill the flat box they replace. A generated chair or
-	# appliance keeps its own proportions and stands at the group's height.
-	if id == "boxes":
-		inst.scale = Vector3(ext.x / bounds.x, ext.y / bounds.y, ext.z / bounds.z)
-	else:
-		var s := ext.y / bounds.y
-		inst.scale = Vector3(s, s, s)
+	# A generated chair or appliance keeps its own proportions.
+	# The television mesh is deep; matching the thin screen slab
+	# would squash it, so it uses its own height.
+	var s := ext.y / bounds.y
+	if HEIGHT.has(id) and id != "recliner" and id != "fridge":
+		s = float(HEIGHT[id]) / bounds.y
+	inst.scale = Vector3(s, s, s)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = absi(id.hash())
+	_tint(inst, rng, id)
 
 
 static func _scatter(root: Node3D, floor_id: String) -> void:
@@ -156,18 +293,53 @@ static func _scatter(root: Node3D, floor_id: String) -> void:
 			]
 	for spot: Array in spots:
 		var id := String(spot[0])
-		var packed := _scene(id)
-		if packed == null:
+		var inst := _place(root, id)
+		if inst == null:
 			continue
 		var bounds: Vector3 = MESH_SIZE.get(id, Vector3(0.7, 1.0, 0.7))
 		var h := float(HEIGHT.get(id, 1.0))
-		var inst := packed.instantiate() as Node3D
-		root.add_child(inst)
 		var pos: Vector3 = spot[1]
 		inst.position = pos
 		inst.rotation.y = float(spot[2])
 		var s := h / bounds.y
 		inst.scale = Vector3(s, s, s)
+		var rng := RandomNumberGenerator.new()
+		rng.seed = absi(id.hash() + int(pos.x * 10.0))
+		_tint(inst, rng, id)
+
+
+static func _place(root: Node3D, id: String) -> Node3D:
+	var packed := _scene(id)
+	if packed == null:
+		return null
+	var inst := packed.instantiate() as Node3D
+	if inst == null:
+		return null
+	root.add_child(inst)
+	return inst
+
+
+static func _tint(inst: Node3D, rng: RandomNumberGenerator, id: String) -> void:
+	var kraft := bool(KRAFT.get(id, false))
+	var tint := Color(0.72, 0.64, 0.52) if kraft else Color(1.0, 0.98, 0.96)
+	tint.r = clampf(tint.r + rng.randf_range(-0.05, 0.05), 0.35, 1.0)
+	tint.g = clampf(tint.g + rng.randf_range(-0.04, 0.04), 0.3, 1.0)
+	tint.b = clampf(tint.b + rng.randf_range(-0.03, 0.04), 0.25, 1.0)
+	var rough := rng.randf_range(0.9, 0.98) if kraft else rng.randf_range(0.72, 0.9)
+	for node: Node in inst.find_children("*", "MeshInstance3D", true, false):
+		var mi := node as MeshInstance3D
+		var src := mi.get_active_material(0) as StandardMaterial3D
+		var m := src.duplicate() as StandardMaterial3D if src != null else StandardMaterial3D.new()
+		m.albedo_color = tint
+		m.roughness = rough
+		mi.material_override = m
+	if inst is MeshInstance3D:
+		var self_mi := inst as MeshInstance3D
+		var src2 := self_mi.get_active_material(0) as StandardMaterial3D
+		var m2 := src2.duplicate() as StandardMaterial3D if src2 != null else StandardMaterial3D.new()
+		m2.albedo_color = tint
+		m2.roughness = rough
+		self_mi.material_override = m2
 
 
 static func _scene(id: String) -> PackedScene:
