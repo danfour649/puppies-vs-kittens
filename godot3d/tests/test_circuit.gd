@@ -51,6 +51,12 @@ func _run() -> void:
 	_game.input_override = {"active": false, "move": Vector2.ZERO, "sprint": false, "stalk": false}
 	check(zones.current_zone == HouseSpec.GROUND_FLOOR,
 		"walking up the porch enters the front door (at %s after %d frames)" % [cat.global_position, walked])
+	await frames(12)
+	var cam: Camera3D = _game.get_viewport().get_camera_3d()
+	var local: Vector3 = cam.global_position - HouseSpec.zone_origin(HouseSpec.GROUND_FLOOR)
+	check(not CameraFeel.outside_footprint(local, HouseSpec.ceil_h(HouseSpec.GROUND_FLOOR)),
+		"the ground-floor camera stays inside the room (%s)" % local)
+	check(_game._arm.collision_mask == 1, "the spring arm collides with the house")
 	await _settle(zones)
 
 	await _walk_into(cat, zones, Vector3(-6.5, 0.35, -201.05), Vector3(-6.5, 0.2, -203.2),

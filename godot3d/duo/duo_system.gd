@@ -169,7 +169,7 @@ func choose(id: String) -> void:
 
 # --- meows ---------------------------------------------------------------------
 
-## The player's meow action (M key / MEOW button). Willie spams it;
+## The player's meow action (M key, or a tap on the right). Willie spams it;
 ## Aggie chirps rarely. Either way it goes through emit_meow.
 func player_meow() -> void:
 	if input_locked() or player_cat == null:
@@ -363,6 +363,7 @@ func _build_hud() -> void:
 	_meter_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.55))
 	_meter_label.add_theme_constant_override("shadow_offset_x", 2)
 	_meter_label.add_theme_constant_override("shadow_offset_y", 2)
+	_meter_label.visible = false
 	_hud_layer.add_child(_meter_label)
 	_meter_bar = ProgressBar.new()
 	_meter_bar.position = Vector2(18, 148)
@@ -379,6 +380,7 @@ func _build_hud() -> void:
 	fill.bg_color = Color(1.0, 0.45, 0.2)
 	fill.set_corner_radius_all(4)
 	_meter_bar.add_theme_stylebox_override("fill", fill)
+	_meter_bar.visible = false
 	_hud_layer.add_child(_meter_bar)
 	_flash_label = Label.new()
 	_flash_label.text = "PROVOKED!"
@@ -395,16 +397,6 @@ func _build_hud() -> void:
 	_flash_label.offset_bottom = 220
 	_flash_label.visible = false
 	_hud_layer.add_child(_flash_label)
-	var meow_btn := Button.new()
-	meow_btn.text = "MEOW"
-	meow_btn.add_theme_font_size_override("font_size", 24)
-	meow_btn.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	meow_btn.offset_left = -160
-	meow_btn.offset_right = -30
-	meow_btn.offset_top = -300
-	meow_btn.offset_bottom = -190
-	meow_btn.pressed.connect(player_meow)
-	_hud_layer.add_child(meow_btn)
 	_update_meter_label()
 
 

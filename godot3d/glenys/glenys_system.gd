@@ -694,8 +694,17 @@ func _flat(a: Vector3, b: Vector3) -> float:
 	return Vector2(a.x - b.x, a.z - b.z).length()
 
 
+func tell(line: String) -> void:
+	_say(line)
+
+
 func _update_hud() -> void:
 	if _prompt == null:
+		return
+	var night: Node = game.get("night") if game != null else null
+	if night != null and (String(night.get("phase")) == "won" or String(night.get("phase")) == "failed"):
+		_prompt.text = ""
+		_bar.visible = false
 		return
 	var cat := player_target()
 	match state:

@@ -30,6 +30,7 @@ func _run() -> void:
 	await _round()
 	await _dawn()
 	await _caught()
+	await _gathered()
 	print("NIGHT RUN TESTS DONE: %d passed, %d failed" % [_pass, _fail])
 	get_tree().quit(0 if _fail == 0 else 1)
 
@@ -48,7 +49,15 @@ func _round() -> void:
 	var game = await _boot()
 	var night: NightRun = game.night
 	var obj: PvKObjectives = game.objectives
+	await frames(2)
 	check(night.phase == "playing", "the night is underway")
+	check(_named_buttons(game).is_empty(), "no RESTART, OBJECTIVES, or MEOW buttons (%s)" % " ".join(_named_buttons(game)))
+	check(night.where_text().contains("Glenys"), "the compass says where Glenys is (%s)" % night.where_text())
+	var hud := game.get_node("ObjectivesHUD") as ObjectivesHUD
+	check(hud != null and not hud.panel_visible(), "the objective list starts folded")
+	hud.toggle()
+	check(hud.panel_visible() and night.objectives_open(), "tapping the compass opens the list")
+	hud.toggle()
 	check(obj.get_item("night:threshold") != null, "coming inside is an objective")
 	check(obj.get_item("night:cellar") != null, "the basement is an objective")
 	check(obj.get_item("night:attic") != null, "the attic is an objective")
@@ -106,3 +115,34 @@ func _caught() -> void:
 	check(not night._banner.text.contains("crazy"), "the caught line stays kind")
 	game.queue_free()
 	await frames(2)
+
+
+func _gathered() -> void:
+	var game = await _boot()
+	var night: NightRun = game.night
+	game.zones.travel(HouseSpec.GROUND_FLOOR, "EntryFrontDoor", true)
+	await frames(2)
+	game.zones.travel(HouseSpec.BASEMENT, "EntryStairs", true)
+	await frames(2)
+	game.zones.travel(HouseSpec.ATTIC, "EntryHatch", true)
+	await frames(2)
+	game.zones.travel(HouseSpec.GROUND_FLOOR, "EntryFrontDoor", true)
+	await frames(4)
+	check(game.glenys.debug_grab(), "she gathers him after the rounds")
+	await frames(8)
+	check(night.phase == "won", "being gathered in after the rounds is the ending")
+	check(night._banner.text.contains("glad"), "that ending is glad, not a scolding")
+	game.queue_free()
+	await frames(2)
+
+
+func _named_buttons(node: Node) -> PackedStringArray:
+	var bad: PackedStringArray = []
+	if node is Button:
+		var t := String((node as Button).text)
+		if t == "RESTART" or t == "OBJECTIVES" or t == "MEOW":
+			bad.append(t)
+	for c: Node in node.get_children():
+		for bit: String in _named_buttons(c):
+			bad.append(bit)
+	return bad

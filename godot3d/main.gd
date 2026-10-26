@@ -53,9 +53,6 @@ var _zone_roots: Dictionary:
 		return module._zone_roots if module != null else {}
 var _faint_t := -1.0
 var _banner_t := 0.0
-var _lbl_hp: Label
-var _hp_bar: ProgressBar
-var _lbl_lives: Label
 var outside: OutsideSystem = null # OUTSIDE
 var occupants: OccupantSystem = null # OCCUPANTS (hub)
 var glenys: GlenysSystem = null # GLENYS (the cat-chaser)
@@ -74,11 +71,14 @@ var input_override := {"active": false, "move": Vector2.ZERO, "sprint": false, "
 
 var _rig: Node3D
 var _arm: SpringArm3D
-var _lbl_left: Label
-var _lbl_caught: Label
-var _lbl_time: Label
+var _status: Label
+var _hp_bar: ProgressBar
+var _prov_bar: ProgressBar
+var _confirm: Label
+var _restart_left := 0.0
 var _banner: Label
 var _touch: TouchControls3D
+var _feel: CameraFeel
 ## Shots seam: when set, the camera rig tracks this node instead of the cat.
 var cam_anchor: Node3D = null
 var _rng := RandomNumberGenerator.new()
@@ -105,6 +105,8 @@ func _ready() -> void:
 	add_child(_touch)
 	_touch.strike_pressed.connect(_on_touch_strike)
 	_touch.pounce_pressed.connect(_on_touch_pounce)
+	_touch.meow_pressed.connect(_on_touch_meow)
+	_touch.restart_pressed.connect(restart_game)
 	_touch.look_dragged.connect(_on_look_drag)
 	_spawn_mice()
 	# MASSEY MODULE: the duo (sibling cat, character select, meow +
@@ -132,6 +134,8 @@ func _ready() -> void:
 	night.name = "NightRun"
 	add_child(night)
 	night.setup(self)
+	if _touch != null and night.compass() != null:
+		_touch.pass_controls.append(night.compass())
 	# OUTSIDE: trees + squirrels, feeder birds + ambush, the street
 	# frontage (hostile traffic, the Corolla island, the fish
 	# treat) and pedestrians walking dogs.
@@ -461,11 +465,18 @@ func _build_camera() -> void:
 	add_child(_rig)
 	_arm = SpringArm3D.new()
 	_arm.spring_length = cam_dist
-	_arm.margin = 0.25
+	_arm.collision_mask = 1
+	_arm.margin = 0.22
 	_rig.add_child(_arm)
 	var cam := Camera3D.new()
+	cam.name = "GameCam"
+	cam.current = true
 	cam.fov = 55.0
 	_arm.add_child(cam)
+	_feel = CameraFeel.new()
+	_feel.name = "CameraFeel"
+	add_child(_feel)
+	_feel.bind(self, _arm, cam)
 	_rig.global_position = cat.global_position + Vector3(0, 0.3, 0)
 	_rig.rotation.y = cam_yaw
 	_arm.rotation.x = cam_pitch
@@ -474,37 +485,50 @@ func _build_camera() -> void:
 func _build_hud() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
-	_lbl_left = _hud_label(layer, "Mice Left: %d" % MOUSE_COUNT, Vector2(18, 12))
-	_lbl_caught = _hud_label(layer, "Caught: 0", Vector2(18, 48))
-	_lbl_time = _hud_label(layer, "Time: 0.0", Vector2(18, 84))
-	_lbl_hp = _hud_label(layer, "HP", Vector2(18, 176))
-	_hp_bar = ProgressBar.new()
-	_hp_bar.position = Vector2(62, 182)
-	_hp_bar.size = Vector2(150, 14)
-	_hp_bar.min_value = 0.0
-	_hp_bar.max_value = 100.0
-	_hp_bar.value = 100.0
-	_hp_bar.show_percentage = false
-	var hp_bg := StyleBoxFlat.new()
-	hp_bg.bg_color = Color(0, 0, 0, 0.55)
-	hp_bg.set_corner_radius_all(4)
-	_hp_bar.add_theme_stylebox_override("background", hp_bg)
-	var hp_fill := StyleBoxFlat.new()
-	hp_fill.bg_color = Color(0.85, 0.30, 0.25)
-	hp_fill.set_corner_radius_all(4)
-	_hp_bar.add_theme_stylebox_override("fill", hp_fill)
-	layer.add_child(_hp_bar)
-	_lbl_lives = _hud_label(layer, "Lives x 9", Vector2(224, 176))
-	var restart := Button.new()
-	restart.text = "RESTART"
-	restart.add_theme_font_size_override("font_size", 22)
-	restart.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	restart.offset_left = -150
-	restart.offset_right = -18
-	restart.offset_top = 12
-	restart.offset_bottom = 58
-	restart.pressed.connect(restart_game)
-	layer.add_child(restart)
+	var chip := PanelContainer.new()
+	chip.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	chip.offset_left = 12
+	chip.offset_top = 10
+	chip.offset_right = 196
+	chip.offset_bottom = 78
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var chip_box := StyleBoxFlat.new()
+	chip_box.bg_color = Color(0.06, 0.05, 0.06, 0.5)
+	chip_box.set_corner_radius_all(8)
+	chip_box.content_margin_left = 10
+	chip_box.content_margin_right = 10
+	chip_box.content_margin_top = 6
+	chip_box.content_margin_bottom = 6
+	chip.add_theme_stylebox_override("panel", chip_box)
+	var col := VBoxContainer.new()
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.add_child(col)
+	_status = Label.new()
+	_status.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_status.text = "%d mice · %d lives" % [MOUSE_COUNT, lives]
+	_status.add_theme_font_size_override("font_size", 15)
+	_status.add_theme_color_override("font_color", Color(0.96, 0.93, 0.86))
+	col.add_child(_status)
+	_hp_bar = _thin_bar(col, Color(0.82, 0.34, 0.3))
+	_hp_bar.visible = false
+	_prov_bar = _thin_bar(col, Color(0.95, 0.62, 0.28))
+	_prov_bar.visible = false
+	layer.add_child(chip)
+	_confirm = Label.new()
+	_confirm.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_confirm.offset_left = -280
+	_confirm.offset_right = 280
+	_confirm.offset_top = 18
+	_confirm.offset_bottom = 52
+	_confirm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_confirm.add_theme_font_size_override("font_size", 18)
+	_confirm.add_theme_color_override("font_color", Color(1, 0.96, 0.88))
+	_confirm.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.65))
+	_confirm.add_theme_constant_override("shadow_offset_x", 1)
+	_confirm.add_theme_constant_override("shadow_offset_y", 1)
+	_confirm.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_confirm.visible = false
+	layer.add_child(_confirm)
 	_banner = Label.new()
 	_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_banner.add_theme_font_size_override("font_size", 38)
@@ -521,17 +545,24 @@ func _build_hud() -> void:
 	layer.add_child(_banner)
 
 
-func _hud_label(parent: Node, text: String, pos: Vector2) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.position = pos
-	l.add_theme_font_size_override("font_size", 24)
-	l.add_theme_color_override("font_color", Color(1, 1, 1))
-	l.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.55))
-	l.add_theme_constant_override("shadow_offset_x", 2)
-	l.add_theme_constant_override("shadow_offset_y", 2)
-	parent.add_child(l)
-	return l
+func _thin_bar(parent: Node, fill_color: Color) -> ProgressBar:
+	var bar := ProgressBar.new()
+	bar.custom_minimum_size = Vector2(150, 6)
+	bar.min_value = 0.0
+	bar.max_value = 100.0
+	bar.value = 100.0
+	bar.show_percentage = false
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0, 0, 0, 0.45)
+	bg.set_corner_radius_all(3)
+	bar.add_theme_stylebox_override("background", bg)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = fill_color
+	fill.set_corner_radius_all(3)
+	bar.add_theme_stylebox_override("fill", fill)
+	parent.add_child(bar)
+	return bar
 
 
 # --- game --------------------------------------------------------------------
@@ -584,6 +615,17 @@ func _on_touch_pounce() -> void:
 		return
 	_aim_nearest_mouse()
 	_jump_or_pounce()
+
+
+func _on_touch_meow() -> void:
+	if run_over:
+		return
+	if duo != null and duo.input_locked():
+		return
+	if night != null and night.blocks_move():
+		return
+	if duo != null:
+		duo.player_meow()
 
 
 func _face_swipe() -> void:
@@ -647,13 +689,24 @@ func _on_mouse_caught(_m: PvKMouse) -> void:
 	caught_count += 1
 	if caught_count >= MOUSE_COUNT and not won:
 		won = true
-		_banner.text = "All mice caught in %.1f s!\nWillie approves. Press R to play again." % elapsed
+		_banner.text = "All mice caught in %.1f s!\nWillie approves. Press R twice to play again." % elapsed
 		_banner.visible = true
 		cat.set_lounge(true) # victory flop, Willie style
 
 
 func restart_game() -> void:
 	get_tree().reload_current_scene()
+
+
+## R asks first. A second R, or two fingers held still, starts over.
+func _arm_restart() -> void:
+	if _restart_left > 0.0:
+		restart_game()
+		return
+	_restart_left = 2.6
+	if _confirm != null:
+		_confirm.text = "Press R again to start the night over"
+		_confirm.visible = true
 
 
 ## MASSEY: Space / POUNCE — jump on the ground, pounce mid-air.
@@ -704,9 +757,9 @@ func _on_cat_poisoned(c: PvKCat, source: String) -> void:
 	run_over = true
 	duo_shake = Vector3.ZERO
 	if source == "chocolate":
-		_banner.text = "The chocolate was poison, just as warned.\nGlenys only meant it as a treat — she's beside herself.\nRun over. Press R to play again."
+		_banner.text = "The chocolate was poison, just as warned.\nGlenys only meant it as a treat — she's beside herself.\nRun over. Press R twice to play again."
 	else:
-		_banner.text = "Into the old rat poison — no coming back from that.\nRun over. Press R to play again."
+		_banner.text = "Into the old rat poison — no coming back from that.\nRun over. Press R twice to play again."
 	_banner.visible = true
 	_banner_t = 0.0
 
@@ -816,7 +869,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					if duo != null:
 						duo.player_meow()
 				KEY_R:
-					restart_game()
+					_arm_restart()
 	elif event is InputEventMouseButton:
 		var b := event as InputEventMouseButton
 		if b.pressed and b.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -835,14 +888,29 @@ func _process(delta: float) -> void:
 	_rig.rotation.y = cam_yaw
 	_arm.rotation.x = cam_pitch
 	_arm.spring_length = cam_dist
-	_lbl_left.text = "Mice Left: %d" % mice_left()
-	_lbl_caught.text = "Caught: %d" % caught_count
-	_lbl_time.text = "Time: %.1f" % elapsed
+	if _feel != null:
+		_feel.apply(cam_dist)
+	if _restart_left > 0.0:
+		_restart_left = maxf(0.0, _restart_left - delta)
+		if _restart_left <= 0.0 and _confirm != null:
+			_confirm.visible = false
+	if _status != null:
+		var line := "%d mice · %d lives" % [mice_left(), lives]
+		if objectives != null and objectives.score > 0:
+			line += " · %d" % objectives.score
+		_status.text = line
 	if objectives != null:
 		objectives.set_progress("outside:mice", caught_count)
 	if _hp_bar != null and cat != null and cat.max_hp > 0.0:
-		_hp_bar.value = 100.0 * cat.hp / cat.max_hp
-		_lbl_lives.text = "Lives x %d" % lives
+		var frac := 100.0 * cat.hp / cat.max_hp
+		_hp_bar.value = frac
+		_hp_bar.visible = frac < 98.0
+	if _prov_bar != null:
+		var meter := 0.0
+		if duo != null and duo.prov != null:
+			meter = duo.prov.meter
+		_prov_bar.value = meter
+		_prov_bar.visible = meter > 2.0
 	# The faint flow: flop for a beat, then wake up at the hub with
 	# a life spent. Never a game-over — cats have nine (and spares).
 	if cat != null and cat.is_fainted:
