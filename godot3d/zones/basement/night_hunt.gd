@@ -12,6 +12,8 @@ const CatScript := preload("res://cat_kit/cat.gd")
 const MouseScript := preload("res://zones/basement/basement_mouse.gd")
 const BirdScript := preload("res://zones/basement/songbird.gd")
 const OtherScript := preload("res://zones/basement/other_cat.gd")
+const MothScript := preload("res://zones/basement/moth.gd")
+const SpiderScript := preload("res://zones/basement/cellar_spider.gd")
 const TouchScript := preload("res://touch_controls_3d.gd")
 
 const GOAL := 3
@@ -31,7 +33,10 @@ var caught := 0
 var carrying_gift := false
 var mice: Array = []
 var birds: Array = []
+var moths: Array = []
+var cellar_spider: CellarSpider
 var other: OtherCat
+var ledger := NightLoop.new()
 var scent := CatScentMap.new()
 var elapsed := 0.0
 
@@ -50,6 +55,7 @@ var _touch: TouchControls3D
 var _ui: CanvasLayer
 var _title: Control
 var _end: Control
+var _end_body: Label
 var _hud: Label
 var _banner: Label
 var _goal: Label
@@ -80,6 +86,7 @@ func _begin() -> void:
 		return
 	_built = true
 	phase = "play"
+	ledger.setup()
 	if _title != null:
 		_title.visible = false
 	_generate()
@@ -248,6 +255,21 @@ func _spawn_cast() -> void:
 		birds.append(b)
 	for b: Variant in birds:
 		(b as Songbird).flock = birds
+	var heart_lamp := HoarderGenerator.cell_center(heart.x, heart.y) + Vector3(0, 1.6, 0)
+	var lamps: Array[Vector3] = [_window, heart_lamp]
+	for i in 4:
+		var moth := MothScript.new()
+		moth.name = "Moth%d" % i
+		add_child(moth)
+		moth.lamp = lamps[i % lamps.size()]
+		moth.cat = cat
+		moth.global_position = moth.lamp + Vector3(0.15 * float(i - 1), -0.25, 0.1 * float(i))
+		moths.append(moth)
+	cellar_spider = SpiderScript.new()
+	cellar_spider.name = "CellarSpider"
+	cellar_spider.anchor = heart_lamp + Vector3(0.85, 0.15, 0.2)
+	cellar_spider.cat = cat
+	add_child(cellar_spider)
 	var perches: Array = []
 	for route: Variant in level["vertical_routes"]:
 		perches.append((route as Dictionary)["perch"])
@@ -281,9 +303,14 @@ func _process(delta: float) -> void:
 			if not foot.is_empty():
 				_pending_sounds.append(foot)
 			scent.deposit(cat.global_position, CatNoise.scent_rate(gait) * delta)
+			ledger.note_noise(gait, delta)
+			ledger.settle(delta, gait)
 		if _meow and cat != null:
 			_pending_sounds.append(CatNoise.meow(cat.global_position))
 			cat.set_meta("meow_until_msec", Time.get_ticks_msec() + 650)
+			if cat.has_method("play_meow"):
+				cat.play_meow()
+			ledger.note_noise("meow", 1.0)
 			_meow = false
 		_live_sounds = _pending_sounds.duplicate()
 		_pending_sounds.clear()
@@ -294,6 +321,9 @@ func _process(delta: float) -> void:
 			if is_instance_valid(b):
 				(b as Songbird).sounds = _live_sounds
 				(b as Songbird).sound_sink = _pending_sounds
+		for moth: Variant in moths:
+			if is_instance_valid(moth):
+				(moth as CellarMoth).sounds = _live_sounds
 		if phase == "play" and caught >= GOAL:
 			phase = "gift"
 			carrying_gift = true
@@ -388,6 +418,7 @@ func _on_paw() -> void:
 
 func _on_mouse_caught(_m: PvKMouse) -> void:
 	caught += 1
+	ledger.note_catch(elapsed, _willie_gait() == "stalk")
 	if caught >= GOAL and phase == "play":
 		phase = "gift"
 		carrying_gift = true
@@ -396,6 +427,13 @@ func _on_mouse_caught(_m: PvKMouse) -> void:
 func _finish() -> void:
 	phase = "end"
 	carrying_gift = false
+	var gift := ledger.deliver_gift()
+	if _end_body != null:
+		_end_body.text = (
+			String(gift["line"])
+			+ "\n\nScore %d. The house was %s.\n\nThe night is over. Press R to hunt again."
+			% [int(gift["score"]), String(gift["mess_word"])]
+		)
 	if cat != null:
 		cat.set_move_input(Vector3.ZERO, false, false)
 		cat.set_lounge(true)
@@ -468,14 +506,14 @@ func _build_ui() -> void:
 	end_title.position = Vector2(0, 48)
 	end_title.size = Vector2(760, 52)
 	end_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var end_body := _label(_end,
+	_end_body = _label(_end,
 		"Glenys takes it the way you take a gift from someone you love.\n" +
 		"A little laugh, a hand on the stair rail.\n" +
 		"\"You dreadful, perfect boy.\"\n\n" +
 		"The night is over. Press R to hunt again.", 20)
-	end_body.position = Vector2(40, 140)
-	end_body.size = Vector2(680, 180)
-	end_body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_end_body.position = Vector2(40, 140)
+	_end_body.size = Vector2(680, 220)
+	_end_body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 
 func _show_title() -> void:
@@ -491,20 +529,36 @@ func _show_title() -> void:
 func _update_hud() -> void:
 	if _hud == null or phase == "title":
 		return
-	_hud.text = "Night seed %d    %s" % [level_seed, _clock()]
+	var combo_bit := ""
+	if ledger.combo > 1:
+		combo_bit = "    combo x%d" % ledger.combo
+	_hud.text = "Night seed %d    %s    score %d    house: %s%s" % [level_seed, _clock(), ledger.score, ledger.mess_word(), combo_bit]
 	if phase == "end":
 		_goal.text = ""
 		_banner.text = ""
 		return
 	if phase == "gift":
-		_goal.text = "The gift is yours. Take it to Glenys, at the light on the stairs."
+		_goal.text = "The gift is yours. Take it to Glenys, at the light on the stairs.  " + _goal_ticks()
 		_banner.text = "She is waiting."
 	else:
-		_goal.text = "Mice for Glenys: %d / %d" % [mini(caught, GOAL), GOAL]
+		_goal.text = "Mice for Glenys: %d / %d    %s" % [mini(caught, GOAL), GOAL, _goal_ticks()]
 		if other != null and other.boast != "":
 			_banner.text = other.boast
+		elif cellar_spider != null and cellar_spider.line != "":
+			_banner.text = cellar_spider.line
 		else:
 			_banner.text = "Stalk, and they only mind you if they see you. A sprint or a meow carries."
+
+
+func _goal_ticks() -> String:
+	if ledger.objectives.is_empty():
+		return ""
+	var bits: PackedStringArray = PackedStringArray()
+	for o: Variant in ledger.objectives:
+		var d: Dictionary = o
+		var mark := "x" if bool(d.get("done", false)) else " "
+		bits.append("[%s] %s" % [mark, String(d.get("title", ""))])
+	return "  ".join(bits)
 
 
 func _clock() -> String:

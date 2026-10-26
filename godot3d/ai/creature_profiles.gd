@@ -23,6 +23,12 @@ static func get_profile(id: String) -> Dictionary:
 			return songbird()
 		"other_cat":
 			return other_cat()
+		"moth":
+			return moth()
+		"spider":
+			return spider()
+		"squirrel":
+			return squirrel()
 		_:
 			return mouse()
 
@@ -101,6 +107,40 @@ static func other_cat() -> Dictionary:
 		"crouch_time": 0.35,
 		"pounce_time": 0.32,
 		"states": ["perch", "patrol", "stalk", "crouch", "pounce", "recover"],
+	}
+
+
+static func moth() -> Dictionary:
+	return {
+		"id": "moth",
+		"sight_range": 1.4,
+		"hearing_range": 3.4,
+		"orbit_radius": 0.42,
+		"orbit_speed": 1.7,
+		"panic_speed": 2.6,
+		"states": ["orbit", "startle", "resettle"],
+	}
+
+
+static func spider() -> Dictionary:
+	return {
+		"id": "spider",
+		"trigger": 1.05,
+		"drop_speed": 2.2,
+		"retreat_speed": 3.0,
+		"states": ["hang", "descend", "retreat"],
+	}
+
+
+static func squirrel() -> Dictionary:
+	return {
+		"id": "squirrel",
+		"flee_radius": 3.4,
+		"meow_radius": 6.2,
+		"calm_radius": 5.5,
+		"calm_time": 4.0,
+		"run_speed": 3.3,
+		"states": ["forage", "flee_tree", "taunt", "descend"],
 	}
 
 

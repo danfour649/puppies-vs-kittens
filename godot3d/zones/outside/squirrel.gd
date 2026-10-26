@@ -205,6 +205,12 @@ func _cat_threat() -> bool:
 	var st := String(cat.get("anim_state"))
 	if st in ["sprint", "strike"] and d < OutsideLayout.SQUIRREL_LUNGE_RADIUS:
 		return true
+	# A meow carries past the ordinary flee radius. A stalk does not.
+	var meow_loud := 0.0
+	if cat.has_meta("meow_until_msec") and Time.get_ticks_msec() < int(cat.get_meta("meow_until_msec")):
+		meow_loud = CatNoise.loudness("meow")
+	if CreatureBrain.squirrel_hears_meow(d, meow_loud, float(CreatureProfiles.squirrel()["meow_radius"])):
+		return true
 	return false
 
 
