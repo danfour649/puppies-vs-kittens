@@ -2,7 +2,7 @@
 
 The mesh is recentered, stood on y=0, and scaled so its height is 1.
 Desktop keeps about 8000 triangles and a 1024 albedo. Web keeps about
-2500 triangles and a 512 albedo. Godot then scales the prop by the
+2500 triangles and a 256 albedo. Godot then scales the prop by the
 height it should occupy.
 
     blender -b -P godot3d/tools/fit_house_props.py -- --src /tmp/prop.obj --name boxes --out godot3d/house/props
@@ -16,7 +16,7 @@ import bpy
 DESKTOP_TRIS = 8000
 WEB_TRIS = 2500
 DESKTOP_TEX = 1024
-WEB_TEX = 512
+WEB_TEX = 256
 
 
 def _args():
