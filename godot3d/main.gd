@@ -78,7 +78,6 @@ var _lbl_caught: Label
 var _lbl_time: Label
 var _banner: Label
 var _touch: TouchControls3D
-var _dragging := false
 ## Shots seam: when set, the camera rig tracks this node instead of the cat.
 var cam_anchor: Node3D = null
 var _rng := RandomNumberGenerator.new()
@@ -103,8 +102,9 @@ func _ready() -> void:
 	_build_hud()
 	_touch = TouchScene.new()
 	add_child(_touch)
-	_touch.strike_pressed.connect(attempt_strike)
-	_touch.pounce_pressed.connect(_jump_or_pounce)
+	_touch.strike_pressed.connect(_on_touch_strike)
+	_touch.pounce_pressed.connect(_on_touch_pounce)
+	_touch.look_dragged.connect(_on_look_drag)
 	_spawn_mice()
 	# MASSEY MODULE: the duo (sibling cat, character select, meow +
 	# provocation), the zones, the objectives registry and the
@@ -553,6 +553,63 @@ func attempt_strike() -> void:
 		cat.strike()
 
 
+func _on_touch_strike() -> void:
+	if duo != null and duo.input_locked():
+		return
+	_face_swipe()
+	attempt_strike()
+
+
+func _on_touch_pounce() -> void:
+	if duo != null and duo.input_locked():
+		return
+	_aim_nearest_mouse()
+	_jump_or_pounce()
+
+
+func _face_swipe() -> void:
+	if _touch == null or cat == null:
+		return
+	var swipe := _touch.swipe_dir
+	if swipe.length() < 0.25:
+		return
+	var world := _cam_relative(Vector2(swipe.x, -swipe.y))
+	if world.length() < 0.05:
+		return
+	cat.rotation.y = TouchControls3D.yaw_to_face(world)
+
+
+func _aim_nearest_mouse() -> void:
+	if cat == null:
+		return
+	var best := Vector3.ZERO
+	var best_d := 3.4
+	var found := false
+	for m: Variant in mice:
+		if not is_instance_valid(m):
+			continue
+		var mouse := m as Node3D
+		if mouse.get("state") == "caught":
+			continue
+		var d := cat.global_position.distance_to(mouse.global_position)
+		if d < best_d:
+			best_d = d
+			best = mouse.global_position
+			found = true
+	if not found:
+		return
+	var to := best - cat.global_position
+	to.y = 0.0
+	if to.length() < 0.05:
+		return
+	cat.rotation.y = TouchControls3D.yaw_to_face(to)
+
+
+func _on_look_drag(relative: Vector2) -> void:
+	cam_yaw -= relative.x * 0.005
+	cam_pitch = clampf(cam_pitch - relative.y * 0.004, -1.15, -0.08)
+
+
 func _on_paw_swiped() -> void:
 	CombatDirector.check_paw_hits(get_tree(), cat)
 	var pp := cat.paw_point()
@@ -691,6 +748,8 @@ func _physics_process(_delta: float) -> void:
 		dir = _cam_relative(Vector2(ix, iz))
 		sprint = Input.is_physical_key_pressed(KEY_SHIFT)
 		stalk = Input.is_physical_key_pressed(KEY_CTRL) or Input.is_physical_key_pressed(KEY_C)
+		if _touch != null and _touch.stalk_held:
+			stalk = true
 		# DUO: while the character select is up, the cat waits.
 		# (The input_override seam above is deliberately not locked:
 		# the smoke test drives straight through it.)
@@ -737,16 +796,10 @@ func _unhandled_input(event: InputEvent) -> void:
 					restart_game()
 	elif event is InputEventMouseButton:
 		var b := event as InputEventMouseButton
-		if b.button_index == MOUSE_BUTTON_LEFT or b.button_index == MOUSE_BUTTON_MIDDLE:
-			_dragging = b.pressed
-		elif b.pressed and b.button_index == MOUSE_BUTTON_WHEEL_UP:
+		if b.pressed and b.button_index == MOUSE_BUTTON_WHEEL_UP:
 			cam_dist = clampf(cam_dist - 0.5, 2.2, 9.0)
 		elif b.pressed and b.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			cam_dist = clampf(cam_dist + 0.5, 2.2, 9.0)
-	elif event is InputEventMouseMotion and _dragging:
-		var mm := event as InputEventMouseMotion
-		cam_yaw -= mm.relative.x * 0.005
-		cam_pitch = clampf(cam_pitch - mm.relative.y * 0.004, -1.15, -0.08)
 
 
 func _process(delta: float) -> void:

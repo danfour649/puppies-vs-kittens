@@ -14,6 +14,11 @@ var sounds: Array = []
 var _wing_l: Node3D
 var _wing_r: Node3D
 var _flap := 0.0
+## Wing tip to wing tip, in metres. Big enough to read beside a lamp.
+const WING_SPAN := 0.7
+var wing_span := WING_SPAN
+var wings_emissive := false
+var wing_material: StandardMaterial3D
 
 
 func _ready() -> void:
@@ -48,19 +53,50 @@ func _process(delta: float) -> void:
 
 func _build() -> void:
 	var root := Node3D.new()
-	root.scale = Vector3.ONE * 0.18
+	root.name = "Body"
 	add_child(root)
 	var body := Node3D.new()
 	root.add_child(body)
-	_box(body, Vector3(0.18, 0.12, 0.42), Vector3.ZERO, Color(0.72, 0.66, 0.48))
-	_wing_l = Node3D.new()
-	_wing_l.position = Vector3(-0.08, 0.02, 0)
-	body.add_child(_wing_l)
-	_box(_wing_l, Vector3(0.7, 0.02, 0.38), Vector3(-0.34, 0, 0), Color(0.86, 0.82, 0.7))
-	_wing_r = Node3D.new()
-	_wing_r.position = Vector3(0.08, 0.02, 0)
-	body.add_child(_wing_r)
-	_box(_wing_r, Vector3(0.7, 0.02, 0.38), Vector3(0.34, 0, 0), Color(0.86, 0.82, 0.7))
+	_box(body, Vector3(0.07, 0.05, 0.16), Vector3.ZERO, Color(0.55, 0.40, 0.26))
+	wing_material = _wing_mat()
+	wings_emissive = wing_material.emission_enabled and wing_material.emission_energy_multiplier >= 1.5
+	_wing_l = _wing(body, -1.0)
+	_wing_r = _wing(body, 1.0)
+	var glow := OmniLight3D.new()
+	glow.light_color = Color(1.0, 0.72, 0.32)
+	glow.light_energy = 0.85
+	glow.omni_range = 1.5
+	glow.shadow_enabled = false
+	body.add_child(glow)
+
+
+func _wing(parent: Node3D, sign: float) -> Node3D:
+	var pivot := Node3D.new()
+	pivot.position = Vector3(sign * 0.035, 0.012, 0.0)
+	parent.add_child(pivot)
+	# Two crossed quads, so the wing still reads when the camera
+	# sees it edge-on. A single thin card disappears from the side.
+	for yaw: float in [0.2, 1.05]:
+		var mi := MeshInstance3D.new()
+		var quad := QuadMesh.new()
+		quad.size = Vector2(0.34, 0.2)
+		mi.mesh = quad
+		mi.position = Vector3(sign * 0.16, 0.0, 0.0)
+		mi.rotation.y = yaw * sign
+		mi.material_override = wing_material
+		pivot.add_child(mi)
+	return pivot
+
+
+func _wing_mat() -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(1.0, 0.84, 0.46)
+	mat.roughness = 0.42
+	mat.emission_enabled = true
+	mat.emission = Color(1.0, 0.62, 0.18)
+	mat.emission_energy_multiplier = 4.0
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return mat
 
 
 func _box(parent: Node3D, size: Vector3, pos: Vector3, color: Color) -> void:

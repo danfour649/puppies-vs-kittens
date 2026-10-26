@@ -115,7 +115,7 @@ static func moth() -> Dictionary:
 		"id": "moth",
 		"sight_range": 1.4,
 		"hearing_range": 3.4,
-		"orbit_radius": 0.42,
+		"orbit_radius": 0.62,
 		"orbit_speed": 1.7,
 		"panic_speed": 2.6,
 		"states": ["orbit", "startle", "resettle"],

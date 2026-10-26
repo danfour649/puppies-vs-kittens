@@ -18,6 +18,10 @@ const TouchScript := preload("res://touch_controls_3d.gd")
 
 const GOAL := 3
 const CATCH_RADIUS := 0.72
+## A keepsake name is solid when Willie is beside it, and gone
+## once he has walked off. Only the nearest one is ever shown.
+const LABEL_FULL := 1.2
+const LABEL_GONE := 3.35
 
 @export var seed_value := 0 ## 0 = pick one at random
 @export var autostart := false
@@ -47,11 +51,23 @@ var _live_sounds: Array = []
 var _window := Vector3.ZERO
 var _rig: Node3D
 var _arm: SpringArm3D
+## Third person, close enough that Willie fills the frame. The
+## spring arm still tucks in for a stack, but it never starts
+## inside his capsule.
 var cam_yaw := PI
-var cam_pitch := -0.62
-var cam_dist := 5.4
-var _dragging := false
+var cam_pitch := -0.5
+var cam_dist := 1.25
+## When set, the rig looks at this point instead of Willie.
+## The moth close-up uses it; play leaves it off.
+var cam_lock := false
+var cam_lock_pos := Vector3.ZERO
+var keepsake_labels: Array = []
+var keepsake_points: Array = []
 var _touch: TouchControls3D
+const HINT_FILE := "user://night_gesture_hint.txt"
+const HINT_TEXT := "Tap to pounce, swipe to paw"
+var _hint: Label
+var _hint_t := 0.0
 var _ui: CanvasLayer
 var _title: Control
 var _end: Control
@@ -96,8 +112,10 @@ func _begin() -> void:
 	if _touch == null:
 		_touch = TouchScript.new()
 		add_child(_touch)
-		_touch.strike_pressed.connect(func() -> void: if cat != null: cat.strike())
-		_touch.pounce_pressed.connect(_jump_or_pounce)
+		_touch.strike_pressed.connect(_on_touch_strike)
+		_touch.pounce_pressed.connect(_on_touch_pounce)
+		_touch.look_dragged.connect(_on_look_drag)
+		_show_gesture_hint()
 
 
 func _generate() -> void:
@@ -177,15 +195,8 @@ func _build_world() -> void:
 		var pos: Vector3 = it["pos"]
 		_mesh(Vector3(0.28, 0.16, 0.22), pos, col)
 		if decade == 1960 or decade == 1980 or decade == 2010:
-			var lab := Label3D.new()
-			lab.text = String(it["name"])
-			lab.font_size = 28
-			lab.pixel_size = 0.0035
-			lab.position = pos + Vector3(0, 0.22, 0)
-			lab.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-			lab.modulate = Color(0.96, 0.93, 0.86)
-			lab.outline_size = 6
-			add_child(lab)
+			keepsake_labels.append(_keepsake_label(String(it["name"]), pos))
+			keepsake_points.append(pos)
 	var entry: Vector2i = level["entry_cell"]
 	var entry_pos := HoarderGenerator.cell_center(entry.x, entry.y)
 	_window = entry_pos + Vector3(0, 1.55, 0.4)
@@ -331,6 +342,11 @@ func _process(delta: float) -> void:
 			_finish()
 	_update_hud()
 	_update_camera(delta)
+	_update_keepsake_labels()
+	if _hint != null and _hint.visible:
+		_hint_t += delta
+		if _hint_t > 8.0:
+			_dismiss_gesture_hint()
 	if shot_path != "" and phase == "play":
 		_shot_wait += 1
 		if _shot_wait == shot_frames:
@@ -360,6 +376,8 @@ func _physics_process(_delta: float) -> void:
 	var dir := _cam_relative(Vector2(ix, iz))
 	var sprint := Input.is_physical_key_pressed(KEY_SHIFT)
 	var stalk := Input.is_physical_key_pressed(KEY_CTRL) or Input.is_physical_key_pressed(KEY_C)
+	if _touch != null and _touch.stalk_held:
+		stalk = true
 	cat.set_move_input(dir, sprint, stalk)
 
 
@@ -383,16 +401,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		var b := event as InputEventMouseButton
 		if phase == "title":
 			return
-		if b.button_index == MOUSE_BUTTON_RIGHT or b.button_index == MOUSE_BUTTON_MIDDLE:
-			_dragging = b.pressed
-		elif b.pressed and b.button_index == MOUSE_BUTTON_WHEEL_UP:
-			cam_dist = clampf(cam_dist - 0.4, 2.4, 9.0)
+		if b.pressed and b.button_index == MOUSE_BUTTON_WHEEL_UP:
+			cam_dist = clampf(cam_dist - 0.25, 1.05, 8.0)
 		elif b.pressed and b.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			cam_dist = clampf(cam_dist + 0.4, 2.4, 9.0)
-	elif event is InputEventMouseMotion and _dragging and _rig != null:
-		var mm := event as InputEventMouseMotion
-		cam_yaw -= mm.relative.x * 0.005
-		cam_pitch = clampf(cam_pitch - mm.relative.y * 0.004, -1.2, -0.15)
+			cam_dist = clampf(cam_dist + 0.25, 1.05, 8.0)
 
 
 func debug_force_gift() -> void:
@@ -441,6 +453,90 @@ func _finish() -> void:
 		_end.visible = true
 
 
+func _on_look_drag(relative: Vector2) -> void:
+	cam_yaw -= relative.x * 0.005
+	cam_pitch = clampf(cam_pitch - relative.y * 0.004, -1.2, -0.15)
+
+
+func _on_touch_strike() -> void:
+	if cat == null or phase == "title" or phase == "end":
+		return
+	_face_swipe()
+	cat.strike()
+	_dismiss_gesture_hint()
+
+
+func _on_touch_pounce() -> void:
+	_aim_nearest_mouse()
+	_jump_or_pounce()
+	_dismiss_gesture_hint()
+
+
+func gesture_hint_visible() -> bool:
+	return _hint != null and _hint.visible
+
+
+func _show_gesture_hint() -> void:
+	if FileAccess.file_exists(HINT_FILE) or _ui == null:
+		return
+	_hint = _label(_ui, HINT_TEXT, 22)
+	_hint.position = Vector2(250, 108)
+	_hint.size = Vector2(652, 36)
+	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hint.add_theme_color_override("font_shadow_color", Color(0.05, 0.03, 0.02, 0.85))
+	_hint.add_theme_constant_override("shadow_offset_x", 2)
+	_hint.add_theme_constant_override("shadow_offset_y", 2)
+	_hint_t = 0.0
+
+
+func _dismiss_gesture_hint() -> void:
+	if _hint != null:
+		_hint.visible = false
+	if FileAccess.file_exists(HINT_FILE):
+		return
+	var f := FileAccess.open(HINT_FILE, FileAccess.WRITE)
+	if f != null:
+		f.store_string("seen")
+
+
+func _face_swipe() -> void:
+	if _touch == null or cat == null:
+		return
+	var swipe := _touch.swipe_dir
+	if swipe.length() < 0.25:
+		return
+	var world := _cam_relative(Vector2(swipe.x, -swipe.y))
+	if world.length() < 0.05:
+		return
+	cat.rotation.y = TouchControls3D.yaw_to_face(world)
+
+
+func _aim_nearest_mouse() -> void:
+	if cat == null:
+		return
+	var best := Vector3.ZERO
+	var best_d := 3.4
+	var found := false
+	for m: Variant in mice:
+		if not is_instance_valid(m):
+			continue
+		var mouse := m as Node3D
+		if mouse.get("state") == "caught":
+			continue
+		var d := cat.global_position.distance_to(mouse.global_position)
+		if d < best_d:
+			best_d = d
+			best = mouse.global_position
+			found = true
+	if not found:
+		return
+	var to := best - cat.global_position
+	to.y = 0.0
+	if to.length() < 0.05:
+		return
+	cat.rotation.y = TouchControls3D.yaw_to_face(to)
+
+
 func _jump_or_pounce() -> void:
 	if cat == null or phase == "title" or phase == "end":
 		return
@@ -482,7 +578,7 @@ func _build_ui() -> void:
 	body.position = Vector2(48, 150)
 	body.size = Vector2(664, 180)
 	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var how := _label(_title, "WASD move    Shift sprint (loud)    Ctrl stalk (quiet)    F paw\nSpace jump    M meow    Right-drag looks    R starts the night over", 16)
+	var how := _label(_title, "WASD move    Shift sprint (loud)    Ctrl or hold to stalk    F paw\nSpace or left click jumps    Right click paws    M meow    Right-drag looks", 16)
 	how.position = Vector2(48, 340)
 	how.size = Vector2(664, 56)
 	how.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -568,9 +664,13 @@ func _clock() -> String:
 
 
 func _update_camera(delta: float) -> void:
-	if _rig == null or cat == null:
+	if _rig == null:
 		return
-	var target := cat.global_position + Vector3(0, 0.35, 0)
+	var target := _rig.global_position
+	if cam_lock:
+		target = cam_lock_pos
+	elif cat != null:
+		target = cat.global_position + Vector3(0, 0.26, 0)
 	_rig.global_position = _rig.global_position.lerp(target, 1.0 - exp(-8.0 * delta))
 	_rig.rotation.y = cam_yaw
 	_arm.rotation.x = cam_pitch
@@ -583,16 +683,71 @@ func _build_camera() -> void:
 	add_child(_rig)
 	_arm = SpringArm3D.new()
 	_arm.spring_length = cam_dist
-	_arm.margin = 0.2
+	_arm.margin = 0.18
 	_rig.add_child(_arm)
 	var cam := Camera3D.new()
 	cam.current = true
-	cam.fov = 58.0
+	cam.fov = 38.0
 	_arm.add_child(cam)
 	if cat != null:
-		_rig.global_position = cat.global_position + Vector3(0, 0.4, 0)
+		_arm.add_excluded_object(cat.get_rid())
+		_rig.global_position = cat.global_position + Vector3(0, 0.32, 0)
 	_rig.rotation.y = cam_yaw
 	_arm.rotation.x = cam_pitch
+
+
+## One name at a time, wrapped so a long keepsake does not run off
+## the screen, and faded out as Willie walks away from it.
+func _keepsake_label(text: String, pos: Vector3) -> Label3D:
+	var lab := Label3D.new()
+	lab.text = text
+	lab.font_size = 48
+	lab.pixel_size = 0.0025
+	lab.width = 340.0
+	lab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lab.position = pos + Vector3(0, 0.36, 0)
+	lab.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	lab.outline_size = 12
+	lab.outline_modulate = Color(0.08, 0.05, 0.04, 1.0)
+	lab.modulate = Color(0.98, 0.95, 0.88, 0.0)
+	lab.alpha_cut = Label3D.ALPHA_CUT_DISABLED
+	lab.no_depth_test = true
+	lab.visible = false
+	add_child(lab)
+	return lab
+
+
+static func keepsake_alpha(dist: float) -> float:
+	if dist <= LABEL_FULL:
+		return 1.0
+	if dist >= LABEL_GONE:
+		return 0.0
+	return 1.0 - (dist - LABEL_FULL) / (LABEL_GONE - LABEL_FULL)
+
+
+func _update_keepsake_labels() -> void:
+	if keepsake_labels.is_empty():
+		return
+	var origin := Vector3(9999, 0, 9999)
+	if cat != null:
+		origin = cat.global_position
+	var best := -1
+	var best_d := LABEL_GONE
+	for i in keepsake_points.size():
+		var d := origin.distance_to(keepsake_points[i])
+		if d < best_d - 0.001:
+			best_d = d
+			best = i
+	for i in keepsake_labels.size():
+		var lab: Label3D = keepsake_labels[i]
+		if i != best:
+			lab.visible = false
+			continue
+		var alpha := keepsake_alpha(best_d)
+		lab.visible = alpha > 0.04
+		lab.modulate = Color(0.98, 0.95, 0.88, alpha)
+		lab.outline_modulate = Color(0.08, 0.05, 0.04, alpha)
 
 
 func _save_shot() -> void:
