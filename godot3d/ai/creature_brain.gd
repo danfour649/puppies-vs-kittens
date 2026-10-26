@@ -26,6 +26,9 @@ var _recover_t := 0.0
 var _alert := false
 var _quiet_t := 0.0
 var _orbit_t := 0.0
+## A freeze holds a moment after the cue fades. Mice do not
+## unstick the instant the scent thins.
+var _freeze_hold := 0.0
 
 
 func bind_profile(id: String, seed_value: int = 1) -> void:
@@ -50,6 +53,7 @@ func bind_profile(id: String, seed_value: int = 1) -> void:
 	_alert = false
 	_quiet_t = 0.0
 	_orbit_t = 0.0
+	_freeze_hold = 0.0
 	runway.clear()
 	nibble_spots.clear()
 	_nibble_i = 0
@@ -297,6 +301,14 @@ func _step_mouse(delta: float, ctx: Dictionary) -> Dictionary:
 	elif danger >= freeze_danger:
 		next = "freeze"
 		flee_t = 0.0
+		_freeze_hold = 0.85
+		speed = 0.0
+		target = pos
+		note = "freeze"
+	elif _freeze_hold > 0.0:
+		_freeze_hold = maxf(0.0, _freeze_hold - delta)
+		next = "freeze"
+		flee_t = 0.0
 		speed = 0.0
 		target = pos
 		note = "freeze"
@@ -308,9 +320,14 @@ func _step_mouse(delta: float, ctx: Dictionary) -> Dictionary:
 		# is quiet she creeps back to the spot she was nibbling.
 		if _alert and _quiet_t >= settle and home_flat > 0.55:
 			flee_t = 0.0
+			_freeze_hold = 0.0
+			# Home along the wall, not a dash across the open. That
+			# is the nest return: thigmotaxis all the way back.
 			target = _clamp_target(home, ctx)
+			target = blend_thigmotaxis(target, ctx.get("wall_pull", Vector3.ZERO), float(profile.get("thigmotaxis", 0.0)))
+			target = _clamp_target(target, ctx)
 			remember_runway(pos)
-			return _intent("return", float(profile.get("wander_speed", 1.2)), target, false, false, "return")
+			return _intent("return", float(profile.get("wander_speed", 1.2)), target, false, false, "nest")
 		if _alert and _quiet_t >= settle:
 			_alert = false
 		if next == "flee" or next == "freeze" or next == "crack" or next == "return":
@@ -439,12 +456,22 @@ func _step_bird(delta: float, ctx: Dictionary) -> Dictionary:
 			sees = true
 	var heard := perception.loudest(pos, ctx.get("sounds", []), float(profile.get("hearing_range", 8.0)))
 	var alarm_heard := String(heard.get("kind", "")) == "alarm" and float(heard.get("loudness", 0.0)) > 0.15
-	if (sees or alarm_heard) and indoor:
-		_alarm_on = true
+	if sees and indoor:
+		# The call goes out before the flush, so a flock mate who
+		# cannot see the cat still hears it.
+		if not _alarm_on:
+			_alarm_on = true
+			return _intent("alarm", 0.0, pos, true, false, "alarm")
 		var windows: Array = ctx.get("windows", [])
 		var toward_window := not windows.is_empty()
 		var light := _nearest_light(pos, windows if toward_window else lights)
 		return _intent("panic_light", float(profile.get("panic_speed", 4.2)), light, true, false, "window" if toward_window else "light")
+	if alarm_heard and indoor:
+		_alarm_on = true
+		var windows: Array = ctx.get("windows", [])
+		var toward_window := not windows.is_empty()
+		var light := _nearest_light(pos, windows if toward_window else lights)
+		return _intent("panic_light", float(profile.get("panic_speed", 4.2)), light, true, false, "warned" if toward_window else "warned-light")
 	if sees and not indoor:
 		# First look is the alarm call. The next look, the flock mobs.
 		if _alarm_on:
