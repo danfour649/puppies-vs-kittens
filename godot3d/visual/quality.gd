@@ -51,20 +51,20 @@ func apply_environment(env: Environment, place: String) -> void:
 	if not is_high():
 		if basement:
 			env.fog_enabled = true
-			env.fog_light_color = Color(0.42, 0.34, 0.22)
-			env.fog_density = maxf(env.fog_density, 0.04)
+			env.fog_light_color = Color(0.32, 0.36, 0.42)
+			env.fog_density = maxf(env.fog_density, 0.02)
 		return
 	env.ssao_enabled = true
-	env.ssao_radius = 0.8
-	env.ssao_intensity = 1.5
-	env.ssao_power = 1.25
-	env.ssil_enabled = true
+	env.ssao_radius = 0.55 if basement else 0.7
+	env.ssao_intensity = 0.95 if basement else 1.15
+	env.ssao_power = 1.35 if basement else 1.2
+	env.ssil_enabled = not basement
 	env.ssil_radius = 2.2
-	env.ssil_intensity = 0.7
+	env.ssil_intensity = 0.55
 	env.volumetric_fog_enabled = true
-	env.volumetric_fog_density = 0.05 if basement else 0.005
-	env.volumetric_fog_albedo = Color(0.58, 0.46, 0.32) if basement else Color(0.8, 0.85, 0.92)
-	env.volumetric_fog_emission = Color(0.015, 0.01, 0.008) if basement else Color(0, 0, 0, 1)
+	env.volumetric_fog_density = 0.012 if basement else 0.005
+	env.volumetric_fog_albedo = Color(0.58, 0.64, 0.72) if basement else Color(0.8, 0.85, 0.92)
+	env.volumetric_fog_emission = Color(0.008, 0.01, 0.014) if basement else Color(0, 0, 0, 1)
 	env.volumetric_fog_length = 16.0 if basement else 64.0
 	env.volumetric_fog_gi_inject = 0.35
 	env.adjustment_enabled = true

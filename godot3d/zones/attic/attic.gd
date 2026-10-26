@@ -166,6 +166,8 @@ func _ready() -> void:
 	HoarderDressing.build(self, HoarderGenerator.generate_floor(HouseSpec.ATTIC, 25502))
 	HouseSurfaces.dress(self, HouseSpec.ATTIC)
 	HouseProps.dress(self, HouseSpec.ATTIC)
+	HouseSurfaces.dress_rest(self)
+	HouseDecals.scatter(self, HouseSpec.ATTIC)
 	FloorAmbience.attach(self, "attic")
 	_spawn_family()
 	# INTEGRATION: the zone-root contract (entry node + return

@@ -88,6 +88,12 @@ def _normalize(obj):
         v.co.y = (v.co.y - cy) * scale
         v.co.z = (v.co.z - z0) * scale
     obj.data.update()
+    pts2 = [obj.matrix_world @ v.co for v in obj.data.vertices]
+    dx = max(p.x for p in pts2) - min(p.x for p in pts2)
+    dy = max(p.y for p in pts2) - min(p.y for p in pts2)
+    dz = max(p.z for p in pts2) - min(p.z for p in pts2)
+    # Blender is Z-up here. Godot Y-up size is (dx, dz, dy).
+    print("BOUNDS", round(dx, 3), round(dz, 3), round(dy, 3))
 
 
 def _limit(obj, tris):
