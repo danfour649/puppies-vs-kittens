@@ -4,8 +4,10 @@ name: Vercel
 # only if this commit is still the tip, and a newer push cancels
 # the one already waiting. That is one production build for a
 # burst of merges. GitHub Pages still publishes from web.yml on
-# every merge to main. With no VERCEL_TOKEN the job records the
-# skip and does not spend a build.
+# every merge to main. Playthroughs stay in playthrough.yml on
+# GitHub Actions. This job exports the web build for production
+# only. With no VERCEL_TOKEN the job records the skip and does
+# not spend a build.
 on:
   push:
     branches: [main]
