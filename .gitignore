@@ -6,3 +6,6 @@ out/
 godot/build/
 godot3d/build/
 .godot/
+# Godot extracts these from the Willie glbs on import.
+godot3d/cat_kit/meshes/*willie_albedo_*.jpg
+godot3d/cat_kit/meshes/*willie_albedo_*.jpg.import

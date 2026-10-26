@@ -47,6 +47,10 @@ static func dress(cat: Node) -> void:
 static func _is_fur_host(mi: MeshInstance3D) -> bool:
 	if mi == null or not mi.visible or not (mi.material_override is StandardMaterial3D):
 		return false
+	# Hunyuan Willie already has a painted coat. Shells on that mesh
+	# read as a second skin. Aggie still uses the procedural shells.
+	if mi.get_meta("baked_coat", false):
+		return false
 	var n := str(mi.name)
 	if n == "FurShell" or n == "NoseLeather" or n.begins_with("Whisker") or n.begins_with("Pupil") or n.begins_with("Cornea") or n.begins_with("Catchlight"):
 		return false
