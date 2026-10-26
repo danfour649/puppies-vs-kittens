@@ -166,7 +166,7 @@ func _ready() -> void:
 	HoarderDressing.build(self, HoarderGenerator.generate_floor(HouseSpec.ATTIC, 25502))
 	HouseSurfaces.dress(self, HouseSpec.ATTIC)
 	HouseProps.dress(self, HouseSpec.ATTIC)
-	HouseSurfaces.dress_rest(self)
+	HouseSurfaces.dress_rest(self, HouseSpec.ATTIC)
 	HouseDecals.scatter(self, HouseSpec.ATTIC)
 	FloorAmbience.attach(self, "attic")
 	_spawn_family()

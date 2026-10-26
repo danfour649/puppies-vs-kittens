@@ -245,7 +245,7 @@ func _ready() -> void:
 	_build_lights()
 	HouseSurfaces.dress(self, HouseSpec.BASEMENT)
 	HouseProps.dress(self, HouseSpec.BASEMENT)
-	HouseSurfaces.dress_rest(self)
+	HouseSurfaces.dress_rest(self, HouseSpec.BASEMENT)
 	HouseDecals.scatter(self, HouseSpec.BASEMENT)
 	FloorAmbience.attach(self, "basement")
 	_spawn_actors()
