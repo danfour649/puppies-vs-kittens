@@ -120,7 +120,15 @@ func _mat(c: Color, rough := 0.92) -> StandardMaterial3D:
 		return _mats[c]
 	var m := StandardMaterial3D.new()
 	m.albedo_color = c
-	m.roughness = rough
+	m.roughness = 0.58 if c == SKIN else rough
+	if c == SKIN:
+		# Same trick as the cats' ears: a little transmittance so the
+		# face is not a flat painted ellipsoid.
+		m.subsurf_scatter_enabled = true
+		m.subsurf_scatter_strength = 0.4
+		m.subsurf_scatter_transmittance_enabled = true
+		m.subsurf_scatter_transmittance_color = Color(0.85, 0.38, 0.3)
+		m.subsurf_scatter_transmittance_depth = 0.08
 	_mats[c] = m
 	return m
 

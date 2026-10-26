@@ -1,0 +1,83 @@
+extends Node
+## Studio portrait of Willie (and Aggie beside him) for before/after
+## fidelity shots. Same camera every run.
+##   xvfb-run godot --path godot3d res://tools/willie_portrait.tscn -- --out /path.png
+
+const CatScript := preload("res://cat_kit/cat.gd")
+
+
+func _ready() -> void:
+	_run()
+
+
+func _run() -> void:
+	var out := "res://screenshots/willie_portrait.png"
+	var args := OS.get_cmdline_user_args()
+	for i in args.size():
+		if args[i] == "--out" and i + 1 < args.size():
+			out = args[i + 1]
+	var world := WorldEnvironment.new()
+	var env := Environment.new()
+	env.background_mode = Environment.BG_COLOR
+	env.background_color = Color(0.16, 0.17, 0.19)
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = Color(0.62, 0.62, 0.64)
+	env.ambient_light_energy = 0.7
+	env.tonemap_mode = Environment.TONE_MAPPER_ACES
+	world.environment = env
+	add_child(world)
+	var key := DirectionalLight3D.new()
+	key.rotation_degrees = Vector3(-42, -36, 0)
+	key.light_energy = 1.5
+	key.shadow_enabled = true
+	add_child(key)
+	var fill := DirectionalLight3D.new()
+	fill.rotation_degrees = Vector3(-18, 150, 0)
+	fill.light_energy = 0.45
+	fill.light_color = Color(0.8, 0.86, 1.0)
+	add_child(fill)
+	var floor := MeshInstance3D.new()
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(8, 8)
+	floor.mesh = plane
+	var fm := StandardMaterial3D.new()
+	fm.albedo_color = Color(0.2, 0.2, 0.22)
+	fm.roughness = 0.9
+	floor.material_override = fm
+	add_child(floor)
+	var willie = CatScript.new()
+	willie.name = "Willie"
+	add_child(willie)
+	# The portrait is a still. Physics gravity (22) drops the body
+	# through the visual floor before the frame is grabbed.
+	willie.set_physics_process(false)
+	willie.set_process(false)
+	willie.velocity = Vector3.ZERO
+	willie.position = Vector3(-0.22, 0.0, 0.0)
+	willie.rotation.y = 0.55
+	var aggie = CatScript.new()
+	aggie.name = "Aggie"
+	aggie.set_character("aggie")
+	add_child(aggie)
+	aggie.set_physics_process(false)
+	aggie.set_process(false)
+	aggie.velocity = Vector3.ZERO
+	aggie.position = Vector3(0.28, 0.0, 0.12)
+	aggie.rotation.y = 0.35
+	var cam := Camera3D.new()
+	cam.fov = 32
+	cam.current = true
+	add_child(cam)
+	await get_tree().process_frame
+	var head: Node3D = willie.get("_head")
+	var focus: Vector3 = head.global_position if head != null else willie.global_position + Vector3(0, 0.2, 0)
+	cam.look_at_from_position(focus + Vector3(0.22, 0.08, 0.62), focus + Vector3(0.0, -0.02, 0.0))
+	print("FOCUS ", focus, " willie ", willie.global_position)
+	for i in 4:
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	await RenderingServer.frame_post_draw
+	var img := get_viewport().get_texture().get_image()
+	var err := img.save_png(out)
+	print("PORTRAIT ", out, " ", img.get_size(), " save ", err, " shells ", willie.get("fur_shells"))
+	get_tree().quit()

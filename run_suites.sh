@@ -24,4 +24,5 @@ run occupants occupants/tests_occupants.tscn
 run ai ai/tests_ai.tscn
 run hoarder zones/basement/tests_hoarder.tscn
 run night zones/basement/tests_night.tscn
+run fidelity tests/test_fidelity.tscn
 echo "ALL DONE" >> "$OUT/summary.txt"
