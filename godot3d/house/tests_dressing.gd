@@ -109,5 +109,37 @@ func _run() -> void:
 	check(dusk_night > 0.05 and dawn_night > 0.05, "door fades differ by the hour")
 	check(LightMood.for_zone("outside") == "dusk", "the yard is dusk")
 
+	var post_host := Node3D.new()
+	add_child(post_host)
+	var post := MeshInstance3D.new()
+	var post_box := BoxMesh.new()
+	post_box.size = Vector3(0.16, 1.7, 0.16)
+	post.mesh = post_box
+	var post_mat := StandardMaterial3D.new()
+	post_mat.albedo_color = Color(0.42, 0.32, 0.22)
+	post.material_override = post_mat
+	post_host.add_child(post)
+	HouseSurfaces.dress_rest(post_host, "attic")
+	var painted := post.material_override as StandardMaterial3D
+	var tex_path := ""
+	if painted != null and painted.albedo_texture != null:
+		tex_path = painted.albedo_texture.resource_path
+	check(tex_path.find("hardwood") < 0 and tex_path.find("beam") >= 0, "an upright post uses beam wood (%s)" % tex_path)
+	var slab := MeshInstance3D.new()
+	var slab_box := BoxMesh.new()
+	slab_box.size = Vector3(4.0, 0.2, 3.0)
+	slab.mesh = slab_box
+	slab.position = Vector3(0, -2.0, 0)
+	var slab_mat := StandardMaterial3D.new()
+	slab_mat.albedo_color = Color(0.62, 0.50, 0.36)
+	slab.material_override = slab_mat
+	post_host.add_child(slab)
+	HouseSurfaces.dress_rest(post_host, "ground_floor")
+	var floor_paint := slab.material_override as StandardMaterial3D
+	var floor_path := ""
+	if floor_paint != null and floor_paint.albedo_texture != null:
+		floor_path = floor_paint.albedo_texture.resource_path
+	check(floor_path.find("hardwood") >= 0, "a flat slab keeps the floor texture (%s)" % floor_path)
+
 	print("DRESSING TESTS DONE: %d passed, %d failed" % [_pass, _fail])
 	get_tree().quit(1 if _fail > 0 else 0)

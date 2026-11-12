@@ -111,23 +111,70 @@ def paper(size):
     return rgba
 
 
+def beam(size):
+    """Rough timber. Grain runs with the image's vertical axis so a
+    triplanar side face reads as vertical grain, not floorboards."""
+    rng = np.random.default_rng(25511)
+    x = np.linspace(0.0, 10.0 * np.pi, size, endpoint=False, dtype=np.float32)
+    y = np.linspace(0.0, 2.0 * np.pi, size, endpoint=False, dtype=np.float32)
+    rings = 0.5 + 0.5 * np.sin(x[None, :] * 1.7 + np.sin(y[:, None] * 0.4) * 0.15)
+    fiber = _noise(rng, size, size, 3)
+    # Squash across X so the noise becomes long vertical fibers.
+    streak = np.array(
+        Image.fromarray(fiber).resize((max(8, size // 40), size), Image.BILINEAR).resize((size, size), Image.BILINEAR),
+        np.float32,
+    )
+    base = np.array([102, 74, 48], np.float32)
+    img = base + (rings - 0.5)[:, :, None] * np.array([64, 40, 22], np.float32)
+    img += (streak - 0.5)[:, :, None] * 10.0
+    knot = _noise(rng, size, size, 2)
+    img -= (knot > 0.82).astype(np.float32)[:, :, None] * np.array([22, 14, 8], np.float32)
+    return np.clip(img, 0, 255).astype(np.uint8)
+
+
+def beam_rough(size):
+    rng = np.random.default_rng(25512)
+    n = _noise(rng, size, size, 3)
+    rough = 188 + n * 48
+    return np.clip(rough, 0, 255).astype(np.uint8)
+
+
+def plaster(size):
+    rng = np.random.default_rng(25513)
+    n = _noise(rng, size, size, 5)
+    fine = _noise(rng, size, size, 2)
+    base = np.array([176, 168, 154], np.float32)
+    img = base + (n - 0.5)[:, :, None] * 22.0 + (fine - 0.5)[:, :, None] * 8.0
+    scuff = _noise(rng, size, size, 2)
+    img -= (scuff > 0.8).astype(np.float32)[:, :, None] * np.array([20, 16, 12], np.float32)
+    return np.clip(img, 0, 255).astype(np.uint8)
+
+
+def plaster_rough(size):
+    rng = np.random.default_rng(25514)
+    n = _noise(rng, size, size, 3)
+    rough = 214 + n * 28
+    return np.clip(rough, 0, 255).astype(np.uint8)
+
+
+def _write_pair(name, albedo, rough, lod2):
+    _save_jpg(os.path.join(ROOT, "%s_albedo_lod0.jpg" % name), albedo)
+    _save_jpg(os.path.join(ROOT, "%s_rough_lod0.jpg" % name), np.repeat(rough[:, :, None], 3, axis=2))
+    small = np.array(Image.fromarray(albedo).resize((lod2, lod2), Image.LANCZOS))
+    small_r = np.array(Image.fromarray(rough).resize((lod2, lod2), Image.LANCZOS))
+    _save_jpg(os.path.join(ROOT, "%s_albedo_lod2.jpg" % name), small)
+    _save_jpg(os.path.join(ROOT, "%s_rough_lod2.jpg" % name), np.repeat(small_r[:, :, None], 3, axis=2))
+
+
 def main():
     os.makedirs(ROOT, exist_ok=True)
-    k = kraft(1024)
-    kr = kraft_rough(1024, k)
-    r = rug(1024)
-    rr = rug_rough(1024)
-    for name, img, rough in (("kraft", k, kr), ("rug", r, rr)):
-        _save_jpg(os.path.join(ROOT, "%s_albedo_lod0.jpg" % name), img)
-        _save_jpg(os.path.join(ROOT, "%s_rough_lod0.jpg" % name), np.repeat(rough[:, :, None], 3, axis=2))
-        small = np.array(Image.fromarray(img).resize((512, 512), Image.LANCZOS))
-        small_r = np.array(Image.fromarray(rough).resize((512, 512), Image.LANCZOS))
-        _save_jpg(os.path.join(ROOT, "%s_albedo_lod2.jpg" % name), small)
-        _save_jpg(os.path.join(ROOT, "%s_rough_lod2.jpg" % name), np.repeat(small_r[:, :, None], 3, axis=2))
-    _save_png(os.path.join(ROOT, "dust.png"), _alpha_blob(256, 25505, (150, 142, 128), 0.45))
-    _save_png(os.path.join(ROOT, "stain.png"), _alpha_blob(256, 25506, (78, 58, 40), 0.55))
-    _save_png(os.path.join(ROOT, "paper.png"), paper(256))
-    print("clutter maps written")
+    # Beam and plaster only. Kraft and rug lod2 stay at 256 from the
+    # pack trim; regenerating them here would push the web pack back up.
+    b = beam(1024)
+    p = plaster(1024)
+    _write_pair("beam", b, beam_rough(1024), 256)
+    _write_pair("plaster", p, plaster_rough(1024), 256)
+    print("beam and plaster maps written")
 
 
 if __name__ == "__main__":
